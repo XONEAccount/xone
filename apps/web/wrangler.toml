@@ -1,5 +1,5 @@
 # Cloudflare Pages — frontend static site
+# Note: Pages config does not support account_id; use CLOUDFLARE_ACCOUNT_ID env instead.
 name = "xone-wallet-web"
 compatibility_date = "2025-08-10"
 pages_build_output_dir = "dist"
-account_id = "02dd7efa4ca7a4f45fe830c2636bfbff"
