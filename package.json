@@ -10,9 +10,9 @@
     "build": "pnpm -r run build",
     "typecheck": "pnpm -r run typecheck",
     "lint": "pnpm -r run lint",
-    "deploy:api": "pnpm --filter @wallet/api deploy",
-    "deploy:web": "pnpm --filter @wallet/web deploy",
-    "deploy": "pnpm deploy:api && pnpm deploy:web"
+    "deploy:api": "pnpm --filter @wallet/api run deploy",
+    "deploy:web": "pnpm --filter @wallet/web run deploy",
+    "deploy": "pnpm run deploy:api && pnpm run deploy:web"
   },
   "engines": {
     "node": ">=20"
