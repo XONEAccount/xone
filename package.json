@@ -1,0 +1,27 @@
+{
+  "name": "web3-ai-wallet",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.18.3",
+  "scripts": {
+    "dev": "pnpm -r --parallel --filter @wallet/web --filter @wallet/api run dev",
+    "dev:web": "pnpm --filter @wallet/web dev",
+    "dev:api": "pnpm --filter @wallet/api dev",
+    "build": "pnpm -r run build",
+    "typecheck": "pnpm -r run typecheck",
+    "lint": "pnpm -r run lint",
+    "deploy:api": "pnpm --filter @wallet/api deploy",
+    "deploy:web": "pnpm --filter @wallet/web deploy",
+    "deploy": "pnpm deploy:api && pnpm deploy:web"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "workerd",
+      "sharp"
+    ]
+  }
+}

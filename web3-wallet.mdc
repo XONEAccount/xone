@@ -1,0 +1,973 @@
+---
+description: Web3 AI Wallet project architecture, coding standards, and UI rules
+globs:
+  - "**/*.{ts,tsx,js,jsx,css,sql,md}"
+alwaysApply: true
+---
+
+# Web3 AI Wallet — Project Rule
+
+## 1. Product Goal
+
+Build a web-first Web3 wallet with a clean shadcn-style black-and-white UI.
+
+Core wallet capabilities:
+- User authentication
+- Create/link a wallet
+- View wallet address and balances
+- Receive assets via address / QR code
+- Send native tokens and ERC-20 tokens
+- Transaction history
+- Payment confirmation
+- Smart Account / gas sponsorship where appropriate
+
+Future capabilities:
+- AI wallet assistant
+- A2A agent integration
+- MCP tool integration
+- x402 / agent payments
+- Merchant and travel-agent integrations
+- Automated payment under explicit user-defined policy limits
+
+The product should feel closer to a modern fintech app than a crypto developer dashboard.
+
+---
+
+# 2. Approved Technology Stack
+
+## Frontend
+- React
+- TypeScript
+- Vite
+- Tailwind CSS
+- shadcn/ui
+- TanStack Query
+- Zustand
+- React Hook Form
+- Zod
+
+## Backend
+- Hono
+- TypeScript
+
+## Web3
+- thirdweb
+- thirdweb User / In-App Wallets
+- thirdweb Smart Accounts when useful
+- thirdweb Server SDK for server-side Web3 operations
+- x402 when supported by external services
+
+## Database / Auth / Infrastructure
+- Supabase
+- PostgreSQL
+- Supabase Auth
+- Supabase RLS
+- Supabase Realtime where useful
+- Supabase Storage only when needed
+
+## AI / Agents
+- OpenAI for reasoning and tool selection
+- A2A client for external agent-to-agent integrations
+- MCP client for tool integrations
+- thirdweb MCP where useful for blockchain execution
+
+Do not introduce an additional framework or infrastructure dependency unless it solves a real problem that the current stack cannot solve cleanly.
+
+---
+
+# 3. Core Architecture
+
+Use the following separation:
+
+User
+  ↓
+React Web App
+  ↓
+Hono API / Agent Orchestrator
+  ├── Supabase
+  ├── OpenAI
+  ├── A2A Clients
+  ├── MCP Clients
+  └── Payment Router
+        └── thirdweb
+              ↓
+          Blockchain
+
+Responsibilities:
+
+## React
+Responsible for:
+- UI
+- User interaction
+- Wallet presentation
+- Forms
+- Transaction confirmation UI
+- AI chat UI
+- Local UI state
+
+React must NOT contain:
+- Server secrets
+- privileged wallet operations
+- unrestricted transaction execution
+- sensitive policy decisions
+- direct database admin access
+
+## Hono
+Responsible for:
+- API gateway
+- authentication verification
+- agent orchestration
+- A2A calls
+- MCP calls
+- payment policy checks
+- transaction preparation
+- payment confirmation
+- webhook handling
+- idempotency
+- server-side thirdweb operations
+
+## Supabase
+Responsible for:
+- canonical application user identity
+- business data
+- wallet mappings
+- orders
+- agent tasks
+- payment requests
+- payments
+- audit logs
+
+## thirdweb
+Responsible for:
+- wallet infrastructure
+- blockchain transactions
+- Smart Accounts
+- gas sponsorship
+- contract interaction
+- Web3 payment execution
+- x402-related blockchain payment flows where applicable
+
+thirdweb is NOT the source of truth for application business identity.
+
+Supabase user ID is the canonical application user ID.
+
+---
+
+# 4. Identity Model
+
+Use Supabase as the canonical identity provider.
+
+Relationship:
+
+Supabase User
+  ↓
+Wallet Mapping
+  ↓
+thirdweb Wallet
+  ↓
+0x Address
+
+Never use a wallet address as the only application user ID.
+
+Suggested model:
+
+users
+- id uuid primary key
+- email
+- phone
+- display_name
+- thirdweb_user_id nullable
+- primary_wallet_address nullable
+- created_at
+- updated_at
+
+wallets
+- id uuid primary key
+- user_id uuid
+- provider
+- provider_wallet_id
+- address
+- chain_type
+- is_primary
+- created_at
+
+A user may have multiple wallets.
+
+---
+
+# 5. Core Domain Model
+
+The following domain concepts must remain separate:
+
+- User
+- Wallet
+- Agent
+- AgentTask
+- Order
+- PaymentRequest
+- Authorization
+- Payment
+- Transaction
+- AuditLog
+
+Do not collapse these into one generic "transaction" table.
+
+Important distinction:
+
+PaymentRequest = intent to pay
+
+Payment = payment execution lifecycle
+
+Transaction = actual blockchain transaction
+
+Authorization = permission granted by user or policy engine
+
+Order = commercial/business order
+
+AgentTask = task execution state
+
+---
+
+# 6. Suggested Database Tables
+
+Minimum tables:
+
+users
+wallets
+wallet_addresses
+contacts
+transactions
+agent_sessions
+agent_messages
+agent_tasks
+orders
+payment_requests
+payment_authorizations
+payments
+a2a_agents
+a2a_tasks
+audit_logs
+
+Recommended payment_requests fields:
+
+- id
+- user_id
+- agent_task_id
+- order_id
+- merchant
+- merchant_agent_id
+- asset
+- amount
+- currency
+- chain
+- recipient
+- status
+- expires_at
+- metadata
+- created_at
+- updated_at
+
+Recommended payments fields:
+
+- id
+- payment_request_id
+- provider
+- tx_hash
+- amount
+- asset
+- chain
+- status
+- submitted_at
+- confirmed_at
+- failure_reason
+- metadata
+
+Recommended audit_logs fields:
+
+- id
+- user_id
+- actor_type
+- actor_id
+- action
+- target_type
+- target_id
+- metadata
+- created_at
+
+---
+
+# 7. Payment Architecture
+
+Do not hard-code thirdweb as the only possible payment method.
+
+Use a Payment Router abstraction.
+
+Conceptual interface:
+
+```ts
+export interface PaymentProvider {
+  canPay(request: PaymentRequest): Promise<boolean>;
+
+  pay(
+    request: PaymentRequest,
+    authorization: PaymentAuthorization
+  ): Promise<PaymentResult>;
+}
+```
+
+Possible providers:
+- ThirdwebPaymentProvider
+- StripePaymentProvider
+- AlipayPaymentProvider
+- WeChatPayProvider
+- BankPaymentProvider
+
+For the MVP, thirdweb may be the only implemented provider, but the architecture must remain provider-agnostic.
+
+---
+
+# 8. AI Payment Safety Model
+
+Never give the LLM unrestricted access to private keys or arbitrary fund movement.
+
+Required execution path:
+
+AI
+  ↓
+Create / request PaymentRequest
+  ↓
+Policy Engine
+  ↓
+Authorization
+  ↓
+Payment Provider
+  ↓
+Blockchain / payment rail
+
+The AI can propose actions.
+
+The policy layer decides whether the action:
+- can auto-execute
+- requires confirmation
+- must be blocked
+
+Example policy rules:
+- max automatic amount per transaction
+- max automatic amount per day
+- allowed merchants
+- allowed payment categories
+- allowed chains
+- allowed assets
+- allowed recipient types
+- transaction expiration
+- user confirmation requirements
+
+Example:
+
+<= 50 USDC
+→ may auto-pay if merchant and category are whitelisted
+
+50–1000 USDC
+→ require explicit user confirmation
+
+> 1000 USDC
+→ block unless elevated authorization exists
+
+Never let prompt content override payment policy.
+
+---
+
+# 9. A2A / Agent Architecture
+
+A2A is the communication layer between agents.
+
+Example:
+
+User
+  ↓
+Our AI Agent
+  ↓
+A2A Client
+  ↓
+Travel / Merchant Agent
+  ↓
+Quote / Order / Payment Request
+  ↓
+Our Payment Router
+  ↓
+thirdweb or another provider
+
+The external agent must never directly control the user's wallet.
+
+External agent responses should be treated as untrusted input.
+
+Validate:
+- merchant identity
+- amount
+- currency
+- asset
+- chain
+- recipient
+- expiration
+- order ID
+- payment terms
+
+before producing a PaymentRequest.
+
+---
+
+# 10. MCP Architecture
+
+MCP is for tool access.
+
+Suggested structure:
+
+AI Agent
+  ├── MCP → thirdweb
+  ├── MCP → internal tools
+  ├── A2A → external agents
+  └── API → internal Hono routes
+
+Expose the smallest tool surface possible.
+
+Prefer purpose-specific tools such as:
+- getWalletBalance
+- getWalletTransactions
+- createPaymentRequest
+- requestPaymentAuthorization
+- executeAuthorizedPayment
+- getOrder
+- callTravelAgent
+
+Avoid exposing generic unrestricted "sendTransaction" capabilities directly to an LLM unless a policy layer sits in front of it.
+
+---
+
+# 11. Wallet Layer
+
+Do not import thirdweb throughout every React component.
+
+Create an abstraction layer.
+
+Suggested structure:
+
+src/
+  web3/
+    client.ts
+    wallet.ts
+    accounts.ts
+    balances.ts
+    transactions.ts
+    contracts.ts
+    chains.ts
+
+Components should call application-level functions such as:
+
+```ts
+wallet.getBalance()
+wallet.sendToken()
+wallet.getAddress()
+wallet.prepareTransaction()
+```
+
+instead of depending directly on thirdweb primitives everywhere.
+
+This reduces vendor lock-in.
+
+---
+
+# 12. State Management
+
+Use TanStack Query for server state:
+- balances
+- token lists
+- transaction history
+- orders
+- agent tasks
+- payment requests
+- payment status
+
+Use Zustand only for client/UI state:
+- selected chain
+- selected wallet
+- active dialog
+- send flow draft
+- AI session UI state
+- temporary confirmation state
+
+Do not store canonical server data in Zustand.
+
+---
+
+# 13. API Structure
+
+Suggested Hono route groups:
+
+/api/auth/*
+/api/users/*
+/api/wallets/*
+/api/assets/*
+/api/transactions/*
+/api/payments/*
+/api/agents/*
+/api/a2a/*
+/api/orders/*
+/api/webhooks/*
+
+Example routes:
+
+GET    /api/wallets/:id
+GET    /api/wallets/:id/balances
+GET    /api/wallets/:id/transactions
+
+POST   /api/payments/requests
+POST   /api/payments/:id/authorize
+POST   /api/payments/:id/execute
+GET    /api/payments/:id
+
+POST   /api/agents/chat
+POST   /api/agents/tasks
+GET    /api/agents/tasks/:id
+
+POST   /api/a2a/tasks
+GET    /api/a2a/tasks/:id
+
+All mutation endpoints must support safe retry / idempotency where financially relevant.
+
+---
+
+# 14. UI Style
+
+The UI must use a shadcn-inspired monochrome visual language.
+
+Primary style:
+- black
+- white
+- neutral grays
+- minimal borders
+- generous whitespace
+- restrained shadows
+- strong typography
+- no neon crypto aesthetic
+- no gradients unless explicitly requested
+- no purple/blue Web3 cliché styling
+- no glassmorphism by default
+
+The product should feel:
+- premium
+- calm
+- financial
+- modern
+- trustworthy
+- precise
+
+Reference feeling:
+- shadcn/ui
+- Linear
+- Stripe Dashboard
+- Vercel
+- modern fintech products
+
+Do not imitate any specific product pixel-for-pixel.
+
+---
+
+# 15. Color Rules
+
+Use neutral semantic tokens.
+
+Recommended base:
+- background: white / near-black depending on theme
+- foreground: near-black / near-white
+- muted: neutral gray
+- border: subtle neutral gray
+- destructive: use semantic destructive red only where necessary
+
+Prefer CSS variables and shadcn semantic tokens.
+
+Do not hard-code large numbers of arbitrary colors.
+
+Avoid:
+- crypto green everywhere
+- bright purple
+- glowing blue
+- rainbow gradients
+
+Token gain/loss colors may use semantic positive/negative styling, but keep saturation restrained.
+
+---
+
+# 16. Layout Rules
+
+Desktop:
+- left sidebar navigation
+- top account/wallet area
+- main content with max-width
+- cards with subtle borders
+- 8px or 12px radius family
+- generous spacing
+
+Mobile:
+- bottom navigation or compact header
+- sheets/drawers for actions
+- large tap targets
+- send/receive actions always easy to reach
+
+Wallet dashboard should prioritize:
+1. total balance
+2. primary actions
+3. asset list
+4. recent activity
+
+Avoid clutter.
+
+---
+
+# 17. Primary Screens
+
+Create these first:
+
+1. Sign In
+2. Wallet Dashboard
+3. Asset Detail
+4. Receive
+5. Send
+6. Transaction Confirmation
+7. Transaction Result
+8. Transaction History
+9. Contacts / Address Book
+10. AI Assistant
+11. Agent Order / Quote
+12. Payment Confirmation
+13. Settings
+14. Security / Payment Limits
+
+Dashboard example:
+
+- Total balance
+- Receive
+- Send
+- Pay
+- Assets
+- Recent activity
+
+Use shadcn Card, Button, Dialog, Sheet, Tabs, Input, Command, Table, Skeleton, Tooltip and Form primitives where appropriate.
+
+---
+
+# 18. Send Flow
+
+Send flow:
+
+Select asset
+→ Enter recipient
+→ Enter amount
+→ Validate balance
+→ Validate address
+→ Estimate fee
+→ Preview
+→ Authorization check
+→ Confirm
+→ Submit
+→ Pending
+→ Confirmed / Failed
+
+Never skip the preview step for user-initiated transfers.
+
+Confirmation UI should clearly show:
+- recipient
+- asset
+- amount
+- network
+- estimated fee
+- total
+- payment source
+
+Do not display raw chain jargon unless needed.
+
+---
+
+# 19. Receive Flow
+
+Receive screen:
+- selected network
+- selected asset if applicable
+- wallet address
+- QR code
+- copy button
+- clear warning about supported network
+
+Avoid ambiguous receive instructions.
+
+---
+
+# 20. AI Assistant UX
+
+The AI assistant should not behave like a generic chatbot.
+
+It should be task-oriented.
+
+Examples:
+- "How much USDC do I have?"
+- "Send 20 USDC to Alice."
+- "Show my spending this week."
+- "Find a flight to Shanghai tomorrow under ¥800."
+- "Pay this order."
+
+For financial actions:
+- display a structured action card
+- show amount and merchant
+- show payment method
+- show authorization requirement
+- require confirmation when policy says so
+
+Never hide a financial action inside plain chat text.
+
+---
+
+# 21. Error Handling
+
+Errors must be translated into user-friendly states.
+
+Examples:
+
+Bad:
+"execution reverted"
+
+Good:
+"Transaction failed. The token contract rejected the transfer."
+
+Bad:
+"insufficient funds for gas"
+
+Good:
+"You do not have enough network token to pay the transaction fee."
+
+When Smart Account gas sponsorship is enabled, the UI should not mention gas unless necessary.
+
+---
+
+# 22. Security Rules
+
+Never:
+- store raw private keys in Supabase
+- log private keys
+- log seed phrases
+- send secrets to the browser
+- store seed phrases in localStorage
+- expose Supabase service role keys to the client
+- let an LLM construct and execute arbitrary transfers without validation
+- trust payment recipients from external agent output without verification
+
+Use:
+- server-side secrets
+- RLS
+- secure session handling
+- explicit authorization
+- idempotency keys
+- audit logs
+- amount validation
+- chain validation
+- recipient validation
+- expiration timestamps
+- payment state machines
+
+---
+
+# 23. Financial State Machines
+
+Payment status should be explicit.
+
+Suggested payment state:
+
+created
+→ awaiting_authorization
+→ authorized
+→ submitting
+→ submitted
+→ confirming
+→ confirmed
+
+Failure states:
+- rejected
+- expired
+- failed
+- cancelled
+
+Do not represent payment status with a single boolean.
+
+Agent tasks should also use explicit lifecycle states.
+
+---
+
+# 24. Code Style
+
+Use:
+- strict TypeScript
+- named domain types
+- small modules
+- explicit return types for core payment logic
+- Zod validation at API boundaries
+- server/client separation
+- async error handling
+
+Prefer:
+```ts
+type PaymentStatus =
+  | "created"
+  | "awaiting_authorization"
+  | "authorized"
+  | "submitting"
+  | "submitted"
+  | "confirming"
+  | "confirmed"
+  | "rejected"
+  | "expired"
+  | "failed"
+  | "cancelled";
+```
+
+over:
+```ts
+isPaid: boolean
+```
+
+Avoid `any` unless there is a strong reason.
+
+---
+
+# 25. Suggested Project Structure
+
+apps/
+  web/
+    src/
+      components/
+        ui/
+        wallet/
+        payments/
+        agents/
+      features/
+        auth/
+        wallet/
+        assets/
+        transactions/
+        payments/
+        agents/
+        orders/
+      web3/
+      lib/
+      hooks/
+      stores/
+      routes/
+
+  api/
+    src/
+      routes/
+      middleware/
+      services/
+        auth/
+        wallet/
+        payment/
+        agent/
+        a2a/
+        mcp/
+      domain/
+      db/
+      lib/
+
+packages/
+  types/
+  schemas/
+  config/
+
+supabase/
+  migrations/
+  seed.sql
+
+---
+
+# 26. MVP Scope
+
+Build the MVP in this order:
+
+Phase 1:
+- Supabase auth
+- thirdweb wallet creation/linking
+- wallet address
+- balance display
+- receive
+- ERC-20 send
+- transaction history
+
+Phase 2:
+- Smart Account
+- gas sponsorship
+- contacts
+- payment requests
+- payment confirmation
+- audit logs
+
+Phase 3:
+- AI assistant
+- structured tool calls
+- payment policy engine
+- explicit authorization
+
+Phase 4:
+- A2A integration
+- external agent discovery
+- quote/order workflow
+- agent payments
+- x402 where supported
+
+Do not build cross-chain, swap, NFT, DeFi, or complex bridge functionality before the wallet/payments core is stable unless explicitly requested.
+
+---
+
+# 27. Cursor Implementation Behavior
+
+When generating code for this project:
+
+1. Follow this architecture.
+2. Prefer existing shadcn components before building custom primitives.
+3. Keep UI monochrome and minimal.
+4. Use server-side authorization for financial actions.
+5. Never put sensitive blockchain credentials in client code.
+6. Use Zod for all untrusted input.
+7. Separate payment intent from payment execution.
+8. Use Supabase as canonical application identity.
+9. Hide thirdweb behind a wallet/payment abstraction.
+10. Build features vertically: UI + API + schema + validation + error states.
+11. Do not create fake blockchain/payment success states.
+12. Do not silently auto-pay unless policy explicitly allows it.
+13. For any financial mutation, consider idempotency and retries.
+14. Prefer simple, maintainable code over premature abstraction.
+15. Keep the MVP small and production-oriented.
+
+---
+
+# 28. Default Design Prompt
+
+When asked to create or modify UI, assume:
+
+"Create a premium monochrome fintech wallet interface using React, TypeScript, Tailwind and shadcn/ui. Use a white/black/neutral-gray palette, subtle borders, generous whitespace, minimal shadows, strong typography, restrained rounded corners, and clear hierarchy. Avoid gradients, neon crypto styling, glowing effects, decorative illustrations, and unnecessary visual noise. The UI should feel like a blend of shadcn, Vercel, Linear and a modern financial product."
+
+---
+
+# 29. Product Principle
+
+The wallet is not just a wallet.
+
+The long-term product is an AI-enabled payment and agent execution layer.
+
+Therefore design every financial action around:
+
+Intent
+→ Validation
+→ Policy
+→ Authorization
+→ Execution
+→ Confirmation
+→ Audit
+
+This flow must remain explicit throughout the codebase.

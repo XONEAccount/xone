@@ -1,0 +1,10 @@
+name = "xone-wallet-api"
+main = "src/index.ts"
+compatibility_date = "2025-08-10"
+compatibility_flags = ["nodejs_compat"]
+account_id = "02dd7efa4ca7a4f45fe830c2636bfbff"
+
+[vars]
+ALLOW_DEMO_AUTH = "true"
+# Override after Pages URL is known, e.g. https://xone-wallet-web.pages.dev
+API_CORS_ORIGIN = "*"

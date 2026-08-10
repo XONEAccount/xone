@@ -1,0 +1,33 @@
+{
+  "name": "@wallet/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --env-file=.env src/node.ts",
+    "dev:worker": "wrangler dev",
+    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "start": "tsx --env-file=.env src/node.ts",
+    "deploy": "wrangler deploy",
+    "lint": "echo \"no lint yet\""
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.19.1",
+    "@supabase/supabase-js": "^2.57.4",
+    "@wallet/config": "workspace:*",
+    "@wallet/schemas": "workspace:*",
+    "@wallet/types": "workspace:*",
+    "hono": "^4.9.7",
+    "jose": "^6.2.8",
+    "thirdweb": "^5.120.1",
+    "zod": "^4.1.5"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260801.1",
+    "@types/node": "^24.3.1",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2",
+    "wrangler": "^4.28.0"
+  }
+}

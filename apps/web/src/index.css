@@ -1,0 +1,140 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  --color-background: #ffffff;
+  --color-foreground: #0a0a0a;
+  --color-muted: #f5f5f5;
+  --color-muted-foreground: #737373;
+  --color-border: #e5e5e5;
+  --color-card: #ffffff;
+  --color-primary: #0a0a0a;
+  --color-primary-foreground: #fafafa;
+  --color-destructive: #dc2626;
+  --color-ring: #0a0a0a;
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+}
+
+* {
+  border-color: var(--color-border);
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  background:
+    radial-gradient(1200px 500px at 10% -10%, #f3f3f3 0%, transparent 55%),
+    radial-gradient(900px 420px at 100% 0%, #f7f7f7 0%, transparent 50%),
+    var(--color-background);
+  color: var(--color-foreground);
+  -webkit-font-smoothing: antialiased;
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes soft-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-in {
+  animation: fade-in-up 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.fade-up {
+  animation: fade-in-up 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.fade-up.delay-1 {
+  animation-delay: 70ms;
+}
+
+.fade-up.delay-2 {
+  animation-delay: 140ms;
+}
+
+.fade-up.delay-3 {
+  animation-delay: 210ms;
+}
+
+.message-in {
+  animation: pop-in 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.pulse-soft {
+  animation: soft-pulse 1.2s ease-in-out infinite;
+}
+
+.hover-lift {
+  transition:
+    transform 180ms ease,
+    background-color 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(10, 10, 10, 0.05);
+}
+
+.balance-tick {
+  animation: fade-in 400ms ease both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-in,
+  .fade-up,
+  .message-in,
+  .pulse-soft,
+  .balance-tick,
+  .hover-lift {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+  }
+}

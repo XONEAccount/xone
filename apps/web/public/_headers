@@ -1,0 +1,5 @@
+/*
+  Cross-Origin-Opener-Policy: same-origin-allow-popups
+
+/favicon.ico
+  Cache-Control: public, max-age=86400

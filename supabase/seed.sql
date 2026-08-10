@@ -1,0 +1,2 @@
+-- Optional local seed placeholder.
+-- Prefer creating users through Supabase Auth, then insert profile rows.
