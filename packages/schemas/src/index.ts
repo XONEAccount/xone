@@ -102,6 +102,46 @@ export const a2aSettleSchema = z.object({
   title: z.string().min(1).max(200),
 });
 
+/** Create a developer agent with a restricted ETH wallet and spend caps. */
+export const createDeveloperAgentSchema = z.object({
+  ownerAddress: evmAddress,
+  name: z.string().min(1).max(80),
+  description: z.string().max(500).optional(),
+  /** Total ETH the agent may spend over its lifetime (policy cap). */
+  maxAmount: z.number().positive().max(100),
+  /** Max ETH per single machine payment. */
+  maxSinglePayment: z.number().positive().max(100),
+  /** Optional initial allowance credited after create (ETH). */
+  initialAllowance: z.number().min(0).max(100).optional(),
+});
+
+export const fundDeveloperAgentSchema = z.object({
+  ownerAddress: evmAddress,
+  amount: z.number().positive().max(100),
+  /** On-chain tx hash of ETH transfer to the agent wallet. */
+  txHash,
+});
+
+/** Machine payment via MCP tool or x402 endpoint. */
+export const machinePaySchema = z.object({
+  amount: z.string().regex(/^\d+(\.\d+)?$/, "Invalid amount"),
+  recipient: evmAddress,
+  merchant: z.string().max(120).optional(),
+  resource: z.string().max(500).optional(),
+  chain: z.string().min(1).default("ethereum-sepolia"),
+  asset: z.enum(["ETH"]).default("ETH"),
+  idempotencyKey: z.string().min(8).max(128).optional(),
+  /** When true, return HTTP 402 challenge instead of auto-executing. */
+  challengeOnly: z.boolean().optional(),
+});
+
+export const mcpJsonRpcSchema = z.object({
+  jsonrpc: z.literal("2.0").default("2.0"),
+  id: z.union([z.string(), z.number(), z.null()]).optional(),
+  method: z.string().min(1),
+  params: z.record(z.string(), z.unknown()).optional(),
+});
+
 export type CreatePaymentRequestInput = z.infer<typeof createPaymentRequestSchema>;
 export type AuthorizePaymentInput = z.infer<typeof authorizePaymentSchema>;
 export type SendTokenInput = z.infer<typeof sendTokenSchema>;
@@ -111,3 +151,7 @@ export type LinkWalletInput = z.infer<typeof linkWalletSchema>;
 export type A2AFundInput = z.infer<typeof a2aFundSchema>;
 export type A2AUpdateAgentInput = z.infer<typeof a2aUpdateAgentSchema>;
 export type A2ASettleInput = z.infer<typeof a2aSettleSchema>;
+export type CreateDeveloperAgentInput = z.infer<typeof createDeveloperAgentSchema>;
+export type FundDeveloperAgentInput = z.infer<typeof fundDeveloperAgentSchema>;
+export type MachinePayInput = z.infer<typeof machinePaySchema>;
+export type McpJsonRpcInput = z.infer<typeof mcpJsonRpcSchema>;

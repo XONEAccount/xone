@@ -152,3 +152,37 @@ export interface AgentTask {
   createdAt: string;
   updatedAt: string;
 }
+
+/** Developer-created agent with a restricted ETH spending wallet. */
+export interface DeveloperAgent {
+  id: string;
+  ownerWallet: string;
+  name: string;
+  description: string;
+  apiKeyPrefix: string;
+  walletAddress: string;
+  maxAmount: number;
+  maxSinglePayment: number;
+  spentAmount: number;
+  allowanceEth: number;
+  asset: "ETH";
+  chain: string;
+  status: "active" | "disabled";
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AgentPayment {
+  id: string;
+  agentId: string;
+  amount: number;
+  asset: string;
+  chain: string;
+  recipient: string;
+  merchant: string | null;
+  resource: string | null;
+  status: PaymentStatus;
+  provider: string;
+  failureReason: string | null;
+  createdAt: string;
+}

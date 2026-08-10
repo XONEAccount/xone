@@ -127,7 +127,7 @@ export function SendPage() {
               </label>
               <select
                 id="asset"
-                className="flex h-10 w-full rounded-md border border-[var(--color-border)] bg-white px-3 text-sm"
+                className="flex h-10 w-full rounded-md border border-border bg-white px-3 text-sm"
                 value={asset}
                 onChange={(e) => {
                   setAsset(e.target.value);
@@ -314,7 +314,7 @@ function Row({
   mono?: boolean;
 }) {
   return (
-    <div className="flex items-start justify-between gap-4 border-b border-[var(--color-border)] py-2 last:border-0">
+    <div className="flex items-start justify-between gap-4 border-b border-border py-2 last:border-0">
       <span className="text-muted-foreground">{label}</span>
       <span className={mono ? "break-all text-right font-mono text-xs" : "text-right"}>
         {value}

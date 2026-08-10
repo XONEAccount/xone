@@ -72,7 +72,7 @@ export function DashboardPage() {
 
       <section className="space-y-3 fade-up delay-2">
         <h2 className="text-sm font-medium">资产</h2>
-        <div className="divide-y divide-[var(--color-border)] rounded-md border border-[var(--color-border)] bg-white">
+        <div className="divide-y divide-[var(--color-border)] rounded-md border border-border bg-white">
           {(balances.length
             ? [...balances].sort((a, b) => (a.symbol === "ETH" ? -1 : b.symbol === "ETH" ? 1 : 0))
             : [

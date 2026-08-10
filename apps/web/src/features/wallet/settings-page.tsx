@@ -114,7 +114,7 @@ export function SettingsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center justify-between gap-4 border-b border-[var(--color-border)] pb-4">
+          <div className="flex items-center justify-between gap-4 border-b border-border pb-4">
             <div className="min-w-0">
               <p className="text-xs text-muted-foreground">钱包地址</p>
               <p className="mt-1 break-all font-mono text-sm font-medium">
@@ -124,19 +124,19 @@ export function SettingsPage() {
                 {appChainLabel} · {shortAddress(account?.address ?? "")}
               </p>
             </div>
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-[var(--color-border)] bg-muted">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-border bg-muted">
               <User className="h-4 w-4" strokeWidth={1.75} aria-hidden />
             </div>
           </div>
 
-          <div className="flex items-center justify-between gap-4 border-b border-[var(--color-border)] pb-4">
+          <div className="flex items-center justify-between gap-4 border-b border-border pb-4">
             <div>
               <p className="text-xs text-muted-foreground">登录方式</p>
               <p className="mt-1 text-sm font-medium">{activeWallet?.id ?? "thirdweb"}</p>
             </div>
           </div>
 
-          <div className="flex items-center justify-between gap-4 border-b border-[var(--color-border)] pb-4">
+          <div className="flex items-center justify-between gap-4 border-b border-border pb-4">
             <div>
               <p className="text-xs text-muted-foreground">语言</p>
               <p className="mt-1 text-sm font-medium">{locale === "zh" ? "中文" : "English"}</p>
@@ -159,7 +159,7 @@ export function SettingsPage() {
           className={cn(
             "message-in rounded-md border px-4 py-3 text-sm",
             toast.tone === "ok"
-              ? "border-[var(--color-border)] bg-muted"
+              ? "border-border bg-muted"
               : "border-[var(--color-destructive)]/30 bg-red-50 text-destructive",
           )}
           role="status"
@@ -288,7 +288,7 @@ export function SettingsPage() {
 
 function ConfirmRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-start justify-between gap-4 border-b border-[var(--color-border)] py-2 last:border-0">
+    <div className="flex items-start justify-between gap-4 border-b border-border py-2 last:border-0">
       <span className="text-muted-foreground">{label}</span>
       <span className="text-right font-medium">{value}</span>
     </div>

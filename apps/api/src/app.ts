@@ -5,9 +5,12 @@ import { getEnv } from "./lib/env.js";
 import { a2a } from "./routes/a2a.js";
 import { agents } from "./routes/agents.js";
 import { auth } from "./routes/auth.js";
+import { developer } from "./routes/developer.js";
+import { mcp } from "./routes/mcp.js";
 import { payments } from "./routes/payments.js";
 import { transactions } from "./routes/transactions.js";
 import { wallets } from "./routes/wallets.js";
+import { x402 } from "./routes/x402.js";
 
 type AppEnv = {
   Bindings: WorkerBindings;
@@ -62,8 +65,15 @@ export function createApp() {
     const env = getEnv();
     return cors({
       origin: env.corsOrigin === "*" ? "*" : env.corsOrigin,
-      allowHeaders: ["Content-Type", "Authorization", "Idempotency-Key"],
+      allowHeaders: [
+        "Content-Type",
+        "Authorization",
+        "Idempotency-Key",
+        "X-PAYMENT",
+        "X-Payment-Required",
+      ],
       allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+      exposeHeaders: ["X-Payment-Required"],
     })(c, next);
   });
 
@@ -92,6 +102,9 @@ export function createApp() {
   app.route("/api/a2a", a2a);
   app.route("/api/payments", payments);
   app.route("/api/agents", agents);
+  app.route("/api/developer", developer);
+  app.route("/api/mcp", mcp);
+  app.route("/api/x402", x402);
 
   app.notFound((c) => c.json({ error: "Not found" }, 404));
 

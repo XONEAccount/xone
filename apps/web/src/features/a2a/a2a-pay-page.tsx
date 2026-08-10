@@ -22,7 +22,7 @@ const AGENT_ICONS: Record<string, LucideIcon> = {
 };
 
 /**
- * 商家列表：已对接 Agent，并为每个 Agent 配置限额。
+ * Agent list：已对接 Agent，并为每个 Agent 配置限额。
  */
 export function A2APayPage() {
   const agents = useA2AStore((s) => s.agents);
@@ -74,14 +74,14 @@ export function A2APayPage() {
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6 animate-in">
-      <PageHeader icon={WalletCards} title="商家列表" />
+      <PageHeader icon={WalletCards} title="Agent list" />
 
       {toast ? (
         <div
           className={cn(
             "message-in rounded-md border px-4 py-3 text-sm",
             toast.tone === "ok"
-              ? "border-[var(--color-border)] bg-muted"
+              ? "border-border bg-muted"
               : "border-[var(--color-destructive)]/30 bg-red-50 text-destructive",
           )}
           role="status"
@@ -106,11 +106,11 @@ export function A2APayPage() {
               <CardHeader className="gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="space-y-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-md border border-[var(--color-border)] bg-muted">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-md border border-border bg-muted">
                       <Icon className="h-4 w-4" strokeWidth={1.75} aria-hidden />
                     </span>
                     <CardTitle>{agent.name}</CardTitle>
-                    <span className="rounded-md border border-[var(--color-border)] px-2 py-0.5 text-xs text-muted-foreground">
+                    <span className="rounded-md border border-border px-2 py-0.5 text-xs text-muted-foreground">
                       {agent.category}
                     </span>
                     <span

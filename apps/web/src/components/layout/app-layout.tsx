@@ -4,8 +4,10 @@ import {
   ArrowLeftRight,
   ArrowUpRight,
   Bot,
+  Code2,
   CreditCard,
   Home,
+  List,
   MessageSquare,
   PanelLeft,
   PanelLeftClose,
@@ -38,12 +40,15 @@ const navItems = [
   { to: "/app", label: "首页", end: true, icon: Home },
   { to: "/app/send", label: "转账", icon: ArrowLeftRight },
   { to: "/app/receive", label: "收款", icon: QrCode },
+  { to: "/app/developers", label: "创建 Agent", end: true, icon: Code2 },
+  { to: "/app/developers/agents", label: "我的 Agents", icon: Bot },
+  { to: "/app/merchants", label: "Agent list", icon: Store },
+  { to: "/app/ledger/a2a", label: "A2A 明细", icon: List },
   { to: "/app/pay", label: "充值", icon: CreditCard },
   { to: "/app/ledger/payments", label: "转账明细", icon: ArrowUpRight },
   { to: "/app/ledger/receive", label: "收款明细", icon: ArrowDownLeft },
   { to: "/app/chat", label: "对话", icon: MessageSquare },
-  { to: "/app/merchants", label: "商家列表", icon: Store },
-  { to: "/app/ledger/a2a", label: "A2A 明细", icon: Bot },
+
   { to: "/app/settings", label: "设置", icon: Settings },
 ];
 
@@ -68,7 +73,7 @@ export function AppLayout() {
       <div className="flex min-h-screen">
         <aside
           className={cn(
-            "hidden shrink-0 overflow-hidden border-r border-[var(--color-border)] bg-white/70 backdrop-blur-sm transition-[width,padding,opacity] duration-300 ease-out md:block",
+            "hidden shrink-0 overflow-hidden border-r border-border bg-white/70 backdrop-blur-sm transition-[width,padding,opacity] duration-300 ease-out md:block",
             sidebarOpen ? "w-56 p-6 opacity-100" : "w-0 border-r-0 p-0 opacity-0",
           )}
           aria-hidden={!sidebarOpen}
@@ -80,7 +85,7 @@ export function AppLayout() {
             )}
           >
             <div className="mb-10 flex items-center gap-2.5">
-              <div className="flex h-9 w-9 items-center justify-center rounded-md border border-[var(--color-border)] bg-muted">
+              <div className="flex h-9 w-9 items-center justify-center rounded-md border border-border bg-muted">
                 <Wallet className="h-4 w-4" strokeWidth={1.75} aria-hidden />
               </div>
               <div>
@@ -118,7 +123,7 @@ export function AppLayout() {
         <div className="flex min-w-0 flex-1 flex-col">
           <header
             className={cn(
-              "flex items-center justify-between gap-3 border-b border-[var(--color-border)] bg-white/70 px-4 py-4 backdrop-blur-sm",
+              "flex items-center justify-between gap-3 border-b border-border bg-white/70 px-4 py-4 backdrop-blur-sm",
               CONTENT_INSET_X,
             )}
           >
@@ -154,14 +159,14 @@ export function AppLayout() {
             </div>
 
             <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-              <div className="balance-tick rounded-md border border-[var(--color-border)] px-2.5 py-1.5 text-right">
+              <div className="balance-tick rounded-md border border-border px-2.5 py-1.5 text-right">
                 <p className="flex items-center justify-end gap-1 text-[10px] leading-none text-muted-foreground">
                   <Wallet className="h-3 w-3" aria-hidden />
                   钱包
                 </p>
                 <p className="mt-1 font-mono text-xs font-medium">{eth.toFixed(4)} ETH</p>
               </div>
-              <div className="balance-tick rounded-md border border-[var(--color-border)] bg-muted px-2.5 py-1.5 text-right">
+              <div className="balance-tick rounded-md border border-border bg-muted px-2.5 py-1.5 text-right">
                 <p className="flex items-center justify-end gap-1 text-[10px] leading-none text-muted-foreground">
                   <WalletCards className="h-3 w-3" aria-hidden />
                   A2A 可支付
@@ -186,7 +191,7 @@ export function AppLayout() {
         </div>
       </div>
 
-      <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-[var(--color-border)] bg-white/95 backdrop-blur-sm md:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-white/95 backdrop-blur-sm md:hidden">
         <div className="mx-auto grid max-w-lg grid-cols-4 gap-1 px-2 py-2">
           {mobileNavItems.map((item) => {
             const Icon = item.icon;

@@ -31,13 +31,10 @@ export function SignInPage() {
     <div className="flex min-h-screen items-center justify-center px-4 py-10">
       <div className="w-full max-w-md space-y-8 animate-in">
         <div className="space-y-3 text-center">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-md border border-[var(--color-border)] bg-white shadow-[0_8px_24px_rgba(10,10,10,0.04)]">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-md border border-border bg-white shadow-[0_8px_24px_rgba(10,10,10,0.04)]">
             <Wallet className="h-5 w-5" strokeWidth={1.75} aria-hidden />
           </div>
           <h1 className="text-3xl font-semibold tracking-tight">{APP_NAME}</h1>
-          <p className="text-sm text-muted-foreground">
-            邮箱、GitHub、MetaMask 与常见钱包一键登录
-          </p>
         </div>
 
         <Card className="fade-up overflow-hidden">

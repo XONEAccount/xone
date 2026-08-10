@@ -93,7 +93,7 @@ export function ChatPage() {
             id: crypto.randomUUID(),
             role: "assistant",
             content:
-              "助手暂时连不上。也可直接说车票、酒店、外卖相关需求，或先到商家列表确认 Agent 已启用。",
+              "助手暂时连不上。也可直接说车票、酒店、外卖相关需求，或先到Agent list确认 Agent 已启用。",
           },
         ]);
       }
@@ -108,7 +108,7 @@ export function ChatPage() {
         {
           id: crypto.randomUUID(),
           role: "assistant",
-          content: "未找到对应 Agent，请检查商家列表。",
+          content: "未找到对应 Agent，请检查Agent list。",
         },
       ]);
       setPending(false);
@@ -121,7 +121,7 @@ export function ChatPage() {
         {
           id: crypto.randomUUID(),
           role: "assistant",
-          content: `${agent.name} 当前未启用。请到商家列表启用后再试。`,
+          content: `${agent.name} 当前未启用。请到Agent list启用后再试。`,
         },
       ]);
       setPending(false);
@@ -175,13 +175,13 @@ export function ChatPage() {
                   className={
                     message.role === "user"
                       ? "ml-8 rounded-md bg-[var(--color-foreground)] px-3 py-2 text-sm text-[var(--color-background)]"
-                      : "mr-8 rounded-md border border-[var(--color-border)] px-3 py-2 text-sm"
+                      : "mr-8 rounded-md border border-border px-3 py-2 text-sm"
                   }
                 >
                   {message.content}
                 </div>
                 {message.action ? (
-                  <div className="mr-8 rounded-md border border-[var(--color-border)] bg-muted p-3 text-sm">
+                  <div className="mr-8 rounded-md border border-border bg-muted p-3 text-sm">
                     <p className="flex items-center gap-2 font-medium">
                       {message.action.status === "success" ? (
                         <ShieldCheck className="h-4 w-4" aria-hidden />

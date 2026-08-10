@@ -46,7 +46,7 @@ export function ReceivePage() {
 
           {address ? (
             <AccountProvider address={address} client={thirdwebClient}>
-              <div className="flex items-center gap-3 rounded-md border border-[var(--color-border)] bg-muted p-4">
+              <div className="flex items-center gap-3 rounded-md border border-border bg-muted p-4">
                 <AccountBlobbie className="h-10 w-10 shrink-0 rounded-full" />
                 <div className="min-w-0 flex-1">
                   <p className="text-xs text-muted-foreground">钱包地址</p>
@@ -58,12 +58,12 @@ export function ReceivePage() {
               </div>
             </AccountProvider>
           ) : (
-            <div className="rounded-md border border-[var(--color-border)] bg-muted p-4 text-center text-sm text-muted-foreground">
+            <div className="rounded-md border border-border bg-muted p-4 text-center text-sm text-muted-foreground">
               未连接钱包
             </div>
           )}
 
-          <div className="flex items-center justify-center rounded-md border border-[var(--color-border)] bg-white p-6 transition-transform duration-300 hover:scale-[1.01]">
+          <div className="flex items-center justify-center rounded-md border border-border bg-white p-6 transition-transform duration-300 hover:scale-[1.01]">
             {address ? (
               <QRCodeSVG
                 value={address}
