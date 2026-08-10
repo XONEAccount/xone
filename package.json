@@ -15,7 +15,7 @@
     "deploy": "pnpm run deploy:api && pnpm run deploy:web"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
