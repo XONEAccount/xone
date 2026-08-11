@@ -11,9 +11,8 @@ export type CreateAgentResponse = {
 };
 
 /**
- * Creates a developer agent with a restricted ETH wallet.
- * @param ownerAddress - Connected owner wallet
- * @param input - Name and spend limits
+ * Creates a developer agent with a restricted spending wallet.
+ * @param input - Name, spend limits, chain, and allowed asset
  */
 export async function createDeveloperAgent(input: {
   ownerAddress: string;
@@ -22,6 +21,8 @@ export async function createDeveloperAgent(input: {
   maxAmount: number;
   maxSinglePayment: number;
   initialAllowance?: number;
+  chain?: "ethereum-sepolia" | "base-sepolia";
+  asset?: "ETH" | "USDC";
 }): Promise<CreateAgentResponse> {
   return apiFetch<CreateAgentResponse>("/api/developer/agents", {
     method: "POST",
@@ -88,7 +89,7 @@ export async function runFirstMachinePayment(
   receipt: {
     paymentId: string;
     amount: string;
-    asset: "ETH";
+    asset: "ETH" | "USDC";
     chain: string;
     recipient: string;
     provider: "x402";
@@ -113,8 +114,8 @@ export async function runFirstMachinePayment(
       recipient: input.recipient,
       merchant: input.merchant ?? "xone-demo-merchant",
       resource: input.resource ?? "xone://first-machine-payment",
-      asset: "ETH",
-      chain: "ethereum-sepolia",
+      asset: "USDC",
+      chain: "base-sepolia",
       idempotencyKey,
     }),
   });
@@ -125,7 +126,7 @@ export async function runFirstMachinePayment(
     receipt?: {
       paymentId: string;
       amount: string;
-      asset: "ETH";
+      asset: "ETH" | "USDC";
       chain: string;
       recipient: string;
       provider: "x402";
@@ -139,6 +140,90 @@ export async function runFirstMachinePayment(
 
   if (!response.ok || !data.ok || !data.receipt || !data.agent) {
     throw new Error(data.error ?? `Payment failed (${response.status})`);
+  }
+
+  return { ok: true, receipt: data.receipt, agent: data.agent };
+}
+
+/** Deployed x402 seller weather endpoint (exact $0.001 USDC). */
+export const REMOTE_X402_MERCHANT_URL =
+  "https://xone-x402-seller.tskwangyi.workers.dev/weather";
+
+/** Local seller weather endpoint for Node/dev. */
+export const LOCAL_X402_MERCHANT_URL = "http://localhost:4021/weather";
+
+/** Default merchant URL for the create-agent machine-pay step (online seller). */
+export const DEFAULT_X402_MERCHANT_URL = REMOTE_X402_MERCHANT_URL;
+
+/**
+ * Pays an allowlisted external x402 merchant with the agent sealed EOA.
+ * Flow: GET merchant → 402 → sign → retry → debit allowance.
+ * @param apiKey - Agent API key
+ * @param input - Merchant URL + optional idempotency key
+ */
+export async function runMerchantPayment(
+  apiKey: string,
+  input: {
+    merchantUrl: string;
+    idempotencyKey?: string;
+  },
+): Promise<{
+  ok: true;
+  receipt: {
+    paymentId: string;
+    amount: string;
+    asset: "USDC";
+    chain: string;
+    recipient: string;
+    provider: "x402-merchant";
+    status: string;
+    merchantUrl: string;
+    merchantBody: unknown;
+    settlementTx?: string;
+  };
+  agent: Pick<
+    DeveloperAgent,
+    "id" | "walletAddress" | "allowanceEth" | "spentAmount" | "maxAmount" | "maxSinglePayment"
+  >;
+}> {
+  const env = getWebEnv();
+  const idempotencyKey = input.idempotencyKey ?? crypto.randomUUID();
+  const response = await fetch(`${env.apiUrl}/api/x402/merchant`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+      "Idempotency-Key": idempotencyKey,
+    },
+    body: JSON.stringify({
+      merchantUrl: input.merchantUrl,
+      idempotencyKey,
+    }),
+  });
+
+  const data = (await response.json().catch(() => ({}))) as {
+    ok?: boolean;
+    error?: string;
+    receipt?: {
+      paymentId: string;
+      amount: string;
+      asset: "USDC";
+      chain: string;
+      recipient: string;
+      provider: "x402-merchant";
+      status: string;
+      merchantUrl: string;
+      merchantBody: unknown;
+      settlementTx?: string;
+    };
+    agent?: Pick<
+      DeveloperAgent,
+      "id" | "walletAddress" | "allowanceEth" | "spentAmount" | "maxAmount" | "maxSinglePayment"
+    >;
+  };
+
+  if (!response.ok || !data.ok || !data.receipt || !data.agent) {
+    throw new Error(data.error ?? `Merchant payment failed (${response.status})`);
   }
 
   return { ok: true, receipt: data.receipt, agent: data.agent };
@@ -158,3 +243,44 @@ export async function getDeveloperAgentDetail(
     { token: "demo" },
   );
 }
+
+/**
+ * Updates maxAmount and maxSinglePayment for an owned agent.
+ * @param agentId - Agent id
+ * @param ownerAddress - Owner wallet
+ * @param maxAmount - New lifetime cap
+ * @param maxSinglePayment - New per-payment cap
+ */
+export async function updateDeveloperAgent(
+  agentId: string,
+  ownerAddress: string,
+  maxAmount: number,
+  maxSinglePayment: number,
+): Promise<DeveloperAgent> {
+  const data = await apiFetch<{ ok: true; agent: DeveloperAgent }>(
+    `/api/developer/agents/${agentId}`,
+    {
+      method: "PATCH",
+      body: { ownerAddress, maxAmount, maxSinglePayment },
+      token: "demo",
+    },
+  );
+  return data.agent;
+}
+
+/**
+ * Soft-deletes (disables) an owned agent.
+ * @param agentId - Agent id
+ * @param ownerAddress - Owner wallet
+ */
+export async function deleteDeveloperAgent(
+  agentId: string,
+  ownerAddress: string,
+): Promise<void> {
+  await apiFetch<{ ok: true }>(`/api/developer/agents/${agentId}`, {
+    method: "DELETE",
+    body: { ownerAddress },
+    token: "demo",
+  });
+}
+

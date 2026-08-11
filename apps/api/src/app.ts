@@ -71,9 +71,13 @@ export function createApp() {
         "Idempotency-Key",
         "X-PAYMENT",
         "X-Payment-Required",
+        "x-vercel-ai-ui-message-stream",
       ],
       allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-      exposeHeaders: ["X-Payment-Required"],
+      exposeHeaders: [
+        "X-Payment-Required",
+        "x-vercel-ai-ui-message-stream",
+      ],
     })(c, next);
   });
 

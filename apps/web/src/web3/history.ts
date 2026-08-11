@@ -102,10 +102,10 @@ async function fetchFromEtherscan(walletAddress: string): Promise<RawTx[]> {
   });
   if (apiKey) params.set("apikey", apiKey);
 
-  // Unified V2 endpoint (chainid) + legacy Sepolia host as fallback.
+  // Unified V2 endpoint (chainid) + Base Sepolia Basescan fallback.
   const urls = [
     `https://api.etherscan.io/v2/api?chainid=${appChain.id}&${params.toString()}`,
-    `https://api-sepolia.etherscan.io/api?${params.toString()}`,
+    `https://api-sepolia.basescan.org/api?${params.toString()}`,
   ];
 
   for (const url of urls) {

@@ -1,10 +1,10 @@
-import { sepolia } from "thirdweb/chains";
+import { baseSepolia } from "thirdweb/chains";
 import { DEFAULT_CHAIN } from "@wallet/config";
 
 /**
- * Active chain for the MVP (Ethereum Sepolia).
+ * Active chain for the MVP (Base Sepolia).
  */
-export const appChain = sepolia;
+export const appChain = baseSepolia;
 
 /**
  * Human-readable chain label for UI.

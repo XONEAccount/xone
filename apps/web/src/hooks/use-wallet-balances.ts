@@ -25,8 +25,9 @@ export function useWalletBalances() {
 
   useEffect(() => {
     if (!query.isSuccess) return;
-    syncWalletEth(eth);
-  }, [query.isSuccess, eth, syncWalletEth]);
+    // A2A fund validation uses the primary spend asset (USDC on Base Sepolia).
+    syncWalletEth(usdc);
+  }, [query.isSuccess, usdc, syncWalletEth]);
 
   return {
     address,

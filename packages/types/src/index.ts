@@ -153,7 +153,7 @@ export interface AgentTask {
   updatedAt: string;
 }
 
-/** Developer-created agent with a restricted ETH spending wallet. */
+/** Developer-created agent with a restricted spending wallet. */
 export interface DeveloperAgent {
   id: string;
   ownerWallet: string;
@@ -165,8 +165,8 @@ export interface DeveloperAgent {
   maxSinglePayment: number;
   spentAmount: number;
   allowanceEth: number;
-  asset: "ETH";
-  chain: string;
+  asset: "ETH" | "USDC";
+  chain: "ethereum-sepolia" | "base-sepolia" | string;
   status: "active" | "disabled";
   createdAt: string;
   updatedAt: string;

@@ -35,7 +35,7 @@ export function SendPage() {
   const { usdc, eth, refetch } = useWalletBalances();
   const recordTransfer = useA2AStore((s) => s.recordTransfer);
 
-  const [asset, setAsset] = useState("ETH");
+  const [asset, setAsset] = useState("USDC");
   const [to, setTo] = useState("");
   const [amount, setAmount] = useState("");
   const [preview, setPreview] = useState<PreparedSend | null>(null);

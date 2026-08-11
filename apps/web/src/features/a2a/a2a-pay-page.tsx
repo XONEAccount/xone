@@ -125,7 +125,7 @@ export function A2APayPage() {
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    已支出 {agent.spentAmount} / {agent.maxAmount} ETH
+                    已支出 {agent.spentAmount} / {agent.maxAmount} USDC
                   </p>
                 </div>
                 <Button
@@ -145,7 +145,7 @@ export function A2APayPage() {
                 >
                   <div className="space-y-2">
                     <label className="text-sm font-medium" htmlFor={`${agent.id}-max`}>
-                      最大金额（ETH）
+                      最大金额（USDC）
                     </label>
                     <Input
                       id={`${agent.id}-max`}
@@ -161,7 +161,7 @@ export function A2APayPage() {
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium" htmlFor={`${agent.id}-single`}>
-                      最大单笔支出（ETH）
+                      最大单笔支出（USDC）
                     </label>
                     <Input
                       id={`${agent.id}-single`}

@@ -1,0 +1,13 @@
+name = "xone-x402-seller"
+main = "src/index.ts"
+compatibility_date = "2025-08-10"
+compatibility_flags = ["nodejs_compat"]
+account_id = "02dd7efa4ca7a4f45fe830c2636bfbff"
+
+# Override EVM_ADDRESS after deploy:
+#   pnpm --filter @wallet/x402-seller exec wrangler secret put EVM_ADDRESS
+[vars]
+FACILITATOR_URL = "https://x402.org/facilitator"
+NETWORK = "eip155:84532"
+CORS_ORIGIN = "*"
+EVM_ADDRESS = "0x731a08bCd8CD98Eb9DD3CD88E59123EE75dc6dAc"

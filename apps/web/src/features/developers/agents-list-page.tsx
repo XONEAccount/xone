@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type FormEvent, type MouseEvent } from "react";
 import { Link } from "react-router-dom";
 import { useActiveAccount } from "thirdweb/react";
-import { Bot, Plus } from "lucide-react";
+import { getAddressExplorerUrl } from "@wallet/config";
+import { Bot, ExternalLink, Plus } from "lucide-react";
 import type { AgentPayment, DeveloperAgent } from "@wallet/types";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
@@ -10,10 +11,12 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { DismissibleError } from "@/components/ui/dismissible-error";
+import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -22,12 +25,27 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { getDeveloperAgentDetail, listDeveloperAgents } from "@/lib/developer-api";
+import { AgentChatDialog } from "@/features/developers/agent-chat-dialog";
+import {
+  deleteDeveloperAgent,
+  getDeveloperAgentDetail,
+  listDeveloperAgents,
+  updateDeveloperAgent,
+} from "@/lib/developer-api";
 import { shortAddress } from "@/lib/address";
 
 /**
+ * Formats a wallet address with a longer visible prefix/suffix.
+ * @param address - Full address
+ */
+function displayWalletAddress(address: string): string {
+  if (!address || address.length < 24) return address || "—";
+  return `${address.slice(0, 14)}…${address.slice(-10)}`;
+}
+
+/**
  * Dedicated list of developer agents owned by the connected wallet.
- * Click a row to open payment history in a dialog.
+ * Click name for payment history; wallet opens the block explorer.
  */
 export function AgentsListPage() {
   const account = useActiveAccount();
@@ -39,6 +57,18 @@ export function AgentsListPage() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const [editOpen, setEditOpen] = useState(false);
+  const [editAgent, setEditAgent] = useState<DeveloperAgent | null>(null);
+  const [editMaxAmount, setEditMaxAmount] = useState("");
+  const [editMaxSingle, setEditMaxSingle] = useState("");
+
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteAgent, setDeleteAgent] = useState<DeveloperAgent | null>(null);
+
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatAgent, setChatAgent] = useState<DeveloperAgent | null>(null);
 
   const refresh = useCallback(async () => {
     if (!owner) return;
@@ -80,6 +110,98 @@ export function AgentsListPage() {
     }
   }
 
+  /**
+   * Opens the edit-limits dialog.
+   * @param event - Click event (stop row navigation)
+   * @param agent - Agent to edit
+   */
+  function onOpenEdit(event: MouseEvent, agent: DeveloperAgent) {
+    event.stopPropagation();
+    setEditAgent(agent);
+    setEditMaxAmount(String(agent.maxAmount));
+    setEditMaxSingle(String(agent.maxSinglePayment));
+    setEditOpen(true);
+  }
+
+  /**
+   * Opens the DeepSeek chat dialog for one agent.
+   * @param event - Click event
+   * @param agent - Target agent
+   */
+  function onOpenChat(event: MouseEvent, agent: DeveloperAgent) {
+    event.stopPropagation();
+    setChatAgent(agent);
+    setChatOpen(true);
+  }
+
+  /**
+   * Opens the delete confirmation dialog.
+   * @param event - Click event (stop row navigation)
+   * @param agent - Agent to delete
+   */
+  function onOpenDelete(event: MouseEvent, agent: DeveloperAgent) {
+    event.stopPropagation();
+    setDeleteAgent(agent);
+    setDeleteOpen(true);
+  }
+
+  /**
+   * Saves new maxAmount / maxSinglePayment for the selected agent.
+   * @param event - Form submit
+   */
+  async function onSaveEdit(event: FormEvent) {
+    event.preventDefault();
+    if (!owner || !editAgent) return;
+
+    const maxAmount = Number(editMaxAmount);
+    const maxSinglePayment = Number(editMaxSingle);
+    if (!(maxAmount > 0) || !(maxSinglePayment > 0)) {
+      setError("请输入有效的上限数值");
+      return;
+    }
+    if (maxSinglePayment > maxAmount) {
+      setError("单笔最大值不能超过总额上限");
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    try {
+      const updated = await updateDeveloperAgent(
+        editAgent.id,
+        owner,
+        maxAmount,
+        maxSinglePayment,
+      );
+      setAgents((prev) => prev.map((row) => (row.id === updated.id ? updated : row)));
+      setEditOpen(false);
+      setEditAgent(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "修改失败");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /**
+   * Confirms soft-delete of the selected agent.
+   */
+  async function onConfirmDelete() {
+    if (!owner || !deleteAgent) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await deleteDeveloperAgent(deleteAgent.id, owner);
+      setAgents((prev) => prev.filter((row) => row.id !== deleteAgent.id));
+      setDeleteOpen(false);
+      setDeleteAgent(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "删除失败");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -91,11 +213,15 @@ export function AgentsListPage() {
           </Link>
         </Button>
       </div>
-      <p className="-mt-4 max-w-2xl text-sm text-muted-foreground">
-        当前钱包名下的受限 ETH Agent。点击一行查看支付记录弹窗。
-      </p>
 
-      {error ? <DismissibleError message={error} onDismiss={() => setError(null)} /> : null}
+
+      {error ? (
+        <DismissibleError
+          message={error}
+          onDismiss={() => setError(null)}
+          autoHideMs={2000}
+        />
+      ) : null}
 
       <Card>
         <CardHeader>
@@ -115,30 +241,87 @@ export function AgentsListPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>名称</TableHead>
-                  <TableHead>钱包</TableHead>
+                  <TableHead className="w-[7rem]">名称</TableHead>
+                  <TableHead className="min-w-[14rem]">钱包</TableHead>
                   <TableHead>已用 / 上限</TableHead>
+                  <TableHead>单笔最大值</TableHead>
                   <TableHead>可用额度</TableHead>
-                  <TableHead>API Key</TableHead>
+                  <TableHead className="min-w-[12rem]">API Key</TableHead>
+                  <TableHead className="w-[1%] whitespace-nowrap text-left">
+                    操作
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {agents.map((item) => (
-                  <TableRow
-                    key={item.id}
-                    className="cursor-pointer"
-                    onClick={() => void onOpenPayments(item)}
-                  >
-                    <TableCell className="font-medium">{item.name}</TableCell>
-                    <TableCell className="font-mono text-xs">
-                      {shortAddress(item.walletAddress)}
+                  <TableRow key={item.id}>
+                    <TableCell className="font-medium">
+                      <button
+                        type="button"
+                        className="text-left font-medium text-foreground underline decoration-foreground/40 underline-offset-4 transition-colors hover:decoration-foreground"
+                        onClick={() => void onOpenPayments(item)}
+                      >
+                        {item.name}
+                      </button>
+                    </TableCell>
+                    <TableCell className="min-w-[16rem]" title={item.walletAddress}>
+                      <a
+                        href={getAddressExplorerUrl(item.walletAddress, item.chain)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 font-mono text-xs text-foreground underline decoration-foreground/30 underline-offset-2 hover:decoration-foreground"
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        {displayWalletAddress(item.walletAddress)}
+                        <ExternalLink className="size-3 shrink-0 opacity-60" />
+                      </a>
                     </TableCell>
                     <TableCell>
-                      {item.spentAmount}/{item.maxAmount} ETH
+                      {item.spentAmount}/{item.maxAmount} {item.asset}
                     </TableCell>
-                    <TableCell>{item.allowanceEth} ETH</TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground">
+                    <TableCell>
+                      {item.maxSinglePayment} {item.asset}
+                    </TableCell>
+                    <TableCell>
+                      {item.allowanceEth} {item.asset}
+                    </TableCell>
+                    <TableCell
+                      className="min-w-[12rem] font-mono text-xs text-muted-foreground"
+                      title={item.apiKeyPrefix}
+                    >
                       {item.apiKeyPrefix}…
+                    </TableCell>
+                    <TableCell className="w-[1%] whitespace-nowrap text-left">
+                      <div className="flex justify-start gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={busy}
+                          onClick={(event) => onOpenChat(event, item)}
+                        >
+                          对话
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={busy}
+                          onClick={(event) => onOpenEdit(event, item)}
+                        >
+                          修改
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={busy}
+                          className="text-red-700 hover:bg-red-50 hover:text-red-900"
+                          onClick={(event) => onOpenDelete(event, item)}
+                        >
+                          删除
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -193,6 +376,103 @@ export function AgentsListPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      <Dialog
+        open={editOpen}
+        onOpenChange={(open) => {
+          setEditOpen(open);
+          if (!open) setEditAgent(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>修改限额 · {editAgent?.name ?? "—"}</DialogTitle>
+            <DialogDescription>
+              可调整总额上限与单笔最大值。总额不能低于已花费或当前可用额度。
+            </DialogDescription>
+          </DialogHeader>
+          <form className="space-y-4" onSubmit={(event) => void onSaveEdit(event)}>
+            <label className="block space-y-1.5 text-sm">
+              <span className="text-muted-foreground">
+                总额上限 ({editAgent?.asset ?? "ETH"})
+              </span>
+              <Input
+                value={editMaxAmount}
+                onChange={(e) => setEditMaxAmount(e.target.value)}
+                inputMode="decimal"
+              />
+            </label>
+            <label className="block space-y-1.5 text-sm">
+              <span className="text-muted-foreground">
+                单笔最大值 ({editAgent?.asset ?? "ETH"})
+              </span>
+              <Input
+                value={editMaxSingle}
+                onChange={(e) => setEditMaxSingle(e.target.value)}
+                inputMode="decimal"
+              />
+            </label>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={busy}
+                onClick={() => setEditOpen(false)}
+              >
+                取消
+              </Button>
+              <Button type="submit" disabled={busy || !owner}>
+                {busy ? "保存中…" : "保存"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={deleteOpen}
+        onOpenChange={(open) => {
+          setDeleteOpen(open);
+          if (!open) setDeleteAgent(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>确认删除</DialogTitle>
+            <DialogDescription>
+              确定删除 Agent「{deleteAgent?.name ?? "—"}」吗？
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={busy}
+              onClick={() => setDeleteOpen(false)}
+            >
+              取消
+            </Button>
+            <Button
+              type="button"
+              disabled={busy || !owner}
+              className="bg-red-700 text-white hover:bg-red-800"
+              onClick={() => void onConfirmDelete()}
+            >
+              {busy ? "删除中…" : "确认删除"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AgentChatDialog
+        open={chatOpen}
+        agent={chatAgent}
+        ownerAddress={owner}
+        onOpenChange={(open) => {
+          setChatOpen(open);
+          if (!open) setChatAgent(null);
+        }}
+      />
     </div>
   );
 }

@@ -1,0 +1,32 @@
+{
+  "name": "@wallet/x402-seller",
+  "version": "0.1.0",
+  "private": true,
+  "description": "XPay Labs — x402 seller test server (Hono) for HTTP 402 micropayment flows.",
+  "keywords": ["xpaylabs", "xpay", "x402", "micropayments", "usdc", "hono"],
+  "homepage": "https://www.xpaylabs.com",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --env-file=.env src/node.ts",
+    "dev:worker": "wrangler dev",
+    "start": "tsx --env-file=.env src/node.ts",
+    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "deploy": "wrangler deploy",
+    "lint": "echo \"no lint yet\""
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.19.1",
+    "@x402/core": "2.21.0",
+    "@x402/evm": "2.21.0",
+    "@x402/hono": "2.21.0",
+    "hono": "^4.9.7"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260801.1",
+    "@types/node": "^22.0.0",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2",
+    "wrangler": "^4.28.0"
+  }
+}

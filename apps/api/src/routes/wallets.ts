@@ -1,6 +1,6 @@
 import { DEFAULT_CHAIN, SUPPORTED_ASSETS } from "@wallet/config";
 import { createThirdwebClient } from "thirdweb";
-import { sepolia } from "thirdweb/chains";
+import { baseSepolia } from "thirdweb/chains";
 import { getWalletBalance } from "thirdweb/wallets";
 import { Hono } from "hono";
 import { getEnv } from "../lib/env.js";
@@ -107,7 +107,7 @@ wallets.get("/:id/balances", async (c) => {
         const balance = await getWalletBalance({
           address,
           client,
-          chain: sepolia,
+          chain: baseSepolia,
           ...(asset.address ? { tokenAddress: asset.address } : {}),
         });
         return {

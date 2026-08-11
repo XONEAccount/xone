@@ -12,6 +12,7 @@
     "lint": "pnpm -r run lint",
     "deploy:api": "pnpm --filter @wallet/api run deploy",
     "deploy:web": "pnpm --filter @wallet/web run deploy",
+    "deploy:x402-seller": "pnpm --filter @wallet/x402-seller run deploy",
     "deploy": "pnpm run deploy:api && pnpm run deploy:web"
   },
   "engines": {

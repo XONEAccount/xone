@@ -62,8 +62,8 @@ export const recordTransferSchema = z.object({
   to: evmAddress,
   amount: z.string().regex(/^\d+(\.\d+)?$/, "Invalid amount"),
   asset: z.enum(["ETH", "USDC"]),
-  chain: z.string().min(1).default("ethereum-sepolia"),
-  chainId: z.number().int().positive().default(11155111),
+  chain: z.string().min(1).default("base-sepolia"),
+  chainId: z.number().int().positive().default(84532),
   status: z.enum(["pending", "submitted", "confirmed", "failed"]).default("submitted"),
 });
 
@@ -113,6 +113,12 @@ export const createDeveloperAgentSchema = z.object({
   maxSinglePayment: z.number().positive().max(100),
   /** Optional initial allowance credited after create (ETH). */
   initialAllowance: z.number().min(0).max(100).optional(),
+  /** Runtime chain — default Base Sepolia (x402 testnet). */
+  chain: z
+    .enum(["ethereum-sepolia", "base-sepolia"])
+    .default("base-sepolia"),
+  /** Allowed spend asset — default USDC. */
+  asset: z.enum(["ETH", "USDC"]).default("USDC"),
 });
 
 export const fundDeveloperAgentSchema = z.object({
@@ -122,17 +128,43 @@ export const fundDeveloperAgentSchema = z.object({
   txHash,
 });
 
+/** Update developer agent spend caps (owner only). */
+export const updateDeveloperAgentSchema = z.object({
+  ownerAddress: evmAddress,
+  maxAmount: z.number().positive().max(100),
+  maxSinglePayment: z.number().positive().max(100),
+});
+
+/** Soft-delete / disable a developer agent (owner only). */
+export const deleteDeveloperAgentSchema = z.object({
+  ownerAddress: evmAddress,
+});
+
+/** Stream chat with a developer agent (Vercel AI SDK UI messages + tools). */
+export const developerAgentChatSchema = z.object({
+  ownerAddress: evmAddress,
+  /** UIMessage[] from `@ai-sdk/react` useChat */
+  messages: z.array(z.any()).min(1),
+});
+
 /** Machine payment via MCP tool or x402 endpoint. */
 export const machinePaySchema = z.object({
   amount: z.string().regex(/^\d+(\.\d+)?$/, "Invalid amount"),
   recipient: evmAddress,
   merchant: z.string().max(120).optional(),
   resource: z.string().max(500).optional(),
-  chain: z.string().min(1).default("ethereum-sepolia"),
-  asset: z.enum(["ETH"]).default("ETH"),
+  chain: z.string().min(1).default("base-sepolia"),
+  asset: z.enum(["ETH", "USDC"]).default("USDC"),
   idempotencyKey: z.string().min(8).max(128).optional(),
   /** When true, return HTTP 402 challenge instead of auto-executing. */
   challengeOnly: z.boolean().optional(),
+});
+
+/** Pay an external x402 merchant resource (402 → sign → retry) with the agent wallet. */
+export const merchantPaySchema = z.object({
+  /** Absolute HTTPS URL of the paid resource, e.g. …/weather */
+  merchantUrl: z.string().url().max(500),
+  idempotencyKey: z.string().min(8).max(128).optional(),
 });
 
 export const mcpJsonRpcSchema = z.object({
@@ -153,5 +185,9 @@ export type A2AUpdateAgentInput = z.infer<typeof a2aUpdateAgentSchema>;
 export type A2ASettleInput = z.infer<typeof a2aSettleSchema>;
 export type CreateDeveloperAgentInput = z.infer<typeof createDeveloperAgentSchema>;
 export type FundDeveloperAgentInput = z.infer<typeof fundDeveloperAgentSchema>;
+export type UpdateDeveloperAgentInput = z.infer<typeof updateDeveloperAgentSchema>;
+export type DeleteDeveloperAgentInput = z.infer<typeof deleteDeveloperAgentSchema>;
+export type DeveloperAgentChatInput = z.infer<typeof developerAgentChatSchema>;
 export type MachinePayInput = z.infer<typeof machinePaySchema>;
+export type MerchantPayInput = z.infer<typeof merchantPaySchema>;
 export type McpJsonRpcInput = z.infer<typeof mcpJsonRpcSchema>;

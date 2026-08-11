@@ -13,15 +13,26 @@
     "lint": "echo \"no lint yet\""
   },
   "dependencies": {
+    "@ai-sdk/deepseek": "^3.0.27",
+    "@ai-sdk/openai": "^4.0.37",
     "@hono/node-server": "^1.19.1",
+    "@langchain/core": "^1.2.5",
+    "@langchain/langgraph": "^1.4.9",
+    "@langchain/openai": "^1.5.6",
     "@supabase/supabase-js": "^2.57.4",
     "@wallet/config": "workspace:*",
     "@wallet/schemas": "workspace:*",
     "@wallet/types": "workspace:*",
+    "@x402/core": "2.21.0",
+    "@x402/evm": "2.21.0",
+    "@x402/fetch": "2.21.0",
+    "ai": "^7.0.59",
     "hono": "^4.9.7",
     "jose": "^6.2.8",
     "thirdweb": "^5.120.1",
-    "zod": "^4.1.5"
+    "undici": "^8.10.0",
+    "viem": "^2.55.13",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260801.1",

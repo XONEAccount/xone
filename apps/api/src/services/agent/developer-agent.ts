@@ -2,7 +2,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { DEFAULT_CHAIN } from "@wallet/config";
 import type { AgentPayment, DeveloperAgent, PaymentStatus } from "@wallet/types";
 import { createThirdwebClient } from "thirdweb";
-import { privateKeyToAccount } from "thirdweb/wallets";
+import { baseSepolia, sepolia } from "thirdweb/chains";
+import { getWalletBalance, privateKeyToAccount } from "thirdweb/wallets";
 import {
   encryptSecret,
   generateAgentApiKey,
@@ -11,7 +12,10 @@ import {
 } from "../../lib/crypto.js";
 import { getEnv } from "../../lib/env.js";
 
-type DeveloperAgentRow = {
+type AgentAsset = "ETH" | "USDC";
+type AgentChain = "ethereum-sepolia" | "base-sepolia";
+
+export type DeveloperAgentRow = {
   id: string;
   owner_wallet: string;
   name: string;
@@ -61,7 +65,7 @@ export type MachinePayResult =
       receipt: {
         paymentId: string;
         amount: string;
-        asset: "ETH";
+        asset: AgentAsset;
         chain: string;
         recipient: string;
         provider: "x402";
@@ -104,6 +108,7 @@ export type X402Challenge = {
  * @param row - Supabase row
  */
 export function toDeveloperAgent(row: DeveloperAgentRow): DeveloperAgent {
+  const asset = row.asset === "USDC" ? "USDC" : "ETH";
   return {
     id: row.id,
     ownerWallet: row.owner_wallet,
@@ -115,7 +120,7 @@ export function toDeveloperAgent(row: DeveloperAgentRow): DeveloperAgent {
     maxSinglePayment: Number(row.max_single_payment),
     spentAmount: Number(row.spent_amount),
     allowanceEth: Number(row.allowance_eth),
-    asset: "ETH",
+    asset,
     chain: row.chain,
     status: row.status,
     createdAt: row.created_at,
@@ -176,6 +181,8 @@ export async function createDeveloperAgent(
     maxAmount: number;
     maxSinglePayment: number;
     initialAllowance?: number;
+    chain?: AgentChain;
+    asset?: AgentAsset;
   },
 ): Promise<CreateDeveloperAgentResult> {
   const env = getEnv();
@@ -189,6 +196,16 @@ export async function createDeveloperAgent(
   const owner = input.ownerAddress.toLowerCase();
   const name = input.name.trim();
   if (!name) throw new Error("Agent name is required");
+
+  const chain: AgentChain = input.chain ?? "base-sepolia";
+  const asset: AgentAsset = input.asset ?? "USDC";
+  // Base Sepolia + USDC is the x402 test path; Ethereum Sepolia remains ETH-only.
+  if (chain === "ethereum-sepolia" && asset !== "ETH") {
+    throw new Error("Ethereum Sepolia 当前仅支持 ETH");
+  }
+  if (chain === "base-sepolia" && asset !== "USDC") {
+    throw new Error("Base Sepolia 当前仅支持 USDC（x402 测试）");
+  }
 
   await ensureProfile(admin, owner);
 
@@ -211,6 +228,7 @@ export async function createDeveloperAgent(
     secretKey: env.thirdwebSecretKey || undefined,
   });
 
+  // Always create a dedicated EOA; private key is sealed server-side and never returned.
   const privateKey = generatePrivateKeyHex();
   const account = privateKeyToAccount({ client, privateKey });
   const walletAddress = account.address.toLowerCase();
@@ -236,8 +254,8 @@ export async function createDeveloperAgent(
       max_single_payment: input.maxSinglePayment,
       spent_amount: 0,
       allowance_eth: initial,
-      asset: "ETH",
-      chain: DEFAULT_CHAIN.slug,
+      asset,
+      chain,
       status: "active",
       updated_at: now,
     })
@@ -253,7 +271,7 @@ export async function createDeveloperAgent(
     agent,
     apiKey,
     mcpEndpoint: "/api/mcp",
-    x402Endpoint: "/api/x402/pay",
+    x402Endpoint: "/api/x402/merchant",
   };
 }
 
@@ -270,6 +288,7 @@ export async function listDeveloperAgents(
     .from("developer_agents")
     .select("*")
     .eq("owner_wallet", ownerAddress.toLowerCase())
+    .eq("status", "active")
     .order("created_at", { ascending: false });
   if (error) throw new Error(error.message);
   return (data as DeveloperAgentRow[] | null)?.map(toDeveloperAgent) ?? [];
@@ -294,6 +313,84 @@ export async function getDeveloperAgentForOwner(
     .maybeSingle();
   if (error) throw new Error(error.message);
   return data ? toDeveloperAgent(data as DeveloperAgentRow) : null;
+}
+
+/**
+ * Updates total / single-payment caps for an owned agent.
+ * @param admin - Supabase admin
+ * @param id - Agent id
+ * @param ownerAddress - Owner wallet
+ * @param maxAmount - New lifetime cap
+ * @param maxSinglePayment - New per-payment cap
+ */
+export async function updateDeveloperAgentLimits(
+  admin: SupabaseClient,
+  id: string,
+  ownerAddress: string,
+  maxAmount: number,
+  maxSinglePayment: number,
+): Promise<DeveloperAgent> {
+  if (maxSinglePayment > maxAmount) {
+    throw new Error("单笔上限不能超过总额上限");
+  }
+
+  const agent = await getDeveloperAgentForOwner(admin, id, ownerAddress);
+  if (!agent || agent.status !== "active") {
+    throw new Error("Agent not found");
+  }
+  if (maxAmount < agent.spentAmount) {
+    throw new Error(`总额上限不能低于已花费 ${agent.spentAmount}`);
+  }
+  if (maxAmount < agent.allowanceEth) {
+    throw new Error(`总额上限不能低于当前可用额度 ${agent.allowanceEth}`);
+  }
+
+  const { data, error } = await admin
+    .from("developer_agents")
+    .update({
+      max_amount: maxAmount,
+      max_single_payment: maxSinglePayment,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .eq("owner_wallet", ownerAddress.toLowerCase())
+    .eq("status", "active")
+    .select("*")
+    .single();
+
+  if (error || !data) {
+    throw new Error(error?.message ?? "Failed to update agent");
+  }
+  return toDeveloperAgent(data as DeveloperAgentRow);
+}
+
+/**
+ * Soft-deletes an agent by setting status to disabled.
+ * @param admin - Supabase admin
+ * @param id - Agent id
+ * @param ownerAddress - Owner wallet
+ */
+export async function deleteDeveloperAgent(
+  admin: SupabaseClient,
+  id: string,
+  ownerAddress: string,
+): Promise<void> {
+  const agent = await getDeveloperAgentForOwner(admin, id, ownerAddress);
+  if (!agent || agent.status !== "active") {
+    throw new Error("Agent not found");
+  }
+
+  const { error } = await admin
+    .from("developer_agents")
+    .update({
+      status: "disabled",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .eq("owner_wallet", ownerAddress.toLowerCase())
+    .eq("status", "active");
+
+  if (error) throw new Error(error.message);
 }
 
 /**
@@ -409,20 +506,28 @@ export function buildX402Challenge(
 ): X402Challenge {
   const view = toDeveloperAgent(agentRow);
 
+  const networkId = view.chain === "base-sepolia" ? 84532 : DEFAULT_CHAIN.id;
+  const assetAddress =
+    view.asset === "USDC"
+      ? view.chain === "base-sepolia"
+        ? "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
+        : "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238"
+      : "0x0000000000000000000000000000000000000000";
+
   return {
     x402Version: 1,
     error: "Payment required",
     accepts: [
       {
         scheme: "exact",
-        network: `eip155:${DEFAULT_CHAIN.id}`,
+        network: `eip155:${networkId}`,
         maxAmountRequired: amount,
         resource,
         description: `Machine payment from agent ${view.name}`,
         mimeType: "application/json",
         payTo: view.walletAddress,
         maxTimeoutSeconds: 300,
-        asset: "0x0000000000000000000000000000000000000000",
+        asset: assetAddress,
         extra: {
           agentId: view.id,
           name: view.name,
@@ -452,7 +557,7 @@ export async function executeMachinePayment(
     merchant?: string;
     resource?: string;
     chain: string;
-    asset: "ETH";
+    asset: AgentAsset;
     idempotencyKey?: string;
     challengeOnly?: boolean;
   },
@@ -463,6 +568,7 @@ export async function executeMachinePayment(
   }
 
   const agent = toDeveloperAgent(agentRow);
+  const asset = agent.asset;
   const resource = input.resource ?? `agent://${agent.id}/pay`;
 
   if (input.challengeOnly) {
@@ -490,7 +596,7 @@ export async function executeMachinePayment(
         receipt: {
           paymentId: payment.id,
           amount: String(payment.amount),
-          asset: "ETH",
+          asset: payment.asset === "USDC" ? "USDC" : "ETH",
           chain: payment.chain,
           recipient: payment.recipient,
           provider: "x402",
@@ -514,7 +620,7 @@ export async function executeMachinePayment(
     return {
       ok: false,
       status: 402,
-      error: "Insufficient agent allowance — fund the restricted ETH wallet first",
+      error: "Insufficient agent allowance — fund the restricted wallet first",
       x402: buildX402Challenge(agentRow, input.amount, resource),
     };
   }
@@ -525,15 +631,15 @@ export async function executeMachinePayment(
       agent_id: agent.id,
       idempotency_key: input.idempotencyKey ?? null,
       amount,
-      asset: "ETH",
-      chain: input.chain,
+      asset,
+      chain: input.chain || agent.chain,
       recipient: input.recipient.toLowerCase(),
       merchant: input.merchant ?? null,
       resource,
       status: "confirmed",
       provider: "x402",
       metadata: {
-        rail: "restricted-eth-allowance",
+        rail: "restricted-allowance",
         note: "Debited from agent policy wallet allowance (not an on-chain broadcast)",
       },
     })
@@ -567,7 +673,7 @@ export async function executeMachinePayment(
     receipt: {
       paymentId: payment.id,
       amount: String(payment.amount),
-      asset: "ETH",
+      asset,
       chain: payment.chain,
       recipient: payment.recipient,
       provider: "x402",
@@ -598,6 +704,86 @@ export async function listAgentPayments(
 }
 
 /**
+ * Looks up one machine payment owned by an agent.
+ * @param admin - Supabase admin
+ * @param agentId - Agent id
+ * @param paymentId - Payment id
+ */
+export async function getAgentPayment(
+  admin: SupabaseClient,
+  agentId: string,
+  paymentId: string,
+): Promise<AgentPayment | null> {
+  const { data, error } = await admin
+    .from("agent_payments")
+    .select("*")
+    .eq("agent_id", agentId)
+    .eq("id", paymentId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ? toAgentPayment(data as AgentPaymentRow) : null;
+}
+
+/**
+ * Returns policy allowance plus on-chain wallet balance for an agent.
+ * @param agent - Public agent shape
+ */
+export async function getAgentBalance(agent: DeveloperAgent): Promise<{
+  walletAddress: string;
+  chain: string;
+  asset: string;
+  allowance: number;
+  spentAmount: number;
+  remainingCap: number;
+  maxAmount: number;
+  maxSinglePayment: number;
+  onChainBalance: string;
+  onChainSymbol: string;
+}> {
+  const env = getEnv();
+  const client = createThirdwebClient({
+    clientId: env.thirdwebClientId || "developer-agent",
+    secretKey: env.thirdwebSecretKey || undefined,
+  });
+  const chain =
+    agent.chain === "base-sepolia" ? baseSepolia : sepolia;
+  const tokenAddress =
+    agent.asset === "USDC"
+      ? agent.chain === "base-sepolia"
+        ? "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
+        : "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238"
+      : undefined;
+
+  let onChainBalance = "0";
+  let onChainSymbol: string = agent.asset;
+  try {
+    const balance = await getWalletBalance({
+      address: agent.walletAddress,
+      client,
+      chain,
+      ...(tokenAddress ? { tokenAddress } : {}),
+    });
+    onChainBalance = balance.displayValue;
+    onChainSymbol = balance.symbol || agent.asset;
+  } catch {
+    // Keep zeros when RPC is unavailable; policy numbers still return.
+  }
+
+  return {
+    walletAddress: agent.walletAddress,
+    chain: agent.chain,
+    asset: agent.asset,
+    allowance: agent.allowanceEth,
+    spentAmount: agent.spentAmount,
+    remainingCap: Math.max(0, agent.maxAmount - agent.spentAmount),
+    maxAmount: agent.maxAmount,
+    maxSinglePayment: agent.maxSinglePayment,
+    onChainBalance,
+    onChainSymbol,
+  };
+}
+
+/**
  * @param admin - Supabase admin
  * @param agentId - Agent id
  * @param input - Pay input
@@ -621,7 +807,7 @@ async function insertFailedPayment(
     agent_id: agentId,
     idempotency_key: input.idempotencyKey ?? null,
     amount,
-    asset: "ETH",
+    asset: "ETH", // failure row fallback; successful pays use agent.asset
     chain: input.chain,
     recipient: input.recipient.toLowerCase(),
     merchant: input.merchant ?? null,

@@ -3,32 +3,51 @@ import { machinePaySchema, mcpJsonRpcSchema } from "@wallet/schemas";
 import { getSupabaseAdmin } from "../lib/supabase.js";
 import {
   executeMachinePayment,
+  getAgentBalance,
+  getAgentPayment,
   getDeveloperAgentByApiKey,
+  listAgentPayments,
   toDeveloperAgent,
 } from "../services/agent/developer-agent.js";
 
 const mcp = new Hono();
 
+/** Agent MCP surface: balance + payment status (+ pay for machine payments). */
 const TOOLS = [
   {
-    name: "get_agent_wallet",
-    description: "Returns the restricted ETH wallet address and remaining allowance.",
+    name: "get_balance",
+    description:
+      "Get the agent wallet on-chain balance, policy allowance, spent amount, and remaining cap.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
   },
   {
-    name: "get_limits",
-    description: "Returns maxAmount, maxSinglePayment, spentAmount, and allowance.",
-    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+    name: "get_payment_status",
+    description:
+      "Get payment status by paymentId, or list recent machine payments when paymentId is omitted.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        paymentId: {
+          type: "string",
+          description: "Optional payment id. Omit to list recent payments.",
+        },
+        limit: {
+          type: "number",
+          description: "Max recent payments when listing (default 10, max 50).",
+        },
+      },
+      additionalProperties: false,
+    },
   },
   {
     name: "pay",
     description:
-      "Execute a policy-gated machine payment in ETH via x402. Requires recipient and amount.",
+      "Execute a policy-gated machine payment via x402. Requires recipient and amount.",
     inputSchema: {
       type: "object",
       required: ["amount", "recipient"],
       properties: {
-        amount: { type: "string", description: "ETH amount, e.g. 0.01" },
+        amount: { type: "string", description: "Amount, e.g. 0.01" },
         recipient: { type: "string", description: "0x recipient" },
         merchant: { type: "string" },
         resource: { type: "string" },
@@ -140,27 +159,41 @@ mcp.post("/", async (c) => {
         ? (params.arguments as Record<string, unknown>)
         : {};
 
-    if (name === "get_agent_wallet") {
+    if (name === "get_balance") {
+      const balance = await getAgentBalance(agent);
       return c.json({
         jsonrpc: "2.0",
         id: id ?? null,
         result: {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify({
-                walletAddress: agent.walletAddress,
-                allowanceEth: agent.allowanceEth,
-                asset: "ETH",
-                chain: agent.chain,
-              }),
-            },
-          ],
+          content: [{ type: "text", text: JSON.stringify(balance) }],
         },
       });
     }
 
-    if (name === "get_limits") {
+    if (name === "get_payment_status") {
+      const paymentId =
+        typeof args.paymentId === "string" ? args.paymentId.trim() : "";
+      if (paymentId) {
+        const payment = await getAgentPayment(admin, agent.id, paymentId);
+        if (!payment) {
+          return c.json({
+            jsonrpc: "2.0",
+            id: id ?? null,
+            error: { code: -32004, message: "Payment not found" },
+          });
+        }
+        return c.json({
+          jsonrpc: "2.0",
+          id: id ?? null,
+          result: {
+            content: [{ type: "text", text: JSON.stringify({ payment }) }],
+          },
+        });
+      }
+
+      const rawLimit = typeof args.limit === "number" ? args.limit : 10;
+      const limit = Math.min(50, Math.max(1, Math.floor(rawLimit)));
+      const payments = await listAgentPayments(admin, agent.id, limit);
       return c.json({
         jsonrpc: "2.0",
         id: id ?? null,
@@ -168,12 +201,7 @@ mcp.post("/", async (c) => {
           content: [
             {
               type: "text",
-              text: JSON.stringify({
-                maxAmount: agent.maxAmount,
-                maxSinglePayment: agent.maxSinglePayment,
-                spentAmount: agent.spentAmount,
-                allowanceEth: agent.allowanceEth,
-              }),
+              text: JSON.stringify({ count: payments.length, payments }),
             },
           ],
         },
@@ -188,14 +216,18 @@ mcp.post("/", async (c) => {
         resource: args.resource,
         idempotencyKey: args.idempotencyKey,
         challengeOnly: args.challengeOnly,
-        asset: "ETH",
+        asset: agent.asset,
         chain: agent.chain,
       });
       if (!payParsed.success) {
         return c.json({
           jsonrpc: "2.0",
           id: id ?? null,
-          error: { code: -32602, message: "Invalid pay arguments", data: payParsed.error.flatten() },
+          error: {
+            code: -32602,
+            message: "Invalid pay arguments",
+            data: payParsed.error.flatten(),
+          },
         });
       }
 

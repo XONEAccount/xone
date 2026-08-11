@@ -2,12 +2,12 @@
 
 export const APP_NAME = "X-ONE钱包";
 
-/** Ethereum Sepolia for development; switch to mainnet for production. */
+/** Base Sepolia for x402 / USDC testnet development. */
 export const DEFAULT_CHAIN = {
-  id: 11155111,
-  name: "Ethereum Sepolia",
-  slug: "ethereum-sepolia",
-  explorerUrl: "https://sepolia.etherscan.io",
+  id: 84532,
+  name: "Base Sepolia",
+  slug: "base-sepolia",
+  explorerUrl: "https://sepolia.basescan.org",
   nativeCurrency: {
     symbol: "ETH",
     name: "Ether",
@@ -23,6 +23,24 @@ export function getTxExplorerUrl(txHash: string): string {
   return `${DEFAULT_CHAIN.explorerUrl}/tx/${txHash}`;
 }
 
+/**
+ * Builds a block explorer URL for a wallet address on the given chain slug.
+ * @param address - EVM address
+ * @param chainSlug - Chain slug (defaults to app default chain)
+ */
+export function getAddressExplorerUrl(
+  address: string,
+  chainSlug: string = DEFAULT_CHAIN.slug,
+): string {
+  const base =
+    chainSlug === "ethereum-sepolia"
+      ? "https://sepolia.etherscan.io"
+      : chainSlug === "base-sepolia"
+        ? "https://sepolia.basescan.org"
+        : DEFAULT_CHAIN.explorerUrl;
+  return `${base}/address/${address}`;
+}
+
 export const SUPPORTED_ASSETS = [
   {
     symbol: "ETH",
@@ -34,8 +52,8 @@ export const SUPPORTED_ASSETS = [
   {
     symbol: "USDC",
     name: "USD Coin",
-    /** Circle USDC on Ethereum Sepolia. */
-    address: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
+    /** Circle USDC on Base Sepolia (x402 default test asset). */
+    address: "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
     decimals: 6,
     chainId: DEFAULT_CHAIN.id,
   },
@@ -55,7 +73,7 @@ export const DEFAULT_PAYMENT_POLICY: {
   maxDailyAutoAmount: "200",
   allowedMerchants: [],
   allowedCategories: ["travel", "subscription"],
-  allowedChains: ["ethereum-sepolia"],
+  allowedChains: ["base-sepolia"],
   allowedAssets: ["USDC", "ETH"],
   requireConfirmationAbove: "50",
   blockAbove: "1000",

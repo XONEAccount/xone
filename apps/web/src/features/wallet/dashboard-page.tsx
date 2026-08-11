@@ -42,11 +42,11 @@ export function DashboardPage() {
           <Skeleton className="h-12 w-56" />
         ) : (
           <h1 className="balance-tick text-4xl font-semibold tracking-tight">
-            {eth.toFixed(6)} <span className="text-lg font-medium">ETH</span>
+            {usdc.toFixed(2)} <span className="text-lg font-medium">USDC</span>
           </h1>
         )}
         <p className="text-sm text-muted-foreground">
-          USDC {isLoading ? "…" : usdc.toFixed(2)} · A2A 可支付 {a2aBalance.toFixed(4)} ETH · 已启用{" "}
+          ETH {isLoading ? "…" : eth.toFixed(6)} · A2A 可支付 {a2aBalance.toFixed(2)} USDC · 已启用{" "}
           {enabledAgents}/{agents.length} 个 Agent
         </p>
       </section>
@@ -74,10 +74,10 @@ export function DashboardPage() {
         <h2 className="text-sm font-medium">资产</h2>
         <div className="divide-y divide-[var(--color-border)] rounded-md border border-border bg-white">
           {(balances.length
-            ? [...balances].sort((a, b) => (a.symbol === "ETH" ? -1 : b.symbol === "ETH" ? 1 : 0))
+            ? [...balances].sort((a, b) => (a.symbol === "USDC" ? -1 : b.symbol === "USDC" ? 1 : 0))
             : [
-              { symbol: "ETH", name: "Ether", displayValue: "0" },
               { symbol: "USDC", name: "USD Coin", displayValue: "0" },
+              { symbol: "ETH", name: "Ether", displayValue: "0" },
             ]
           ).map((asset) => (
             <div key={asset.symbol} className="flex items-center justify-between px-4 py-3 text-sm">

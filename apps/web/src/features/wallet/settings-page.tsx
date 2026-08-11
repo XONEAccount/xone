@@ -30,11 +30,11 @@ export function SettingsPage() {
   const account = useActiveAccount();
   const activeWallet = useActiveWallet();
   const { disconnect } = useDisconnect();
-  const { eth } = useWalletBalances();
+  const { usdc } = useWalletBalances();
   const fundFromWallet = useA2AStore((s) => s.fundFromWallet);
 
   const [locale, setLocale] = useState<Locale>("zh");
-  const [fundAmount, setFundAmount] = useState("0.1");
+  const [fundAmount, setFundAmount] = useState("1");
   const [toast, setToast] = useState<{ tone: "ok" | "err"; text: string } | null>(null);
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [fundOpen, setFundOpen] = useState(false);
@@ -58,15 +58,15 @@ export function SettingsPage() {
       showToast("err", "请输入有效金额");
       return;
     }
-    if (amount > eth) {
-      showToast("err", "钱包可用余额不足");
+    if (amount > usdc) {
+      showToast("err", "钱包可用 USDC 不足");
       return;
     }
     setFundOpen(true);
   }
 
   /**
-   * Confirms moving ETH into the A2A spending balance (persisted in Supabase).
+   * Confirms moving USDC into the A2A spending balance (persisted in Supabase).
    */
   async function onConfirmFund() {
     const amount = Number(fundAmount);
@@ -76,7 +76,7 @@ export function SettingsPage() {
       showToast("err", error);
       return;
     }
-    showToast("ok", `已转入 ${amount} ETH 到 A2A 余额`);
+    showToast("ok", `已转入 ${amount} USDC 到 A2A 余额`);
   }
 
   /**
@@ -179,18 +179,18 @@ export function SettingsPage() {
           <form className="space-y-4" onSubmit={onFundSubmit}>
             <div className="space-y-2">
               <label className="text-sm font-medium" htmlFor="fund-amount">
-                转入金额（ETH）· 链上可用 {eth.toFixed(4)}
+                转入金额（USDC）· 链上可用 {usdc.toFixed(2)}
               </label>
               <Input
                 id="fund-amount"
                 inputMode="decimal"
                 value={fundAmount}
                 onChange={(e) => setFundAmount(e.target.value)}
-                placeholder="例如 0.1"
+                placeholder="例如 1"
               />
             </div>
             <div className="flex flex-wrap gap-2">
-              {["0.01", "0.05", "0.1"].map((value) => (
+              {["0.1", "1", "5"].map((value) => (
                 <Button
                   key={value}
                   type="button"
@@ -205,7 +205,7 @@ export function SettingsPage() {
                 type="button"
                 size="sm"
                 variant="ghost"
-                onClick={() => setFundAmount(String(eth))}
+                onClick={() => setFundAmount(String(usdc))}
               >
                 全部
               </Button>
@@ -258,8 +258,8 @@ export function SettingsPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-1 text-sm">
-            <ConfirmRow label="转入金额" value={`${fundAmount} ETH`} />
-            <ConfirmRow label="链上可用" value={`${eth.toFixed(4)} ETH`} />
+            <ConfirmRow label="转入金额" value={`${fundAmount} USDC`} />
+            <ConfirmRow label="链上可用" value={`${usdc.toFixed(2)} USDC`} />
             <ConfirmRow label="用途" value="A2A 可支付" />
           </div>
           <DialogFooter className="sm:flex-col">

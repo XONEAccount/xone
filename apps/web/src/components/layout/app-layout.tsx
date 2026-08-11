@@ -63,7 +63,7 @@ const mobileNavItems = [
  * 应用壳层：桌面侧边栏、顶栏余额、thirdweb 账户菜单、移动端底部导航。
  */
 export function AppLayout() {
-  const { eth } = useWalletBalances();
+  const { usdc } = useWalletBalances();
   const a2aBalance = useA2AStore((s) => s.a2aBalance);
   const sidebarOpen = useUiStore((s) => s.sidebarOpen);
   const toggleSidebar = useUiStore((s) => s.toggleSidebar);
@@ -164,14 +164,14 @@ export function AppLayout() {
                   <Wallet className="h-3 w-3" aria-hidden />
                   钱包
                 </p>
-                <p className="mt-1 font-mono text-xs font-medium">{eth.toFixed(4)} ETH</p>
+                <p className="mt-1 font-mono text-xs font-medium">{usdc.toFixed(2)} USDC</p>
               </div>
               <div className="balance-tick rounded-md border border-border bg-muted px-2.5 py-1.5 text-right">
                 <p className="flex items-center justify-end gap-1 text-[10px] leading-none text-muted-foreground">
                   <WalletCards className="h-3 w-3" aria-hidden />
                   A2A 可支付
                 </p>
-                <p className="mt-1 font-mono text-xs font-medium">{a2aBalance.toFixed(4)} ETH</p>
+                <p className="mt-1 font-mono text-xs font-medium">{a2aBalance.toFixed(2)} USDC</p>
               </div>
               <ConnectButton
                 client={thirdwebClient}
@@ -180,7 +180,7 @@ export function AppLayout() {
                 wallets={appWallets}
                 theme={connectTheme}
                 connectButton={{ label: "连接" }}
-                switchButton={{ label: "切换到 Sepolia" }}
+                switchButton={{ label: "切换到 Base Sepolia" }}
               />
             </div>
           </header>

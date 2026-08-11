@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* Streamdown (Vercel AI markdown) — scan hoisted package utilities */
+@source "../../node_modules/streamdown/dist/*.js";
+@source "../../../node_modules/streamdown/dist/*.js";
+
 @theme {
   --font-sans: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;

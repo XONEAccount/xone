@@ -1,18 +1,25 @@
 import { Hono } from "hono";
 import {
   createDeveloperAgentSchema,
+  deleteDeveloperAgentSchema,
+  developerAgentChatSchema,
   fundDeveloperAgentSchema,
+  updateDeveloperAgentSchema,
 } from "@wallet/schemas";
 import type { AuthVariables } from "../middleware/auth.js";
 import { requireAuth } from "../middleware/auth.js";
 import { getSupabaseAdmin } from "../lib/supabase.js";
 import {
   createDeveloperAgent,
+  deleteDeveloperAgent,
   fundDeveloperAgent,
   getDeveloperAgentForOwner,
   listAgentPayments,
   listDeveloperAgents,
+  updateDeveloperAgentLimits,
 } from "../services/agent/developer-agent.js";
+import { createDeveloperAgentChatResponse } from "../services/agent/developer-agent-chat.js";
+import type { UIMessage } from "ai";
 
 const developer = new Hono<{ Variables: AuthVariables }>();
 
@@ -119,6 +126,81 @@ developer.post("/agents/:id/fund", async (c) => {
     return c.json({ ok: true, agent, txHash: parsed.data.txHash });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Fund failed";
+    return c.json({ error: message }, 400);
+  }
+});
+
+/**
+ * PATCH /api/developer/agents/:id — update maxAmount / maxSinglePayment.
+ */
+developer.patch("/agents/:id", async (c) => {
+  const parsed = updateDeveloperAgentSchema.safeParse(await c.req.json());
+  if (!parsed.success) {
+    return c.json({ error: "Invalid payload", details: parsed.error.flatten() }, 400);
+  }
+
+  const admin = getSupabaseAdmin();
+  if (!admin) return c.json({ error: "Database not configured" }, 503);
+
+  try {
+    const agent = await updateDeveloperAgentLimits(
+      admin,
+      c.req.param("id"),
+      parsed.data.ownerAddress,
+      parsed.data.maxAmount,
+      parsed.data.maxSinglePayment,
+    );
+    return c.json({ ok: true, agent });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Update failed";
+    return c.json({ error: message }, 400);
+  }
+});
+
+/**
+ * DELETE /api/developer/agents/:id — soft-delete (disable) an agent.
+ */
+developer.delete("/agents/:id", async (c) => {
+  const parsed = deleteDeveloperAgentSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!parsed.success) {
+    return c.json({ error: "Invalid payload", details: parsed.error.flatten() }, 400);
+  }
+
+  const admin = getSupabaseAdmin();
+  if (!admin) return c.json({ error: "Database not configured" }, 503);
+
+  try {
+    await deleteDeveloperAgent(admin, c.req.param("id"), parsed.data.ownerAddress);
+    return c.json({ ok: true });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Delete failed";
+    return c.json({ error: message }, 400);
+  }
+});
+
+/**
+ * POST /api/developer/agents/:id/chat — Vercel AI SDK UI stream (DeepSeek + tools).
+ * Tools: get_wallet_info, get_spending_history.
+ */
+developer.post("/agents/:id/chat", async (c) => {
+  const parsed = developerAgentChatSchema.safeParse(await c.req.json());
+  if (!parsed.success) {
+    return c.json({ error: "Invalid payload", details: parsed.error.flatten() }, 400);
+  }
+
+  const admin = getSupabaseAdmin();
+  if (!admin) return c.json({ error: "Database not configured" }, 503);
+
+  try {
+    return await createDeveloperAgentChatResponse(
+      admin,
+      c.req.param("id"),
+      parsed.data.ownerAddress,
+      parsed.data.messages as UIMessage[],
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Chat failed";
+    console.error("[developer] chat", error);
     return c.json({ error: message }, 400);
   }
 });

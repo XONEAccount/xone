@@ -23,7 +23,7 @@ interface UiState {
  * Canonical server data stays in TanStack Query / Supabase.
  */
 export const useUiStore = create<UiState>((set) => ({
-  selectedChain: "ethereum-sepolia",
+  selectedChain: "base-sepolia",
   selectedWalletId: null,
   sidebarOpen: true,
   setSelectedChain: (selectedChain) => set({ selectedChain }),

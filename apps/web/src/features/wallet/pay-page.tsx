@@ -9,20 +9,10 @@ import { USDC_ADDRESS, appChainLabel } from "@/web3";
 
 const FAUCETS = [
   {
-    name: "Google Cloud Sepolia Faucet",
-    href: "https://cloud.google.com/application/web3/faucet/ethereum/sepolia",
-    note: "领取测试 ETH",
-  },
-  {
-    name: "Alchemy Sepolia Faucet",
-    href: "https://www.alchemy.com/faucets/ethereum-sepolia",
-    note: "领取测试 ETH",
-  },
-  {
-    name: "Circle Sepolia USDC",
+    name: "Circle Base Sepolia USDC",
     href: "https://faucet.circle.com/",
-    note: "领取测试 USDC（选择 Ethereum Sepolia）",
-  },
+    note: "领取测试 USDC（选择 Base Sepolia）",
+  }
 ] as const;
 
 /**
@@ -53,8 +43,7 @@ export function PayPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            当前网络是 {appChainLabel}。thirdweb BuyWidget / 法币买币主要面向主网，测试网请用水龙头领取。
-            向他人转账请用「转账」。
+            当前网络是 {appChainLabel}。
           </p>
 
           <div className="rounded-md border border-border bg-muted p-4">
@@ -81,19 +70,7 @@ export function PayPage() {
             </Button>
           </div>
 
-          <div className="space-y-2 text-sm">
-            <p className="font-medium">资产说明</p>
-            <ul className="list-inside list-disc space-y-1 text-muted-foreground">
-              <li>网络：{DEFAULT_CHAIN.name}（chainId {DEFAULT_CHAIN.id}）</li>
-              <li>原生币：ETH</li>
-              <li>
-                USDC：
-                <span className="break-all font-mono text-xs">
-                  {USDC_ADDRESS ?? "未配置"}
-                </span>
-              </li>
-            </ul>
-          </div>
+
 
           <div className="space-y-2">
             <p className="text-sm font-medium">水龙头</p>
