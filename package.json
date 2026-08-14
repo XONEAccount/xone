@@ -20,9 +20,12 @@
     "deploy:x402-seller": "pnpm --filter @wallet/x402-seller run deploy",
     "deploy:sdk-api": "pnpm --filter @xone/api run deploy",
     "deploy:sdk-console": "pnpm --filter @xone/console run deploy",
+    "deploy:sdk-docs": "pnpm --filter @xone/sdk-playground run deploy",
     "deploy": "pnpm run deploy:api && pnpm run deploy:web",
     "deploy:ops": "pnpm run deploy:admin-api && pnpm run deploy:admin",
     "dev:sdk-api": "pnpm --filter @xone/api dev",
+    "dev:sdk-docs": "pnpm --filter @xone/sdk-playground dev",
+    "dev:sdk-playground": "pnpm --filter @xone/sdk-playground dev",
     "build:sdk": "pnpm --filter @xone/sdk build",
     "typecheck:sdk": "pnpm --filter @xone/sdk typecheck && pnpm --filter @xone/api typecheck"
   },

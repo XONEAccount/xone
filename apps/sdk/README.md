@@ -1,100 +1,192 @@
 # @xone/sdk
 
-A programmable wallet SDK for **AI agents**: pay for **x402** resources within spend limits set in the console, and expose the same capabilities as **LangChain tools**.
+TypeScript SDK for **agent-scoped wallets** that settle **HTTP 402 / x402** payments under console-defined policy. The same spend surface is exposed as **LangChain structured tools** for LLM runtimes.
 
 ---
 
-## What this SDK is for
+## Overview
 
-XOne solves this problem:
+`@xone/sdk` is the **runtime** half of XOne:
 
-> Your agent needs to access **HTTP 402 / x402** paid resources — without putting a hot mainnet wallet into the model to spend freely.
+| Surface | Role |
+| ------- | ---- |
+| **[Console](https://xone-console.pages.dev/login)** | Operator identity, API keys, agent provisioning, spend limits, host/payee allowlists, pause/delete, audit |
+| **`@xone/sdk`** | Load the bound agent with a spend token and execute policy-constrained x402 payments |
 
-There are two sides:
+Agent tokens are **spend-only**. Policy changes (create agent, limits, allowlists, pause, delete) are performed in the console, never from the agent runtime.
 
-| Role | Responsibility | Surface |
-|------|-----------------|---------|
-| **Human / Console** | Sign up, create API keys **and agents**, set limits / host & payee allowlists, pause, review history | Personal console |
-| **App / agent runtime** | Load the bound agent with a key and pay within those limits | `@xone/sdk` |
+Spend is gated by:
 
-Core rules:
+- Daily and per-transaction caps (UTC day boundary)
+- Optional hostname and payee allowlists
+- Agent lifecycle status (`active` / `paused` / `exhausted` / `deleted`)
+- Server-side sealed keys (the client never receives the private key)
 
-- **1 API key ↔ 1 agent ↔ 1 wallet**
-- Keys are created in the Console (`xone_` + 16 alphanumeric) and shown in full only once
-- **Agent tokens are spend-only:** `get` / `pay` / history / `getTools()`. Create, limits, pause, and delete require the console session
-- App surface: `new XOne({ agentToken })` → `agent.get()` → `pay` / `getTools()`
-- **Daily / per-tx limits** apply to x402; daily budget resets each **UTC calendar day**
-- Optional **allowedHosts** / **allowedPayees** (empty = any public host / any payee). Private/localhost URLs are always blocked on the API
-- **No deposit / withdraw ledger** — fund the agent address with on-chain USDC; SDK only enforces spend limits
-- Private keys stay **sealed on the API** in remote mode; `pay` / tools hit server-side settlement
-- The API origin is not a constructor option — read env **`XONE_API_URL`** (set → remote, unset → mock)
+**Binding rule:** one API key maps to at most **one** agent and **one** wallet.
+
+---
+
+## Architecture
 
 ```
-Console issues a key + creates the agent (limits, allowlists)
-    │
-    ▼
-App: new XOne({ agentToken })
-    │
-    ├─ agent.get()
-    │     → wallet + spend limits
-    │
-    ├─ agent.pay({ url })          → real x402 paid fetch
-    │
-    └─ agent.getTools()
-          → LLM calls xone_x402_pay / read tools
+Console (JWT)
+  create API key + agent, set limits / allowlists
+        │
+        ▼
+Runtime: new XOne({ agentToken })
+        │
+        ├─ agent.get()           → RemoteAgent
+        ├─ agent.pay({ url })    → server-side x402 settle + resource body
+        └─ agent.getTools()      → LangChain tools (same policy)
 ```
 
-Real x402 uses `@x402/fetch` + `ExactEvmScheme`: probe `402` → sign `PAYMENT-SIGNATURE` → retry for the resource. Example seller: `https://xone-x402-seller.tskwangyi.workers.dev/weather`. Fund the agent address with on-chain USDC; spend limits use remainingDaily / perTransaction only.
+Private keys remain sealed on the API. `pay` and tools call the server to settle; the SDK client only carries the spend token.
 
+### x402 settlement path
 
-## Install
+1. Request the resource URL; expect HTTP `402` with a payment requirement.
+2. Debit the agent’s **daily budget** for the quote amount (atomic reserve).
+3. Enforce per-tx / daily / allowlist policy **before** chain settlement.
+4. Sign and settle server-side (`ExactEvmScheme` via `@x402/fetch`).
+5. On success, append history. On failed settle after reserve, refund the daily debit.
+6. Retry safely with the same `idempotencyKey`.
+
+Supported settlement chains: `base-sepolia` \| `base` \| `polygon` \| `arbitrum`.
+
+Example seller: `https://xone-x402-seller.tskwangyi.workers.dev/weather`
+
+---
+
+## Console setup
+
+Do this before writing runtime code:
+
+1. Open the [Console](https://xone-console.pages.dev/login) and sign in.
+2. Create an **API key** (`xone_…`). Copy the secret when shown — it is displayed once.
+3. Create an **agent** bound to that key: name, chain, `dailyLimit`, `perTransaction`.
+4. Optionally set **`allowedHosts`** / **`allowedPayees`**.
+5. Note the agent wallet address (also available later via `agent.getAddress()`).
+
+Operator actions (limits, pause, delete) stay in the console. The SDK only spends.
+
+---
+
+## Funding
+
+The SDK does **not** hold a deposit balance. Settlement spends **on-chain USDC** at the agent address.
+
+1. Call `agent.getAddress()` (or copy the address from the console).
+2. Send **USDC** on the agent’s chain (`agent.chain`, e.g. `base-sepolia`).
+3. Confirm the transfer on an explorer before the first `pay`.
+4. Policy still applies: even with on-chain funds, `remainingDaily` / `perTransaction` can block spend.
+
+`getBalance()` returns address + **policy** snapshot (`remainingDaily`, caps, status). It is not a full RPC USDC balance query.
+
+---
+
+## Environment
+
+Configure the runtime with environment variables (not constructor fields for the API origin):
+
+| Variable | Required | Description |
+| -------- | -------- | ----------- |
+| `XONE_API_URL` | yes | Hono API origin (no trailing slash) |
+| `XONE_AGENT_TOKEN` | yes | Console API key (`xone_…`), passed as `agentToken` |
+
+```bash
+# Production
+export XONE_API_URL=https://xone-sdk-api.tskwangyi.workers.dev
+
+# Local (when running sdk-api with wrangler / vite)
+# export XONE_API_URL=http://127.0.0.1:8787
+
+export XONE_AGENT_TOKEN=xone_…
+```
+
+API health: [https://xone-sdk-api.tskwangyi.workers.dev/health](https://xone-sdk-api.tskwangyi.workers.dev/health)
+
+Store tokens in a secrets manager. Never embed operator JWT or service-role keys in agent runtimes.
+
+---
+
+## Installation
 
 ```bash
 pnpm add @xone/sdk
+# or: npm install @xone/sdk / yarn add @xone/sdk
 ```
 
-## Concepts
+**Requirements:** Node.js 18+, TypeScript 5 recommended.
 
-| Concept | Meaning |
-|---------|---------|
-| **API key** (`agentToken`) | Created in Console. `xone_` + 16 alphanumeric. **1 key = 1 agent** |
-| **Agent** | Named wallet + `dailyLimit` / `perTransaction` |
-| **Spend limits** | Apply to **x402** only (no fake deposit balance) |
-| **Status** | `active` · `paused` · `exhausted` · `deleted` |
+If you are developing inside this monorepo before the package is published to npm:
 
-## Quick start
+```bash
+pnpm add @xone/sdk --filter your-app
+# workspace protocol: "workspace:*"
+```
+
+---
+
+## Quickstart
+
+Prerequisites: [Console setup](#console-setup), [Funding](#funding), and [Environment](#environment).
 
 ```ts
 import { XOne } from "@xone/sdk";
 
-// Optional: XONE_API_URL=https://your-api…  (omit = local mock)
 const xone = new XOne({
-  agentToken: process.env.XONE_AGENT_TOKEN!, // from console
+  agentToken: process.env.XONE_AGENT_TOKEN!,
 });
 
 const agent = await xone.agent.get();
 if (!agent) {
-  throw new Error("Create the agent in the console first");
+  throw new Error(
+    "No agent bound to this key. Provision the agent in the console.",
+  );
 }
 
-// Fund agent.getAddress() with on-chain USDC, then pay.
-const paid = await agent.pay({
+const result = await agent.pay({
   url: "https://xone-x402-seller.tskwangyi.workers.dev/weather",
+  idempotencyKey: crypto.randomUUID(),
 });
-console.log(paid.body);
+
+console.log(result.paid, result.body);
 
 const tools = agent.getTools();
 ```
 
 ---
 
-## `new XOne(config)`
+## Core concepts
 
-Creates the SDK client. Public config is only the API key; the API origin is read internally from **`XONE_API_URL`**.
+| Concept | Definition |
+| ------- | ---------- |
+| **API key (`agentToken`)** | Spend credential. Format `xone_…`. **1 key ↔ 1 agent**. |
+| **Agent** | Named wallet + policy (`dailyLimit`, `perTransaction`, allowlists). Provisioned in the console. |
+| **Spend limits** | Apply to **x402** only. There is no SDK-side deposit ledger. |
+| **`allowedHosts`** | Hostname allowlist for pay URLs. Empty = any **public** host. Private/localhost always blocked. |
+| **`allowedPayees`** | Allowlist of `0x` quote `payTo` addresses. Empty = any payee. |
+| **Status** | `active` · `paused` · `exhausted` · `deleted` |
+
+---
+
+## API reference: `XOne`
+
+### Constructor
+
+```ts
+new XOne(config: XOneConfig)
+```
+
+Creates a client bound to a single agent token. The client talks to the API at `XONE_API_URL`.
+
+#### Parameters
 
 | Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `agentToken` | `string` | yes | Console API key (`xone_…`) |
+| ----- | ---- | -------- | ----------- |
+| `agentToken` | `string` | yes | Console-issued API key (`xone_…`) |
+
+#### Example
 
 ```ts
 const xone = new XOne({
@@ -104,52 +196,56 @@ const xone = new XOne({
 
 ---
 
-## `xone.agent` methods
+## API reference: `xone.agent`
 
-### `agent.create(params)`
-
-**Mock only.** With `XONE_API_URL` set this throws `OperatorRequiredError` — create the agent in the console (JWT), then call `agent.get()`.
-
-| Param | Type | Required | Description |
-|-------|------|----------|-------------|
-| `name` | `string` | yes | Human-readable name |
-| `chain` | `XOneChain` | no | Settlement chain; default `"base-sepolia"` |
-| `dailyLimit` | `number \| string` | yes | Max spend per **UTC calendar day** |
-| `perTransaction` | `number \| string` | yes | Max spend per single tx |
-| `currency` | `string` | no | Default `"USDC"` |
-| `allowedHosts` | `string[]` | no | Hostname allowlist (`example.com` or `*.example.com`). Empty = any public host |
-| `allowedPayees` | `string[]` | no | `0x` payTo allowlist. Empty = any payee |
-
----
+Namespace for the agent bound to this key. Operator actions (create, limits, pause, delete) are not available on the spend token; use the console.
 
 ### `agent.get()`
 
-Load the agent bound to this API key (**1 key ↔ 1 agent**), or `undefined`.
+Loads the agent for this token, or `undefined` if none is bound.
+
+**Returns:** `Promise<RemoteAgent | undefined>`
 
 ```ts
 const agent = await xone.agent.get();
 if (!agent) {
-  console.log("no agent yet — create it in the console");
-} else {
-  console.log(agent.name, agent.getStatus());
+  // Provision in the console, then retry.
 }
 ```
 
 ---
 
-### `agent.delete()`
+## API reference: `RemoteAgent`
 
-**Mock only.** Remote tokens throw `OperatorRequiredError`. Soft-delete from the console.
+Spender methods available on the agent returned by `agent.get()`.
+
+### Properties
+
+| Property | Type | Description |
+| -------- | ---- | ----------- |
+| `id` | `string` | Agent id |
+| `name` | `string` | Display name |
+| `chain` | `XOneChain` | Settlement network |
+| `currency` | `string` | e.g. `USDC` |
+| `apiKeyId` | `string` | Owning API key id |
+
+### Methods
+
+| Method | Description |
+| ------ | ----------- |
+| `getStatus` | Lifecycle status |
+| `getAddress` | Wallet address |
+| `getBalance` | Address + spend-policy snapshot |
+| `getLimits` | Caps and remaining daily budget |
+| `getHistory` | Spend / lifecycle events |
+| `pay` | Settle an x402 resource |
+| `getTools` | LangChain tools (same policy) |
 
 ---
 
-## `Agent` / `RemoteAgent` methods
-
-Spender methods (`getStatus`, `getAddress`, `getBalance`, `getLimits`, `getHistory`, `pay`, `getTools`) exist on both. **Pause / resume / updateLimits / delete** are mock + console only — not on the remote spender token.
-
 ### `getStatus()`
 
-Returns lifecycle status: `"active" | "paused" | "exhausted" | "deleted"`.
+**Returns:** `AgentStatus` — `"active" | "paused" | "exhausted" | "deleted"`.
 
 ```ts
 const status = agent.getStatus();
@@ -159,239 +255,290 @@ const status = agent.getStatus();
 
 ### `getAddress()`
 
-Returns the on-chain wallet address (sync, from local snapshot).
+**Returns:** `string` — on-chain wallet address (sync snapshot).
 
 ```ts
 const address = agent.getAddress();
-// EVM: 0x…   Solana: base58…
+// EVM: 0x…
 ```
 
 ---
 
 ### `getBalance()`
 
-Returns the agent **address** plus current spend limits. There is no SDK deposit balance — fund on-chain USDC at `address`.
+Returns address + current spend-policy snapshot. This is **not** an on-chain USDC balance query; fund USDC at `address` separately.
+
+**Returns:** `Promise<BalanceSnapshot>`
 
 ```ts
 const snap = await agent.getBalance();
-// { currency, chain, address, remainingDaily, dailyLimit, perTransaction, status, note }
 ```
 
 ---
 
 ### `getLimits()`
 
-Snapshot of spend caps.
+**Returns:** `Promise<AgentLimits>` — caps, remaining daily budget, optional allowlists.
 
 ```ts
 const limits = await agent.getLimits();
-/*
-{
-  dailyLimit: 10,
-  perTransaction: 1,
-  remainingDaily: 8.5,
-  currency: "USDC"
-}
-*/
 ```
-
----
-
-### `updateLimits(params)`
-
-Change daily and/or per-transaction caps. At least one field required.
-
-```ts
-const next = await agent.updateLimits({
-  dailyLimit: 50,
-  perTransaction: 5,
-});
-console.log(next.remainingDaily);
-```
-
-**Throws:** `ValidationError` if both fields omitted.
 
 ---
 
 ### `getHistory(params?)`
 
-Spend + lifecycle events, newest first.
+Returns spend and lifecycle events, newest first.
+
+#### Parameters
+
+| Param | Type | Description |
+| ----- | ---- | ----------- |
+| `limit` | `number` | Maximum entries |
+| `types` | `AgentHistoryType[]` | Filter: `x402` · `transfer` · `limits_update` · `pause` · `resume` · `delete` |
+
+**Returns:** `Promise<AgentHistoryEntry[]>`
 
 ```ts
 const history = await agent.getHistory({
   limit: 20,
-  types: ["x402", "transfer"],
+  types: ["x402"],
 });
-
-for (const e of history) {
-  console.log(e.type, e.createdAt, e.amount, e.txHash ?? e.url);
-}
 ```
-
-| Param | Type | Description |
-|-------|------|-------------|
-| `limit` | `number` | Max entries |
-| `types` | `AgentHistoryType[]` | Filter: `x402` · `transfer` · `limits_update` · `pause` · `resume` · `delete` (legacy `deposit`/`withdraw` may still appear in old rows) |
-
----
-
-### `pause()` / `resume()`
-
-Temporarily block **spending** (x402). Resume clears `paused` (and may clear `exhausted` when budget remains).
-
-```ts
-await agent.pause();
-console.log(agent.getStatus()); // "paused"
-
-await agent.resume();
-console.log(agent.getStatus()); // "active"
-```
-
-**Throws on spend while paused:** `AgentPausedError`.
 
 ---
 
 ### `pay(params)`
 
-Pay a real **x402** HTTP resource.
+Pays a real **x402** HTTP resource under agent policy. Settlement is executed **on the API** with the sealed key.
 
-1. `GET url` → expect `402` + `PAYMENT-REQUIRED`
-2. Quote amount from 402 (daily budget debit **always** equals the quote)
-3. Enforce SDK spend limits (**before** chain settlement)
-4. Sign + settle (`RemoteAgent` does this **server-side** with a sealed key)
-5. Append history on success (failed settle refunds a reserved daily debit)
+#### Parameters
+
+| Param | Type | Required | Description |
+| ----- | ---- | -------- | ----------- |
+| `url` | `string` | yes | Resource that returns HTTP 402 |
+| `maxAmount` | `string \| number` | no | Client-side ceiling; aborts if the quote exceeds it (does not override the quote) |
+| `idempotencyKey` | `string` | no | Stable key for retries; generated if omitted |
+
+#### Returns
+
+`Promise<PayResult>` — see [Types](#types).
+
+#### Idempotency
+
+On timeout or unknown network errors, **reuse the same `idempotencyKey`**. Successful payments replay the cached result (`replay: true`). In-flight or ambiguous attempts refuse a second settlement.
+
+#### Requirements
+
+- EVM chain: `base-sepolia` \| `base` \| `polygon` \| `arbitrum`
+- On-chain USDC at `agent.getAddress()`
+- Status `active` with remaining daily / per-tx headroom
+- URL host and quote payee allowed by policy (when allowlists are set)
+
+#### Throws
+
+`X402PaymentError` · `LimitExceededError` · `InsufficientBalanceError` · `AgentPausedError` · `AgentDeletedError` · `ValidationError`
 
 ```ts
-const idempotencyKey = crypto.randomUUID(); // save this for retries
+const idempotencyKey = crypto.randomUUID();
 const result = await agent.pay({
   url: "https://xone-x402-seller.tskwangyi.workers.dev/weather",
-  // maxAmount: "0.01", // optional ceiling only
+  maxAmount: "0.05",
   idempotencyKey,
 });
 
-console.log(result.paid, result.body, result.settlement, result.replay);
+console.log(result.paid, result.body, result.replay);
 ```
-
-| Param | Type | Description |
-|-------|------|-------------|
-| `url` | `string` | x402 resource URL |
-| `maxAmount` | `string \| number` | Optional ceiling; aborts if quote is higher |
-| `idempotencyKey` | `string` | Reuse on network retries to prevent a second on-chain pay |
-
-On timeout/unknown errors: **reuse the same `idempotencyKey`**. Succeeded attempts replay the cached result; uncertain attempts refuse a new settlement.
-
-**Requires:** EVM chain (`base-sepolia` / `base` / `polygon` / `arbitrum`), on-chain USDC at `agent.getAddress()`, and remaining daily / per-tx headroom.
-
-**Throws:** `X402PaymentError`, `LimitExceededError`, `InsufficientBalanceError`, `AgentPausedError`, …
 
 ---
 
 ### `getTools()`
 
-Returns **LangChain** structured tools (mock + remote). See below.
+**Returns:** LangChain structured tools that share this agent’s policy. See [LangChain tools](#langchain-tools).
 
 ---
 
-## LangChain tools (`agent.getTools()`)
+## LangChain tools
 
 ```ts
 const tools = agent.getTools();
 ```
 
-Each tool returns a **JSON string**.
+Each tool returns a **JSON string**. Parse before use in application code.
+
+| Tool | Arguments | Description |
+| ---- | --------- | ----------- |
+| `xone_wallet_address` | none | Agent identity and address |
+| `xone_wallet_balance` | none | Address + spend-limit snapshot |
+| `xone_payment_status` | none | Limits + status (pre-pay check) |
+| `xone_x402_pay` | `url`, optional `maxAmount`, `idempotencyKey` | Same settlement path as `agent.pay()` |
 
 ### `xone_wallet_address`
-
-**Purpose:** Read wallet identity (no args).
 
 ```ts
 const t = tools.find((x) => x.name === "xone_wallet_address")!;
 const raw = await t.invoke({});
-console.log(JSON.parse(raw));
-/*
-{
-  agentId, name, chain, address, family: "evm"|"solana", status
-}
-*/
+// { agentId, name, chain, address, family, status }
 ```
-
----
 
 ### `xone_wallet_balance`
 
-**Purpose:** Balance + remaining daily budget (no args).
-
 ```ts
 const t = tools.find((x) => x.name === "xone_wallet_balance")!;
-console.log(JSON.parse(await t.invoke({})));
-/*
-{
-  chain, address, currency, balance,
-  remainingDaily, dailyLimit, perTransaction, status
-}
-*/
+const raw = await t.invoke({});
+// { chain, address, currency, remainingDaily, dailyLimit, perTransaction, status, note }
 ```
-
----
 
 ### `xone_payment_status`
 
-**Purpose:** Limits + status only (no args). Useful before a pay.
-
 ```ts
 const t = tools.find((x) => x.name === "xone_payment_status")!;
-console.log(JSON.parse(await t.invoke({})));
-/*
-{
-  dailyLimit, perTransaction, remainingDaily, currency, status
-}
-*/
+const raw = await t.invoke({});
+// { dailyLimit, perTransaction, remainingDaily, currency, status, allowedHosts?, allowedPayees? }
 ```
-
----
 
 ### `xone_x402_pay`
 
-**Purpose:** Same as `agent.pay()` — real x402 payment for LLMs.
-
 | Arg | Type | Required | Description |
-|-----|------|----------|-------------|
-| `url` | `string` (URL) | yes | x402 resource (returns 402) |
-| `maxAmount` | `number \| string` | no | Ceiling only; does not override the 402 quote |
+| --- | ---- | -------- | ----------- |
+| `url` | `string` (URL) | yes | x402 resource |
+| `maxAmount` | `number \| string` | no | Ceiling only |
+| `idempotencyKey` | `string` | no | Retry key |
 
 ```ts
 const pay = tools.find((x) => x.name === "xone_x402_pay")!;
 const raw = await pay.invoke({
   url: "https://xone-x402-seller.tskwangyi.workers.dev/weather",
+  maxAmount: "0.05",
 });
-console.log(JSON.parse(raw));
-/*
-{
-  ok: true, mock: false, protocol: "x402",
-  url, paid, currency, chain, from, status, body,
-  remainingDaily, settlement, network
-}
-*/
 ```
 
-**Throws:** `X402PaymentError`, `LimitExceededError`, `AgentPausedError`, `AgentDeletedError`.
+**Throws:** `X402PaymentError`, `LimitExceededError`, `AgentPausedError`, `AgentDeletedError`
+
+### LangChain agent example
+
+Minimal wiring with `@langchain/langgraph` (install separately):
+
+```ts
+import { createReactAgent } from "@langchain/langgraph/prebuilt";
+import { ChatOpenAI } from "@langchain/openai";
+import { XOne } from "@xone/sdk";
+
+const xone = new XOne({ agentToken: process.env.XONE_AGENT_TOKEN! });
+const agent = await xone.agent.get();
+if (!agent) throw new Error("Agent not provisioned");
+
+const tools = agent.getTools();
+const llm = new ChatOpenAI({ model: "gpt-4o-mini" });
+
+const graph = createReactAgent({ llm, tools });
+const result = await graph.invoke({
+  messages: [
+    {
+      role: "user",
+      content:
+        "Pay https://xone-x402-seller.tskwangyi.workers.dev/weather if within limits.",
+    },
+  ],
+});
+```
 
 ---
 
-## Typed errors
+## Types
 
-All extend `XOneError` with a `code` field.
+### `XOneChain`
+
+```ts
+type XOneChain =
+  | "base"
+  | "base-sepolia"
+  | "solana"
+  | "polygon"
+  | "arbitrum";
+```
+
+x402 settlement today requires an EVM chain: `base-sepolia` \| `base` \| `polygon` \| `arbitrum`.
+
+### `AgentStatus`
+
+`"active" | "paused" | "exhausted" | "deleted"`
+
+### `BalanceSnapshot`
+
+| Field | Type | Description |
+| ----- | ---- | ----------- |
+| `currency` | `string` | e.g. `USDC` |
+| `chain` | `XOneChain` | Settlement network |
+| `address` | `string` | Fund this address on-chain |
+| `remainingDaily` | `number` | Remaining daily spend (UTC day) |
+| `dailyLimit` | `number` | Daily cap |
+| `perTransaction` | `number` | Per-payment cap |
+| `status` | `AgentStatus` | Lifecycle status |
+| `note` | `string` | Funding reminder |
+
+### `AgentLimits`
+
+| Field | Type | Description |
+| ----- | ---- | ----------- |
+| `dailyLimit` | `number` | Daily cap |
+| `perTransaction` | `number` | Per-payment cap |
+| `remainingDaily` | `number` | Remaining today |
+| `currency` | `string` | e.g. `USDC` |
+| `dailyPeriod` | `string?` | UTC day key `YYYY-MM-DD` |
+| `allowedHosts` | `string[]?` | Host allowlist |
+| `allowedPayees` | `string[]?` | Payee allowlist |
+
+### `AgentHistoryEntry`
+
+| Field | Type | Description |
+| ----- | ---- | ----------- |
+| `id` | `string` | Event id |
+| `type` | `AgentHistoryType` | Event kind |
+| `createdAt` | `string` | ISO timestamp |
+| `amount` | `number?` | Amount when applicable |
+| `currency` | `string?` | Currency |
+| `to` | `string?` | Destination |
+| `url` | `string?` | x402 URL |
+| `txHash` | `string?` | Chain tx when present |
+| `meta` | `object?` | Extra metadata |
+
+### `PayResult`
+
+| Field | Type | Description |
+| ----- | ---- | ----------- |
+| `ok` | `true` | Success |
+| `protocol` | `"x402"` | Protocol marker |
+| `url` | `string` | Paid resource |
+| `paid` | `number` | Amount settled (matches quote) |
+| `currency` | `string` | e.g. `USDC` |
+| `chain` | `XOneChain` | Settlement chain |
+| `from` | `string` | Payer address |
+| `status` | `number` | Final HTTP status after payment |
+| `body` | `unknown` | Resource response body |
+| `remainingDaily` | `number` | Remaining daily budget after debit |
+| `settlement` | `unknown?` | Facilitator / chain settlement payload |
+| `network` | `string?` | Network label when present |
+| `idempotencyKey` | `string` | Key used for this attempt |
+| `replay` | `boolean?` | Cached success for the same key |
+
+---
+
+## Errors
+
+All SDK errors extend `XOneError` and expose a stable `code` string for programmatic handling.
 
 | Error | `code` | When |
-|-------|--------|------|
-| `X402PaymentError` | `X402_PAYMENT_FAILED` | Real x402 HTTP/signing/settlement failed |
-| `LimitExceededError` | `LIMIT_EXCEEDED` | x402 exceeds per-tx or daily cap |
-| `AgentPausedError` | `AGENT_PAUSED` | Spend while paused |
-| `AgentDeletedError` | `AGENT_DELETED` | Money movement after soft-delete |
-| `AgentNotFoundError` | `AGENT_NOT_FOUND` | Unknown agent id |
-| `InvalidApiKeyError` | `INVALID_API_KEY` | Missing / deleted API key |
-| `OperatorRequiredError` | `OPERATOR_REQUIRED` | Agent token used for create / limits / pause / delete |
-| `ValidationError` | `VALIDATION_ERROR` | Bad params, host/payee/network not allowed |
+| ----- | ------ | ---- |
+| `X402PaymentError` | `X402_PAYMENT_FAILED` | Probe, signing, or settlement failed |
+| `LimitExceededError` | `LIMIT_EXCEEDED` | Quote exceeds per-tx or daily cap |
+| `InsufficientBalanceError` | `INSUFFICIENT_BALANCE` | On-chain funds insufficient for settlement |
+| `AgentPausedError` | `AGENT_PAUSED` | Spend attempted while paused |
+| `AgentDeletedError` | `AGENT_DELETED` | Spend after soft-delete |
+| `AgentNotFoundError` | `AGENT_NOT_FOUND` | Unknown agent |
+| `InvalidApiKeyError` | `INVALID_API_KEY` | Missing or deleted API key |
+| `OperatorRequiredError` | `OPERATOR_REQUIRED` | Spend token used for operator-only APIs |
+| `ValidationError` | `VALIDATION_ERROR` | Invalid params, host, payee, or network |
 
 ```ts
 import {
@@ -401,62 +548,36 @@ import {
 } from "@xone/sdk";
 
 try {
-  await pay.invoke({ url: "https://example.com/x", amount: 100 });
+  await agent.pay({ url: "https://example.com/paid" });
 } catch (e) {
   if (e instanceof LimitExceededError) {
-    console.log(e.limitType, e.amount, e.limit);
+    console.error(e.limitType, e.amount, e.limit);
   } else if (e instanceof InsufficientBalanceError) {
-    console.log(e.balance, e.amount);
+    console.error(e.balance, e.amount);
   } else if (e instanceof AgentPausedError) {
-    console.log(e.agentId);
+    console.error(e.agentId);
   } else {
     throw e;
   }
 }
 ```
 
----
+### Common scenarios
 
-## End-to-end example (mock)
-
-```ts
-import {
-  XOne,
-  createApiKeyRecord, // mock/dev helper only
-  LimitExceededError,
-} from "@xone/sdk";
-
-const key = await createApiKeyRecord({ name: "demo" });
-const xone = new XOne({ agentToken: key.token });
-
-const agent = await xone.agent.create({
-  name: "bot",
-  chain: "base",
-  dailyLimit: 5,
-  perTransaction: 2,
-});
-
-console.log(await agent.getBalance()); // address + limits
-console.log(await agent.getLimits());
-
-const [addressTool, , , payTool] = agent.getTools();
-console.log(await addressTool.invoke({}));
-
-await payTool.invoke({ url: "https://example.com/a", maxAmount: 1 });
-
-try {
-  await payTool.invoke({ url: "https://example.com/b", amount: 3 });
-} catch (e) {
-  console.log(e instanceof LimitExceededError); // true (per-tx = 2)
-}
-
-await agent.pause();
-await agent.resume();
-
-const hist = await agent.getHistory({ limit: 10 });
-console.log(hist.map((h) => h.type));
-```
-
-> In production, create the key **and the agent** in the **console**, set `XONE_API_URL`, and pass `agentToken`. Do not rely on `createApiKeyRecord` outside local/mock tests.
+| Situation | Typical error | What to do |
+| --------- | ------------- | ---------- |
+| Quote above per-tx or daily cap | `LimitExceededError` | Lower amount, wait for UTC day reset, or raise limits in console |
+| Wallet underfunded | `InsufficientBalanceError` | Fund USDC at `getAddress()` |
+| Agent paused in console | `AgentPausedError` | Resume in console |
+| Host / payee not allowlisted | `ValidationError` | Update allowlists or use an allowed URL/payee |
+| Seller not x402 / settlement failed | `X402PaymentError` | Inspect seller; do not mint a new idempotency key yet |
+| Timeout after `pay` | Unknown | **Reuse the same `idempotencyKey`** |
 
 ---
+
+## Security notes
+
+- Prefer **https** resource URLs; the API blocks private / localhost targets (SSRF protection).
+- Empty `allowedHosts` / `allowedPayees` means unrestricted among **allowed public** destinations — still subject to SSRF and https checks.
+- Agent tokens are spend-only; never ship console JWT or Supabase service-role keys with the agent.
+- Treat `idempotencyKey` as part of the payment intent — persist it with the job/request until success or definitive failure.
