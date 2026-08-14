@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { ArrowDownLeft, ArrowUpRight, Bot } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Bot, CreditCard } from "lucide-react";
 import { LedgerTablePage } from "@/features/wallet/ledger-table-page";
 import { useWalletTransactions } from "@/hooks/use-wallet-transactions";
 import { useA2AStore } from "@/stores/a2a";
@@ -42,6 +42,33 @@ export function PaymentLedgerPage() {
       emptyText={isLoading ? "加载中…" : "暂无转账记录"}
       rows={filtered}
       showTitleColumn={false}
+    />
+  );
+}
+
+/**
+ * 支付明细：全部支出（转账 + A2A）。
+ */
+export function PayLedgerPage() {
+  const { rows, isLoading } = useWalletTransactions();
+  const a2aLedger = useA2AStore((s) => s.ledger);
+  const filtered = useMemo(() => {
+    const outgoing = rows.filter((item) => item.direction === "out");
+    const seen = new Set(outgoing.map((item) => item.id));
+    const a2a = (a2aLedger ?? []).filter(
+      (item) => item.kind === "a2a" && !seen.has(item.id),
+    );
+    return [...outgoing, ...a2a].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
+  }, [rows, a2aLedger]);
+
+  return (
+    <LedgerTablePage
+      icon={CreditCard}
+      title="支付明细"
+      emptyText={isLoading ? "加载中…" : "暂无支付记录"}
+      rows={filtered}
     />
   );
 }

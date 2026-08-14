@@ -1,24 +1,17 @@
 import { NavLink, Outlet } from "react-router-dom";
 import {
-  ArrowDownLeft,
   ArrowLeftRight,
   ArrowUpRight,
-  Bot,
-  Code2,
-  CreditCard,
   Home,
-  List,
-  MessageSquare,
   PanelLeft,
   PanelLeftClose,
   QrCode,
-  Settings,
-  Store,
   Wallet,
   WalletCards,
 } from "lucide-react";
 import { APP_NAME } from "@wallet/config";
 import { AccountMenu } from "@/components/auth/account-menu";
+import { AppSidebarNav } from "@/components/layout/app-sidebar-nav";
 import { Button } from "@/components/ui/button";
 import { useWalletBalances } from "@/hooks/use-wallet-balances";
 import { useA2AStore } from "@/stores/a2a";
@@ -28,22 +21,6 @@ import { appChainLabel } from "@/web3";
 
 /** Fixed content inset from sidebar edge on desktop (via main/header padding). */
 const CONTENT_INSET_X = "md:px-8";
-
-/** Wallet core first, then ledger, then AI / A2A, then settings. */
-const navItems = [
-  { to: "/app", label: "首页", end: true, icon: Home },
-  { to: "/app/send", label: "转账", icon: ArrowLeftRight },
-  { to: "/app/receive", label: "收款", icon: QrCode },
-  { to: "/app/pay", label: "充值", icon: CreditCard },
-  { to: "/app/developers", label: "创建 Agent", end: true, icon: Code2 },
-  { to: "/app/developers/agents", label: "我的 Agents", icon: Bot },
-  { to: "/app/ledger/payments", label: "转账明细", icon: ArrowUpRight },
-  { to: "/app/ledger/receive", label: "收款明细", icon: ArrowDownLeft },
-  { to: "/app/chat", label: "对话", icon: MessageSquare },
-  { to: "/app/merchants", label: "agent list", icon: Store },
-  { to: "/app/ledger/a2a", label: "A2A 明细", icon: List },
-  { to: "/app/settings", label: "设置", icon: Settings },
-];
 
 const mobileNavItems = [
   { to: "/app", label: "首页", end: true, icon: Home },
@@ -66,14 +43,14 @@ export function AppLayout() {
       <div className="flex min-h-screen">
         <aside
           className={cn(
-            "hidden shrink-0 overflow-hidden border-r border-border bg-white/70 backdrop-blur-sm transition-[width,padding,opacity] duration-300 ease-out md:block",
-            sidebarOpen ? "w-56 p-6 opacity-100" : "w-0 border-r-0 p-0 opacity-0",
+            "hidden shrink-0 border-r border-border bg-white/70 backdrop-blur-sm transition-[width,padding,opacity] duration-300 ease-out md:sticky md:top-0 md:block md:h-screen md:overflow-y-auto",
+            sidebarOpen ? "w-60 p-6 opacity-100" : "w-0 overflow-hidden border-r-0 p-0 opacity-0",
           )}
           aria-hidden={!sidebarOpen}
         >
           <div
             className={cn(
-              "w-44 transition-opacity duration-200",
+              "w-48 transition-opacity duration-200",
               sidebarOpen ? "opacity-100" : "pointer-events-none opacity-0",
             )}
           >
@@ -86,30 +63,7 @@ export function AppLayout() {
                 <p className="text-xs text-muted-foreground">Web3 · A2A</p>
               </div>
             </div>
-            <nav className="flex flex-col gap-1">
-              {navItems.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <NavLink
-                    key={item.to}
-                    to={item.to}
-                    end={item.end}
-                    tabIndex={sidebarOpen ? 0 : -1}
-                    className={({ isActive }) =>
-                      cn(
-                        "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-all duration-200",
-                        isActive
-                          ? "bg-[var(--color-foreground)] text-[var(--color-background)]"
-                          : "text-muted-foreground hover:bg-[var(--color-muted)] hover:text-[var(--color-foreground)]",
-                      )
-                    }
-                  >
-                    <Icon className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden />
-                    <span>{item.label}</span>
-                  </NavLink>
-                );
-              })}
-            </nav>
+            <AppSidebarNav enabled={sidebarOpen} />
           </div>
         </aside>
 

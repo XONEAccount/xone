@@ -6,14 +6,17 @@ import { EnsureEmbeddedWallet } from "@/components/auth/ensure-embedded-wallet";
 import { RequireWallet } from "@/components/auth/require-wallet";
 import { WalletSessionSync } from "@/components/auth/wallet-session-sync";
 import { AppLayout } from "@/components/layout/app-layout";
+import { A2AFundPage } from "@/features/a2a/a2a-fund-page";
 import { A2APayPage } from "@/features/a2a/a2a-pay-page";
 import { ChatPage } from "@/features/chat/chat-page";
 import { SignInPage } from "@/features/auth/sign-in-page";
 import { AgentsListPage } from "@/features/developers/agents-list-page";
 import { CreateAgentPage } from "@/features/developers/create-agent-page";
 import { DashboardPage } from "@/features/wallet/dashboard-page";
+import { AssetsPage } from "@/features/wallet/assets-page";
 import {
   A2ALedgerPage,
+  PayLedgerPage,
   PaymentLedgerPage,
   ReceiveLedgerPage,
 } from "@/features/wallet/ledger-pages";
@@ -45,15 +48,18 @@ export function App() {
               }
             >
               <Route index element={<DashboardPage />} />
+              <Route path="assets" element={<AssetsPage />} />
               <Route path="chat" element={<ChatPage />} />
               <Route path="pay" element={<PayPage />} />
               <Route path="merchants" element={<A2APayPage />} />
               <Route path="developers" element={<CreateAgentPage />} />
               <Route path="developers/agents" element={<AgentsListPage />} />
-              <Route path="a2a" element={<Navigate to="/app/merchants" replace />} />
+              <Route path="a2a" element={<Navigate to="/app/a2a/fund" replace />} />
+              <Route path="a2a/fund" element={<A2AFundPage />} />
               <Route path="ledger" element={<Navigate to="/app/ledger/payments" replace />} />
               <Route path="ledger/payments" element={<PaymentLedgerPage />} />
               <Route path="ledger/receive" element={<ReceiveLedgerPage />} />
+              <Route path="ledger/pay" element={<PayLedgerPage />} />
               <Route path="ledger/a2a" element={<A2ALedgerPage />} />
               <Route path="send" element={<SendPage />} />
               <Route path="receive" element={<ReceivePage />} />
