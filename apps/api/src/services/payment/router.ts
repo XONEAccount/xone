@@ -4,7 +4,7 @@ import type {
   PaymentResult,
 } from "@wallet/types";
 import type { PaymentProvider } from "./provider.js";
-import { ThirdwebPaymentProvider } from "./thirdweb-provider.js";
+import { PrivyPaymentProvider } from "./privy-provider.js";
 
 /**
  * Selects an available payment provider and routes execution.
@@ -13,9 +13,9 @@ export class PaymentRouter {
   private readonly providers: PaymentProvider[];
 
   /**
-   * @param providers - Registered payment providers; defaults to thirdweb-only MVP
+   * @param providers - Registered payment providers; defaults to Privy-only MVP
    */
-  constructor(providers: PaymentProvider[] = [new ThirdwebPaymentProvider()]) {
+  constructor(providers: PaymentProvider[] = [new PrivyPaymentProvider()]) {
     this.providers = providers;
   }
 

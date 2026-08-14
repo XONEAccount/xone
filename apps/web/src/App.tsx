@@ -1,8 +1,8 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
-import { ThirdwebProvider } from "thirdweb/react";
-import { AutoConnectRoot } from "@/components/auth/auto-connect-root";
+import { queryClient } from "@/lib/query-client";
 import { EnsureAppChain } from "@/components/auth/ensure-app-chain";
+import { EnsureEmbeddedWallet } from "@/components/auth/ensure-embedded-wallet";
 import { RequireWallet } from "@/components/auth/require-wallet";
 import { WalletSessionSync } from "@/components/auth/wallet-session-sync";
 import { AppLayout } from "@/components/layout/app-layout";
@@ -21,26 +21,18 @@ import { PayPage } from "@/features/wallet/pay-page";
 import { ReceivePage } from "@/features/wallet/receive-page";
 import { SendPage } from "@/features/wallet/send-page";
 import { SettingsPage } from "@/features/wallet/settings-page";
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 15_000,
-      retry: 1,
-    },
-  },
-});
+import { WalletPrivyProvider } from "@/web3/privy-provider";
 
 /**
- * Root application router with thirdweb provider and wallet gate.
+ * Root application router with Privy provider and wallet gate.
  */
 export function App() {
   return (
-    <ThirdwebProvider>
+    <WalletPrivyProvider>
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
-          <AutoConnectRoot />
           <EnsureAppChain />
+          <EnsureEmbeddedWallet />
           <WalletSessionSync />
           <Routes>
             <Route path="/" element={<SignInPage />} />
@@ -73,6 +65,6 @@ export function App() {
           </Routes>
         </BrowserRouter>
       </QueryClientProvider>
-    </ThirdwebProvider>
+    </WalletPrivyProvider>
   );
 }

@@ -17,20 +17,14 @@ import {
   Wallet,
   WalletCards,
 } from "lucide-react";
-import { ConnectButton } from "thirdweb/react";
 import { APP_NAME } from "@wallet/config";
+import { AccountMenu } from "@/components/auth/account-menu";
 import { Button } from "@/components/ui/button";
 import { useWalletBalances } from "@/hooks/use-wallet-balances";
 import { useA2AStore } from "@/stores/a2a";
 import { useUiStore } from "@/stores/ui";
 import { cn } from "@/lib/utils";
-import {
-  appChain,
-  appChainLabel,
-  appWallets,
-  connectTheme,
-  thirdwebClient,
-} from "@/web3";
+import { appChainLabel } from "@/web3";
 
 /** Fixed content inset from sidebar edge on desktop (via main/header padding). */
 const CONTENT_INSET_X = "md:px-8";
@@ -40,15 +34,14 @@ const navItems = [
   { to: "/app", label: "首页", end: true, icon: Home },
   { to: "/app/send", label: "转账", icon: ArrowLeftRight },
   { to: "/app/receive", label: "收款", icon: QrCode },
+  { to: "/app/pay", label: "充值", icon: CreditCard },
   { to: "/app/developers", label: "创建 Agent", end: true, icon: Code2 },
   { to: "/app/developers/agents", label: "我的 Agents", icon: Bot },
-  { to: "/app/merchants", label: "Agent list", icon: Store },
-  { to: "/app/ledger/a2a", label: "A2A 明细", icon: List },
-  { to: "/app/pay", label: "充值", icon: CreditCard },
   { to: "/app/ledger/payments", label: "转账明细", icon: ArrowUpRight },
   { to: "/app/ledger/receive", label: "收款明细", icon: ArrowDownLeft },
   { to: "/app/chat", label: "对话", icon: MessageSquare },
-
+  { to: "/app/merchants", label: "agent list", icon: Store },
+  { to: "/app/ledger/a2a", label: "A2A 明细", icon: List },
   { to: "/app/settings", label: "设置", icon: Settings },
 ];
 
@@ -60,7 +53,7 @@ const mobileNavItems = [
 ];
 
 /**
- * 应用壳层：桌面侧边栏、顶栏余额、thirdweb 账户菜单、移动端底部导航。
+ * 应用壳层：桌面侧边栏、顶栏余额、账户菜单、移动端底部导航。
  */
 export function AppLayout() {
   const { usdc } = useWalletBalances();
@@ -69,7 +62,7 @@ export function AppLayout() {
   const toggleSidebar = useUiStore((s) => s.toggleSidebar);
 
   return (
-    <div className="min-h-screen text-(--color-foreground)">
+    <div className="min-h-screen text-[var(--color-foreground)]">
       <div className="flex min-h-screen">
         <aside
           className={cn(
@@ -85,7 +78,7 @@ export function AppLayout() {
             )}
           >
             <div className="mb-10 flex items-center gap-2.5">
-              <div className="flex h-9 w-9 items-center justify-center rounded-md border border-border bg-muted">
+              <div className="flex h-9 w-9 items-center justify-center rounded-md border border-border bg-[var(--color-muted)]">
                 <Wallet className="h-4 w-4" strokeWidth={1.75} aria-hidden />
               </div>
               <div>
@@ -107,7 +100,7 @@ export function AppLayout() {
                         "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-all duration-200",
                         isActive
                           ? "bg-[var(--color-foreground)] text-[var(--color-background)]"
-                          : "text-muted-foreground hover:bg-muted hover:text-(--color-foreground)",
+                          : "text-muted-foreground hover:bg-[var(--color-muted)] hover:text-[var(--color-foreground)]",
                       )
                     }
                   >
@@ -166,22 +159,14 @@ export function AppLayout() {
                 </p>
                 <p className="mt-1 font-mono text-xs font-medium">{usdc.toFixed(2)} USDC</p>
               </div>
-              <div className="balance-tick rounded-md border border-border bg-muted px-2.5 py-1.5 text-right">
+              <div className="balance-tick rounded-md border border-border bg-[var(--color-muted)] px-2.5 py-1.5 text-right">
                 <p className="flex items-center justify-end gap-1 text-[10px] leading-none text-muted-foreground">
                   <WalletCards className="h-3 w-3" aria-hidden />
                   A2A 可支付
                 </p>
                 <p className="mt-1 font-mono text-xs font-medium">{a2aBalance.toFixed(2)} USDC</p>
               </div>
-              <ConnectButton
-                client={thirdwebClient}
-                chain={appChain}
-                chains={[appChain]}
-                wallets={appWallets}
-                theme={connectTheme}
-                connectButton={{ label: "连接" }}
-                switchButton={{ label: "切换到 Base Sepolia" }}
-              />
+              <AccountMenu />
             </div>
           </header>
 
@@ -204,7 +189,7 @@ export function AppLayout() {
                   cn(
                     "flex flex-col items-center gap-1 rounded-md px-2 py-2 text-center text-[11px] transition-colors",
                     isActive
-                      ? "bg-muted font-medium"
+                      ? "bg-[var(--color-muted)] font-medium"
                       : "text-muted-foreground",
                   )
                 }

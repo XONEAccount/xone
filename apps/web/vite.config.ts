@@ -3,7 +3,7 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
-/** Required for thirdweb Google/GitHub OAuth popups to talk back to the opener. */
+/** Required for Privy Google/GitHub OAuth popups to talk back to the opener. */
 const oauthHeaders = {
   "Cross-Origin-Opener-Policy": "same-origin-allow-popups",
 };

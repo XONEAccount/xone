@@ -1,9 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { DEFAULT_CHAIN } from "@wallet/config";
 import type { AgentPayment, DeveloperAgent, PaymentStatus } from "@wallet/types";
-import { createThirdwebClient } from "thirdweb";
-import { baseSepolia, sepolia } from "thirdweb/chains";
-import { getWalletBalance, privateKeyToAccount } from "thirdweb/wallets";
+import { privateKeyToAccount } from "viem/accounts";
 import {
   encryptSecret,
   generateAgentApiKey,
@@ -11,6 +9,7 @@ import {
   hashApiKey,
 } from "../../lib/crypto.js";
 import { getEnv } from "../../lib/env.js";
+import { chainFromSlug, fetchDisplayBalance } from "../../lib/evm.js";
 
 type AgentAsset = "ETH" | "USDC";
 type AgentChain = "ethereum-sepolia" | "base-sepolia";
@@ -223,14 +222,10 @@ export async function createDeveloperAgent(
   }
 
   const sealSecret = env.jwtSecret || env.supabaseServiceRoleKey;
-  const client = createThirdwebClient({
-    clientId: env.thirdwebClientId || "developer-agent",
-    secretKey: env.thirdwebSecretKey || undefined,
-  });
 
   // Always create a dedicated EOA; private key is sealed server-side and never returned.
   const privateKey = generatePrivateKeyHex();
-  const account = privateKeyToAccount({ client, privateKey });
+  const account = privateKeyToAccount(privateKey as `0x${string}`);
   const walletAddress = account.address.toLowerCase();
   await ensureProfile(admin, walletAddress);
 
@@ -740,13 +735,7 @@ export async function getAgentBalance(agent: DeveloperAgent): Promise<{
   onChainBalance: string;
   onChainSymbol: string;
 }> {
-  const env = getEnv();
-  const client = createThirdwebClient({
-    clientId: env.thirdwebClientId || "developer-agent",
-    secretKey: env.thirdwebSecretKey || undefined,
-  });
-  const chain =
-    agent.chain === "base-sepolia" ? baseSepolia : sepolia;
+  const chain = chainFromSlug(agent.chain);
   const tokenAddress =
     agent.asset === "USDC"
       ? agent.chain === "base-sepolia"
@@ -755,16 +744,14 @@ export async function getAgentBalance(agent: DeveloperAgent): Promise<{
       : undefined;
 
   let onChainBalance = "0";
-  let onChainSymbol: string = agent.asset;
+  const onChainSymbol: string = agent.asset;
   try {
-    const balance = await getWalletBalance({
-      address: agent.walletAddress,
-      client,
+    onChainBalance = await fetchDisplayBalance(
+      agent.walletAddress as `0x${string}`,
+      tokenAddress as `0x${string}` | undefined,
+      agent.asset === "USDC" ? 6 : 18,
       chain,
-      ...(tokenAddress ? { tokenAddress } : {}),
-    });
-    onChainBalance = balance.displayValue;
-    onChainSymbol = balance.symbol || agent.asset;
+    );
   } catch {
     // Keep zeros when RPC is unavailable; policy numbers still return.
   }

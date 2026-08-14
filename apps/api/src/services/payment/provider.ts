@@ -6,7 +6,7 @@ import type {
 
 /**
  * Provider-agnostic payment execution interface.
- * MVP implements ThirdwebPaymentProvider; other rails can plug in later.
+ * MVP implements PrivyPaymentProvider; other rails can plug in later.
  */
 export interface PaymentProvider {
   readonly name: string;

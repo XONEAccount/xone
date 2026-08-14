@@ -7,11 +7,11 @@ import type {
 import type { PaymentProvider } from "./provider.js";
 
 /**
- * Placeholder thirdweb payment provider for Phase 1–2 scaffolding.
- * Real chain submission will be wired via thirdweb Server SDK.
+ * Placeholder Privy payment provider for Phase 1–2 scaffolding.
+ * Client-side sends go through Privy; server-side settlement is not faked as success.
  */
-export class ThirdwebPaymentProvider implements PaymentProvider {
-  readonly name = "thirdweb";
+export class PrivyPaymentProvider implements PaymentProvider {
+  readonly name = "privy";
 
   /**
    * @param request - Payment intent
@@ -25,7 +25,7 @@ export class ThirdwebPaymentProvider implements PaymentProvider {
    * Prepares a payment record. Blockchain submission is intentionally not faked as success.
    * @param request - Payment intent
    * @param authorization - Authorization granted by policy/user
-   * @returns Payment result in submitting state pending real thirdweb integration
+   * @returns Payment result in submitting state pending server-side Privy signing
    * @throws When authorization decision is block
    */
   async pay(
@@ -50,7 +50,7 @@ export class ThirdwebPaymentProvider implements PaymentProvider {
       confirmedAt: null,
       failureReason: null,
       metadata: {
-        note: "Awaiting thirdweb Server SDK wiring",
+        note: "Awaiting Privy server wallet wiring",
       },
     };
 

@@ -26,7 +26,7 @@ const developer = new Hono<{ Variables: AuthVariables }>();
 developer.use("*", requireAuth);
 
 /**
- * POST /api/developer/agents — create agent + restricted ETH wallet in one shot.
+ * POST /api/developer/agents — create agent + restricted USDC wallet in one shot.
  */
 developer.post("/agents", async (c) => {
   const parsed = createDeveloperAgentSchema.safeParse(await c.req.json());

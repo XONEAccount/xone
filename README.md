@@ -2,7 +2,7 @@
 
 Web-first Web3 钱包，支持 A2A 快捷支付。
 
-技术栈：React + Vite + Tailwind + Hono + Cloudflare（Pages + Workers）+ Supabase + thirdweb（In-App Wallet / MetaMask 等）。
+技术栈：React + Vite + Tailwind + Hono + Cloudflare（Pages + Workers）+ Supabase + Privy（嵌入式钱包 / MetaMask 等）+ viem。
 
 ## 结构
 
@@ -20,6 +20,12 @@ supabase/         SQL migrations
 ```bash
 pnpm install
 cp .env.example .env
+```
+
+在 [Privy Dashboard](https://dashboard.privy.io) 创建应用，打开 Email / Social / Wallet 登录，并把 `http://localhost:5173` 加到 Allowed Origins。把 App ID 填进 `apps/web/.env`：
+
+```bash
+VITE_PRIVY_APP_ID=your-privy-app-id
 ```
 
 `apps/api/.env` 中保持：
@@ -52,10 +58,10 @@ pnpm dev
 | `VITE_API_URL` | 例如 `https://xone-wallet-api.tskwangyi.workers.dev` |
 | `VITE_SUPABASE_URL` | Supabase 项目 URL |
 | `VITE_SUPABASE_ANON_KEY` | Supabase anon key |
-| `VITE_THIRDWEB_CLIENT_ID` | thirdweb client id |
+| `VITE_PRIVY_APP_ID` | Privy App ID（dashboard.privy.io） |
 | `VITE_ETHERSCAN_API_KEY` | 可选 |
 
-Worker 侧的 `SUPABASE_*` / `THIRDWEB_*` 等仍用 `wrangler secret put` 配在 Cloudflare，不必放进 GitHub。
+Worker 侧的 `SUPABASE_*` 等仍用 `wrangler secret put` 配在 Cloudflare，不必放进 GitHub。
 
 ### 本地手动部署
 
@@ -70,11 +76,11 @@ pnpm deploy
 
 ## 产品说明
 
-- **登录**：邮箱 / GitHub / Google / Apple / Discord / 手机号 / Passkey / MetaMask / WalletConnect 等（thirdweb）
+- **登录**：邮箱 / GitHub / Google / Apple / Discord / 手机号 / Passkey / MetaMask / WalletConnect 等（Privy）
 - **钱包**：Ethereum Sepolia 余额、收款二维码、链上转账
 - **首页**：链上余额 + A2A 快捷入口
 - **设置**：退出登录、从钱包转入 A2A、配置限额
-- **顶栏**：钱包余额 + A2A 可支付余额 + Connect 账户菜单
+- **顶栏**：钱包余额 + A2A 可支付余额 + 账户地址
 
 ## 安全模型
 

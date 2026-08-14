@@ -1,39 +1,51 @@
 import { useEffect, useRef } from "react";
-import { useActiveAccount, useActiveWallet } from "thirdweb/react";
 import { apiFetch } from "@/lib/api";
+import { queryClient } from "@/lib/query-client";
 import { useA2AStore } from "@/stores/a2a";
+import { useWalletAccount } from "@/hooks/use-wallet-account";
 
 /**
- * Links the connected thirdweb wallet to the backend profile once per address,
- * and scopes local A2A demo balance to the active wallet.
+ * Links the connected Privy wallet to the backend profile once per user+address,
+ * scopes A2A state to the active wallet, and drops cached queries on logout.
  */
 export function WalletSessionSync() {
-  const account = useActiveAccount();
-  const wallet = useActiveWallet();
+  const { ready, authenticated, address, wallet, user } = useWalletAccount();
   const linkedRef = useRef<string | null>(null);
   const switchWallet = useA2AStore((s) => s.switchWallet);
+  const userId = user?.id ?? null;
 
   useEffect(() => {
-    void switchWallet(account?.address ?? null);
-  }, [account?.address, switchWallet]);
+    if (!ready) return;
+
+    if (!authenticated) {
+      linkedRef.current = null;
+      queryClient.clear();
+      void switchWallet(null);
+      return;
+    }
+
+    void switchWallet(address ?? null);
+  }, [ready, authenticated, address, switchWallet]);
 
   useEffect(() => {
-    const address = account?.address;
-    if (!address || linkedRef.current === address) return;
+    if (!authenticated || !address) return;
 
-    linkedRef.current = address;
+    const key = `${userId ?? "anon"}:${address.toLowerCase()}`;
+    if (linkedRef.current === key) return;
+
+    linkedRef.current = key;
     void apiFetch("/api/auth/link-wallet", {
       method: "POST",
       body: {
         address,
-        provider: wallet?.id ?? "thirdweb",
+        provider: wallet?.walletClientType ?? "privy",
         chainType: "evm",
       },
     }).catch((error) => {
       console.warn("[auth] link-wallet failed", error);
       linkedRef.current = null;
     });
-  }, [account?.address, wallet?.id]);
+  }, [authenticated, address, userId, wallet?.walletClientType]);
 
   return null;
 }

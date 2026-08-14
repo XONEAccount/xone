@@ -1,15 +1,14 @@
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useActiveAccount } from "thirdweb/react";
 import { useA2AStore } from "@/stores/a2a";
+import { useWalletAccount } from "@/hooks/use-wallet-account";
 import { fetchTokenBalances, findDisplayBalance } from "@/web3";
 
 /**
  * Loads live token balances for the connected wallet.
  */
 export function useWalletBalances() {
-  const account = useActiveAccount();
-  const address = account?.address;
+  const { address } = useWalletAccount();
   const syncWalletEth = useA2AStore((s) => s.syncWalletEth);
 
   const query = useQuery({

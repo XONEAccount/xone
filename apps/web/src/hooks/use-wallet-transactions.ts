@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { useActiveAccount } from "thirdweb/react";
 import { fetchServerTransfers, type ServerTransferRow } from "@/lib/record-transfer";
+import { useWalletAccount } from "@/hooks/use-wallet-account";
 import { useA2AStore, type LedgerRecord } from "@/stores/a2a";
 import { fetchWalletLedger } from "@/web3/history";
 
@@ -9,8 +9,8 @@ import { fetchWalletLedger } from "@/web3/history";
  * Backend `in` rows make 收款明细 work without Insight indexing.
  */
 export function useWalletTransactions() {
-  const account = useActiveAccount();
-  const address = account?.address?.toLowerCase();
+  const { address: connected } = useWalletAccount();
+  const address = connected?.toLowerCase();
   const localLedger = useA2AStore((s) => s.pendingTransfers);
 
   const query = useQuery({

@@ -1,6 +1,5 @@
-import { Insight, toEther } from "thirdweb";
+import { formatEther } from "viem";
 import type { LedgerRecord } from "@/stores/a2a";
-import { thirdwebClient } from "@/web3/client";
 import { appChain } from "@/web3/chains";
 
 type RawTx = {
@@ -13,65 +12,16 @@ type RawTx = {
 };
 
 /**
- * Fetches recent ETH transfers for a wallet.
- * Prefers thirdweb Insight; falls back to Etherscan on Sepolia when Insight is empty
- * (common on testnets where indexing lags or returns no rows).
+ * Fetches recent ETH transfers for a wallet from Basescan / Etherscan.
  * @param walletAddress - Connected wallet address
  * @returns Ledger rows for UI tables
  */
 export async function fetchWalletLedger(walletAddress: string): Promise<LedgerRecord[]> {
   const address = walletAddress.toLowerCase();
-
-  const insightRows = await fetchFromInsight(walletAddress);
-  if (insightRows.length > 0) {
-    return insightRows.map((tx) => mapRawTx(tx, address)).filter((row): row is LedgerRecord => row != null);
-  }
-
   const explorerRows = await fetchFromEtherscan(walletAddress);
   return explorerRows
     .map((tx) => mapRawTx(tx, address))
     .filter((row): row is LedgerRecord => row != null);
-}
-
-/**
- * Loads txs via thirdweb Insight. Returns [] when unavailable or unindexed.
- * @param walletAddress - Wallet address
- */
-async function fetchFromInsight(walletAddress: string): Promise<RawTx[]> {
-  try {
-    const txs = await Insight.getTransactions({
-      client: thirdwebClient,
-      walletAddress,
-      chains: [appChain],
-      queryOptions: {
-        limit: 50,
-        sort_order: "desc",
-        decode: true,
-      },
-    });
-
-    return (txs ?? []).map((tx) => {
-      const row = tx as {
-        hash: string;
-        from_address?: string;
-        to_address?: string;
-        value?: string | number | null;
-        status?: number | null;
-        block_timestamp?: number | null;
-      };
-      return {
-        hash: row.hash,
-        from: (row.from_address ?? "").toLowerCase(),
-        to: (row.to_address ?? "").toLowerCase(),
-        value: String(row.value ?? "0"),
-        status: row.status === 0 ? "failed" : "success",
-        timestampMs: (row.block_timestamp ?? 0) * 1000,
-      } satisfies RawTx;
-    });
-  } catch (error) {
-    console.warn("[web3] Insight history unavailable", error);
-    return [];
-  }
 }
 
 type EtherscanTx = {
@@ -85,7 +35,7 @@ type EtherscanTx = {
 };
 
 /**
- * Loads native txs from Etherscan Sepolia account API.
+ * Loads native txs from the Etherscan V2 API, with a Basescan fallback.
  * @param walletAddress - Wallet address
  */
 async function fetchFromEtherscan(walletAddress: string): Promise<RawTx[]> {
@@ -102,7 +52,6 @@ async function fetchFromEtherscan(walletAddress: string): Promise<RawTx[]> {
   });
   if (apiKey) params.set("apikey", apiKey);
 
-  // Unified V2 endpoint (chainid) + Base Sepolia Basescan fallback.
   const urls = [
     `https://api.etherscan.io/v2/api?chainid=${appChain.id}&${params.toString()}`,
     `https://api-sepolia.basescan.org/api?${params.toString()}`,
@@ -128,7 +77,7 @@ async function fetchFromEtherscan(walletAddress: string): Promise<RawTx[]> {
         timestampMs: Number(tx.timeStamp || 0) * 1000,
       }));
     } catch (error) {
-      console.warn("[web3] Etherscan history unavailable", error);
+      console.warn("[web3] explorer history unavailable", error);
     }
   }
 
@@ -160,7 +109,7 @@ function mapRawTx(tx: RawTx, address: string): LedgerRecord | null {
   }
   if (valueWei === 0n) return null;
 
-  const amount = Number(toEther(valueWei));
+  const amount = Number(formatEther(valueWei));
   const outgoing = direction === "out";
 
   return {

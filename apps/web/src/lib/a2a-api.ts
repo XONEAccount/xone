@@ -25,10 +25,13 @@ export type A2AAccountDto = {
  * @param address - Wallet address
  */
 export async function fetchA2AAccount(address: string): Promise<A2AAccountDto> {
-  const data = await apiFetch<{ account: A2AAccountDto }>(
+  const data = await apiFetch<{ account?: A2AAccountDto }>(
     `/api/a2a/account?address=${encodeURIComponent(address)}`,
     { token: "demo" },
   );
+  if (!data.account?.walletAddress) {
+    throw new Error("A2A account missing from API response");
+  }
   return data.account;
 }
 

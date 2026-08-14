@@ -1,7 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowRightLeft, Languages, LogOut, Settings, User } from "lucide-react";
-import { useActiveAccount, useActiveWallet, useDisconnect } from "thirdweb/react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,7 +13,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { useWalletAccount } from "@/hooks/use-wallet-account";
 import { useWalletBalances } from "@/hooks/use-wallet-balances";
+import { queryClient } from "@/lib/query-client";
 import { shortAddress } from "@/lib/address";
 import { useA2AStore } from "@/stores/a2a";
 import { cn } from "@/lib/utils";
@@ -27,11 +28,10 @@ type Locale = "zh" | "en";
  */
 export function SettingsPage() {
   const navigate = useNavigate();
-  const account = useActiveAccount();
-  const activeWallet = useActiveWallet();
-  const { disconnect } = useDisconnect();
+  const { address, loginMethod, logout } = useWalletAccount();
   const { usdc } = useWalletBalances();
   const fundFromWallet = useA2AStore((s) => s.fundFromWallet);
+  const switchWallet = useA2AStore((s) => s.switchWallet);
 
   const [locale, setLocale] = useState<Locale>("zh");
   const [fundAmount, setFundAmount] = useState("1");
@@ -87,14 +87,14 @@ export function SettingsPage() {
   }
 
   /**
-   * Disconnects the thirdweb wallet and returns to sign-in.
+   * Disconnects the Privy session and returns to sign-in.
    */
   async function onConfirmLogout() {
     setLoggingOut(true);
     try {
-      if (activeWallet) {
-        await disconnect(activeWallet);
-      }
+      queryClient.clear();
+      await switchWallet(null);
+      await logout();
       setLogoutOpen(false);
       navigate("/", { replace: true });
     } finally {
@@ -118,13 +118,13 @@ export function SettingsPage() {
             <div className="min-w-0">
               <p className="text-xs text-muted-foreground">钱包地址</p>
               <p className="mt-1 break-all font-mono text-sm font-medium">
-                {account?.address ?? "—"}
+                {address ?? "—"}
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
-                {appChainLabel} · {shortAddress(account?.address ?? "")}
+                {appChainLabel} · {shortAddress(address ?? "")}
               </p>
             </div>
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-border bg-muted">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-border bg-[var(--color-muted)]">
               <User className="h-4 w-4" strokeWidth={1.75} aria-hidden />
             </div>
           </div>
@@ -132,7 +132,7 @@ export function SettingsPage() {
           <div className="flex items-center justify-between gap-4 border-b border-border pb-4">
             <div>
               <p className="text-xs text-muted-foreground">登录方式</p>
-              <p className="mt-1 text-sm font-medium">{activeWallet?.id ?? "thirdweb"}</p>
+              <p className="mt-1 text-sm font-medium">{loginMethod}</p>
             </div>
           </div>
 
@@ -159,8 +159,8 @@ export function SettingsPage() {
           className={cn(
             "message-in rounded-md border px-4 py-3 text-sm",
             toast.tone === "ok"
-              ? "border-border bg-muted"
-              : "border-[var(--color-destructive)]/30 bg-red-50 text-destructive",
+              ? "border-border bg-[var(--color-muted)]"
+              : "border-[var(--color-destructive)]/30 bg-red-50 text-[var(--color-destructive)]",
           )}
           role="status"
         >

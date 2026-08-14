@@ -18,8 +18,6 @@ export function getEnv() {
     supabaseUrl: process.env.SUPABASE_URL ?? "",
     supabaseAnonKey: process.env.SUPABASE_ANON_KEY ?? "",
     supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
-    thirdwebClientId: process.env.THIRDWEB_CLIENT_ID ?? "",
-    thirdwebSecretKey: process.env.THIRDWEB_SECRET_KEY ?? "",
     /** Prefer DEEPSEEK_API_KEY when LLM_PROVIDER=deepseek. */
     openaiApiKey,
     deepseekApiKey,

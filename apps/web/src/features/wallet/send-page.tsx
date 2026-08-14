@@ -2,7 +2,6 @@ import { useMemo, useState, type FormEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getTxExplorerUrl } from "@wallet/config";
 import { ArrowLeftRight, ExternalLink, Eye, LoaderCircle } from "lucide-react";
-import { TransactionButton, useActiveAccount } from "thirdweb/react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,22 +14,24 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { useSendAsset } from "@/hooks/use-send-asset";
+import { useWalletAccount } from "@/hooks/use-wallet-account";
 import { useWalletBalances } from "@/hooks/use-wallet-balances";
 import { recordTransferOnServer } from "@/lib/record-transfer";
 import { useA2AStore } from "@/stores/a2a";
 import {
   buildSendTransaction,
-  connectTheme,
   estimateSendFee,
   prepareSendPreview,
   type PreparedSend,
 } from "@/web3";
 
 /**
- * 转账页：自研表单预览 + thirdweb TransactionButton 提交。
+ * 转账页：自研表单预览 + Privy 签名发送。
  */
 export function SendPage() {
-  const account = useActiveAccount();
+  const { address } = useWalletAccount();
+  const { sendAsset } = useSendAsset();
   const queryClient = useQueryClient();
   const { usdc, eth, refetch } = useWalletBalances();
   const recordTransfer = useA2AStore((s) => s.recordTransfer);
@@ -40,6 +41,7 @@ export function SendPage() {
   const [amount, setAmount] = useState("");
   const [preview, setPreview] = useState<PreparedSend | null>(null);
   const [estimating, setEstimating] = useState(false);
+  const [sending, setSending] = useState(false);
   const [txHash, setTxHash] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -64,7 +66,7 @@ export function SendPage() {
     setTxHash(null);
     setPreview(null);
 
-    if (!account) {
+    if (!address) {
       setError("请先连接钱包");
       return;
     }
@@ -90,7 +92,7 @@ export function SendPage() {
         trimmedTo,
         trimmedAmount,
         asset,
-        account,
+        address,
       );
       setPreview(prepareSendPreview(trimmedTo, trimmedAmount, asset, estimatedFee));
     } catch (err) {
@@ -104,11 +106,57 @@ export function SendPage() {
   }
 
   /**
+   * Signs and broadcasts the prepared transfer.
+   */
+  async function onConfirmSend() {
+    if (!preview || !address || transaction instanceof Error || !transaction) return;
+    setSending(true);
+    setError(null);
+    try {
+      const hash = await sendAsset(preview.to, preview.amount, preview.asset);
+      setTxHash(hash);
+      const sentAsset = preview.asset === "ETH" ? "ETH" : "USDC";
+      recordTransfer({
+        from: address,
+        to: preview.to,
+        amount: preview.amount,
+        asset: sentAsset,
+        txHash: hash,
+      });
+      void recordTransferOnServer({
+        txHash: hash,
+        from: address,
+        to: preview.to,
+        amount: preview.amount,
+        asset: sentAsset,
+        status: "submitted",
+      })
+        .catch((err) => {
+          console.warn("[send] backend ledger record failed", err);
+        })
+        .finally(() => {
+          void queryClient.invalidateQueries({
+            queryKey: ["wallet-txs"],
+          });
+        });
+      setPreview(null);
+      void refetch();
+      void queryClient.invalidateQueries({
+        queryKey: ["wallet-txs", address.toLowerCase()],
+      });
+    } catch (err) {
+      setError(friendlySendError(err instanceof Error ? err.message : String(err)));
+    } finally {
+      setSending(false);
+    }
+  }
+
+  /**
    * Closes the confirm dialog without sending.
    * @param open - Dialog open state from Radix
    */
   function onConfirmOpenChange(open: boolean) {
-    if (!open) setPreview(null);
+    if (!open && !sending) setPreview(null);
   }
 
   return (
@@ -203,55 +251,27 @@ export function SendPage() {
                 {transaction.message}
               </p>
             ) : transaction ? (
-              <TransactionButton
-                transaction={() => transaction}
-                theme={connectTheme}
-                className="!h-10 !w-full !rounded-md !bg-[var(--color-foreground)] !text-sm !font-medium !text-[var(--color-background)]"
-                payModal={false}
-                onTransactionSent={(result) => {
-                  const hash = result.transactionHash;
-                  setTxHash(hash);
-                  if (preview && account?.address) {
-                    const sentAsset = preview.asset === "ETH" ? "ETH" : "USDC";
-                    recordTransfer({
-                      from: account.address,
-                      to: preview.to,
-                      amount: preview.amount,
-                      asset: sentAsset,
-                      txHash: hash,
-                    });
-                    void recordTransferOnServer({
-                      txHash: hash,
-                      from: account.address,
-                      to: preview.to,
-                      amount: preview.amount,
-                      asset: sentAsset,
-                      status: "submitted",
-                    })
-                      .catch((err) => {
-                        console.warn("[send] backend ledger record failed", err);
-                      })
-                      .finally(() => {
-                        void queryClient.invalidateQueries({
-                          queryKey: ["wallet-txs"],
-                        });
-                      });
-                  }
-                  setPreview(null);
-                  void refetch();
-                  void queryClient.invalidateQueries({
-                    queryKey: ["wallet-txs", account?.address?.toLowerCase()],
-                  });
-                }}
-                onError={(err) => setError(friendlySendError(err.message))}
+              <Button
+                type="button"
+                className="w-full"
+                disabled={sending}
+                onClick={() => void onConfirmSend()}
               >
-                确认并发送
-              </TransactionButton>
+                {sending ? (
+                  <>
+                    <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden />
+                    发送中…
+                  </>
+                ) : (
+                  "确认并发送"
+                )}
+              </Button>
             ) : null}
             <Button
               type="button"
               variant="outline"
               className="w-full"
+              disabled={sending}
               onClick={() => setPreview(null)}
             >
               取消
@@ -295,7 +315,7 @@ function friendlySendError(message: string): string {
   if (lower.includes("insufficient funds") || lower.includes("exceeds balance")) {
     return "余额不足，无法完成转账（可能还包括网络手续费）。";
   }
-  if (lower.includes("user rejected") || lower.includes("denied")) {
+  if (lower.includes("user rejected") || lower.includes("denied") || lower.includes("cancelled")) {
     return "你已取消本次交易。";
   }
   if (lower.includes("execution reverted")) {

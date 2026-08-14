@@ -1,0 +1,4 @@
+# Cloudflare Pages — admin console static site
+name = "xone-admin"
+compatibility_date = "2025-08-10"
+pages_build_output_dir = "dist"

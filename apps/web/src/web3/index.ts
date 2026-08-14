@@ -1,6 +1,12 @@
-export { thirdwebClient } from "./client";
-export { appChain, appChainLabel, assertChainAlignment } from "./chains";
-export { appWallets, connectTheme } from "./wallets";
+export { getPublicClient, getPublicClientBySlug } from "./client";
+export { WalletPrivyProvider } from "./privy-provider";
+export {
+  appChain,
+  appChainLabel,
+  assertChainAlignment,
+  chainFromSlug,
+  sepoliaChain,
+} from "./chains";
 export { fetchTokenBalances, findDisplayBalance, type TokenBalanceView } from "./balances";
 export {
   buildSendTransaction,
@@ -8,6 +14,7 @@ export {
   prepareSendPreview,
   USDC_ADDRESS,
   type PreparedSend,
+  type PreparedTxRequest,
 } from "./transactions";
 export { fetchWalletLedger } from "./history";
 export { wallet } from "./wallet";

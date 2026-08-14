@@ -1,0 +1,55 @@
+{
+  "name": "@xone/sdk",
+  "version": "0.1.0",
+  "description": "XOne SDK — agent wallets and LangChain tools for x402 payments",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./mock": {
+      "types": "./dist/mock.d.ts",
+      "import": "./dist/mock.js",
+      "require": "./dist/mock.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts src/mock.ts --format cjs,esm --dts --clean",
+    "dev": "tsup src/index.ts src/mock.ts --format cjs,esm --dts --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "echo \"no lint yet\""
+  },
+  "keywords": [
+    "x402",
+    "langchain",
+    "wallet",
+    "usdc",
+    "ai-agent",
+    "payments"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@langchain/core": "^0.3.66",
+    "@solana/web3.js": "^1.98.4",
+    "@x402/evm": "^2.22.0",
+    "@x402/fetch": "^2.22.0",
+    "viem": "^2.33.3",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^22.17.0",
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.2"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

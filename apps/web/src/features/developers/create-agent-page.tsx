@@ -2,14 +2,13 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { getTxExplorerUrl } from "@wallet/config";
-import { TransactionButton, useActiveAccount } from "thirdweb/react";
 import {
   ArrowDownToLine,
   Check,
   Copy,
   ExternalLink,
   KeyRound,
-  Terminal,
+  LoaderCircle,
   Wallet,
   Zap,
 } from "lucide-react";
@@ -27,57 +26,48 @@ import {
 } from "@/components/ui/dialog";
 import { DismissibleError } from "@/components/ui/dismissible-error";
 import { Input } from "@/components/ui/input";
+import { useEnsureEmbeddedWallet } from "@/hooks/use-ensure-embedded-wallet";
+import { useSendAsset } from "@/hooks/use-send-asset";
+import { useWalletAccount } from "@/hooks/use-wallet-account";
 import { useWalletBalances } from "@/hooks/use-wallet-balances";
 import { shortAddress } from "@/lib/address";
 import {
   createDeveloperAgent,
   DEFAULT_X402_MERCHANT_URL,
-  LOCAL_X402_MERCHANT_URL,
-  REMOTE_X402_MERCHANT_URL,
   fundDeveloperAgent,
   listDeveloperAgents,
-  runFirstMachinePayment,
   runMerchantPayment,
 } from "@/lib/developer-api";
 import { recordTransferOnServer } from "@/lib/record-transfer";
-import { getWebEnv } from "@/lib/env";
 import { cn } from "@/lib/utils";
-import { buildSendTransaction, connectTheme, estimateSendFee } from "@/web3";
+import { buildSendTransaction, estimateSendFee } from "@/web3";
 
 type Step = 1 | 2 | 3;
-type AgentChain = "ethereum-sepolia" | "base-sepolia";
-type AgentAsset = "ETH" | "USDC";
 
+const AGENT_CHAIN = "base-sepolia" as const;
+const AGENT_ASSET = "USDC" as const;
 const FIRST_PAY_AMOUNT = 0.001;
-
-const CHAIN_OPTIONS: Array<{ value: AgentChain; label: string }> = [
-  { value: "base-sepolia", label: "Base Sepolia（x402 测试）" },
-  { value: "ethereum-sepolia", label: "Ethereum Sepolia" },
-];
 
 /**
  * 5-minute developer flow: create restricted agent wallet → on-chain fund → first x402 pay.
  */
 export function CreateAgentPage() {
-  const account = useActiveAccount();
+  const { address } = useWalletAccount();
+  const { ensureEmbeddedWalletAddress } = useEnsureEmbeddedWallet();
+  const { sendAsset } = useSendAsset();
   const queryClient = useQueryClient();
-  const owner = account?.address?.toLowerCase() ?? "";
-  const apiBase = getWebEnv().apiUrl;
-  const { eth, usdc, refetch: refetchBalances } = useWalletBalances();
+  const owner = address?.toLowerCase() ?? "";
+  const { usdc, refetch: refetchBalances } = useWalletBalances();
 
   const [step, setStep] = useState<Step>(1);
   const [name, setName] = useState("");
-  const [chain, setChain] = useState<AgentChain>("base-sepolia");
-  const [asset, setAsset] = useState<AgentAsset>("USDC");
-  const [maxAmount, setMaxAmount] = useState("5");
+  const [maxAmount, setMaxAmount] = useState("10");
   const [maxSingle, setMaxSingle] = useState("1");
   const [fundAmount, setFundAmount] = useState(String(FIRST_PAY_AMOUNT));
   const [fundOpen, setFundOpen] = useState(false);
   const [fundFee, setFundFee] = useState("估算中…");
   const [fundTxHash, setFundTxHash] = useState<string | null>(null);
-  const [payAmount, setPayAmount] = useState(String(FIRST_PAY_AMOUNT));
-  const [payRecipient, setPayRecipient] = useState("");
-  const [merchantUrl, setMerchantUrl] = useState(DEFAULT_X402_MERCHANT_URL);
+  const [funding, setFunding] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [apiKey, setApiKey] = useState<string | null>(null);
@@ -97,46 +87,27 @@ export function CreateAgentPage() {
       .catch(() => setExistingNames([]));
   }, [owner]);
 
-  // Default recipient to connected wallet when empty or when wallet switches.
-  useEffect(() => {
-    if (!owner) return;
-    setPayRecipient((prev) => (!prev ? owner : prev));
-  }, [owner]);
-
-  // Keep chain/asset pairs valid when either select changes.
-  useEffect(() => {
-    if (chain === "ethereum-sepolia" && asset !== "ETH") setAsset("ETH");
-    if (chain === "base-sepolia" && asset !== "USDC") setAsset("USDC");
-  }, [chain, asset]);
-
   const fundTransaction = useMemo(() => {
     if (!fundOpen || !agent) return null;
-    const supported =
-      (agent.asset === "USDC" && agent.chain === "base-sepolia") ||
-      (agent.asset === "ETH" && agent.chain === "ethereum-sepolia");
-    if (!supported) {
-      return new Error("当前仅支持 Base Sepolia USDC 或 Ethereum Sepolia ETH 链上转入");
-    }
     try {
-      return buildSendTransaction(agent.walletAddress, fundAmount.trim(), agent.asset);
+      return buildSendTransaction(
+        agent.walletAddress,
+        fundAmount.trim(),
+        AGENT_ASSET,
+        AGENT_CHAIN,
+      );
     } catch (err) {
       return err instanceof Error ? err : new Error("无法构建转入交易");
     }
   }, [fundOpen, agent, fundAmount]);
 
-  const supportsOnChainFund =
-    (agent?.asset === "USDC" && agent?.chain === "base-sepolia") ||
-    (agent?.asset === "ETH" && agent?.chain === "ethereum-sepolia");
+  const supportsOnChainFund = Boolean(agent);
 
   /**
-   * Step 1 — create agent wallet with chain, asset, and spend caps.
+   * Step 1 — ensure the owner has an embedded wallet, then create the agent EOA.
    */
   async function onCreate(event: FormEvent) {
     event.preventDefault();
-    if (!owner) {
-      setError("请先连接钱包");
-      return;
-    }
     const trimmed = name.trim();
     if (!trimmed) {
       setError("请填写 Agent 名称");
@@ -156,15 +127,16 @@ export function CreateAgentPage() {
     setBusy(true);
     setError(null);
     try {
+      const ownerAddress = await ensureEmbeddedWalletAddress();
       const result = await createDeveloperAgent({
-        ownerAddress: owner,
+        ownerAddress,
         name: trimmed,
-        description: `Restricted ${asset} wallet on ${chain} for MCP / x402`,
+        description: "Restricted USDC wallet on Base Sepolia for MCP / x402",
         maxAmount: max,
         maxSinglePayment: single,
         initialAllowance: 0,
-        chain,
-        asset,
+        chain: AGENT_CHAIN,
+        asset: AGENT_ASSET,
       });
       setAgent(result.agent);
       setApiKey(result.apiKey);
@@ -191,7 +163,7 @@ export function CreateAgentPage() {
    * Opens confirm dialog after validating amount; estimates gas for the on-chain fund.
    */
   async function onOpenFundConfirm() {
-    if (!agent || !owner || !account) {
+    if (!agent || !owner || !address) {
       setError("请先连接钱包");
       return;
     }
@@ -200,9 +172,9 @@ export function CreateAgentPage() {
       setError("请输入有效转入金额");
       return;
     }
-    const available = agent.asset === "USDC" ? usdc : eth;
+    const available = usdc;
     if (amount > available) {
-      setError(`钱包余额不足（可用 ${available} ${agent.asset}）`);
+      setError(`钱包余额不足（可用 ${available} USDC）`);
       return;
     }
     if (agent.allowanceEth + amount > agent.maxAmount) {
@@ -217,8 +189,9 @@ export function CreateAgentPage() {
       const fee = await estimateSendFee(
         agent.walletAddress,
         fundAmount.trim(),
-        agent.asset,
-        account,
+        AGENT_ASSET,
+        address,
+        AGENT_CHAIN,
       );
       setFundFee(fee);
     } catch {
@@ -227,11 +200,34 @@ export function CreateAgentPage() {
   }
 
   /**
+   * Signs and broadcasts the on-chain USDC fund transfer to the agent wallet.
+   */
+  async function onConfirmFundSend() {
+    if (!agent || fundTransaction instanceof Error || !fundTransaction) return;
+    setFunding(true);
+    setError(null);
+    try {
+      const hash = await sendAsset(
+        agent.walletAddress,
+        fundAmount.trim(),
+        AGENT_ASSET,
+        AGENT_CHAIN,
+      );
+      await onFundTxSent(hash);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "链上转入失败");
+      setFundOpen(false);
+    } finally {
+      setFunding(false);
+    }
+  }
+
+  /**
    * After on-chain send: credit allowance + ledger, refresh balances.
    * @param txHash - Submitted transaction hash
    */
   async function onFundTxSent(txHash: string) {
-    if (!agent || !owner || !account?.address) return;
+    if (!agent || !owner || !address) return;
     const amount = Number(fundAmount);
     setFundTxHash(txHash);
     setBusy(true);
@@ -239,10 +235,10 @@ export function CreateAgentPage() {
     try {
       void recordTransferOnServer({
         txHash,
-        from: account.address,
+        from: address,
         to: agent.walletAddress,
         amount: fundAmount.trim(),
-        asset: agent.asset === "USDC" ? "USDC" : "ETH",
+        asset: AGENT_ASSET,
         status: "submitted",
       }).catch((err) => console.warn("[fund] ledger record failed", err));
 
@@ -265,7 +261,7 @@ export function CreateAgentPage() {
 
   /**
    * Validates simulated machine spend against single-cap, lifetime cap, and funded allowance.
-   * @param amount - Requested ETH amount
+   * @param amount - Requested USDC amount
    * @param current - Agent state
    * @returns Error message, or null when allowed
    */
@@ -288,79 +284,37 @@ export function CreateAgentPage() {
   }
 
   /**
-   * Real x402 merchant pay against allowlisted seller (/weather), or internal simulate fallback.
+   * Pays the allowlisted x402 weather merchant with the agent wallet.
    */
-  async function onFirstPay() {
-    if (!apiKey || !agent || !owner) return;
+  async function onMerchantPay() {
+    if (!apiKey || !agent) return;
+    const validationError = validateMachineSpend(FIRST_PAY_AMOUNT, agent);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
     setBusy(true);
     setError(null);
     try {
-      const useExternalMerchant =
-        agent.chain === "base-sepolia" && agent.asset === "USDC";
-
-      if (useExternalMerchant) {
-        const url = merchantUrl.trim();
-        if (!url.startsWith("http")) {
-          setError("请填写完整的商家 URL（含 https://）");
-          return;
-        }
-        // Amount / policy are enforced server-side against the merchant's 402 quote.
-
-        const result = await runMerchantPayment(apiKey, {
-          merchantUrl: url,
-          idempotencyKey: `merchant-${agent.id}-${Date.now()}`,
-        });
-        setAgent((prev) =>
-          prev
-            ? {
-              ...prev,
-              allowanceEth: result.agent.allowanceEth,
-              spentAmount: result.agent.spentAmount,
-            }
-            : prev,
-        );
-        setReceiptId(result.receipt.paymentId);
-        setPaidTo(result.receipt.recipient);
-        setPaidAmount(result.receipt.amount);
-        setMerchantBody(result.receipt.merchantBody);
-        setSettlementTx(result.receipt.settlementTx ?? null);
-        setStep(3);
-        return;
-      }
-
-      const recipient = payRecipient.trim();
-      if (!/^0x[a-fA-F0-9]{40}$/.test(recipient)) {
-        setError("收款地址格式不正确");
-        return;
-      }
-      const amount = Number(payAmount);
-      const validationError = validateMachineSpend(amount, agent);
-      if (validationError) {
-        setError(validationError);
-        return;
-      }
-
-      const result = await runFirstMachinePayment(apiKey, {
-        amount: String(amount),
-        recipient,
-        merchant: "xone-first-pay",
-        resource: "xone://developers/first-machine-payment",
-        idempotencyKey: `pay-${agent.id}-${amount}-${Date.now()}`,
+      const result = await runMerchantPayment(apiKey, {
+        merchantUrl: DEFAULT_X402_MERCHANT_URL,
+        idempotencyKey: `merchant-${agent.id}-${Date.now()}`,
       });
       setAgent((prev) =>
         prev
           ? {
-            ...prev,
-            allowanceEth: result.agent.allowanceEth,
-            spentAmount: result.agent.spentAmount,
-          }
+              ...prev,
+              allowanceEth: result.agent.allowanceEth,
+              spentAmount: result.agent.spentAmount,
+            }
           : prev,
       );
       setReceiptId(result.receipt.paymentId);
       setPaidTo(result.receipt.recipient);
       setPaidAmount(result.receipt.amount);
-      setMerchantBody(null);
-      setSettlementTx(null);
+      setMerchantBody(result.receipt.merchantBody);
+      setSettlementTx(result.receipt.settlementTx ?? null);
       setStep(3);
     } catch (err) {
       setError(err instanceof Error ? err.message : "支付失败");
@@ -369,53 +323,17 @@ export function CreateAgentPage() {
     }
   }
 
-  const useExternalMerchant =
-    agent?.chain === "base-sepolia" && agent?.asset === "USDC";
-  const payAmountNumber = Number(payAmount);
-  const recipientOk = /^0x[a-fA-F0-9]{40}$/.test(payRecipient.trim());
-  const payValidation =
-    !useExternalMerchant && agent && Number.isFinite(payAmountNumber) && payAmount.trim() !== ""
-      ? validateMachineSpend(payAmountNumber, agent)
-      : !useExternalMerchant && agent
-        ? "请输入消费金额"
-        : null;
-  const recipientValidation =
-    !useExternalMerchant && payRecipient.trim() && !recipientOk
-      ? "收款地址格式不正确"
-      : null;
-  const merchantUrlOk = Boolean(merchantUrl.trim().startsWith("http"));
-  const canFirstPay = useExternalMerchant
-    ? Boolean(agent && merchantUrlOk)
-    : Boolean(agent && !payValidation && recipientOk);
-  const mcpExample = apiKey
-    ? [
-      `# get_balance`,
-      `curl -s ${apiBase}/api/mcp \\`,
-      `  -H "Authorization: Bearer ${apiKey}" \\`,
-      `  -H "Content-Type: application/json" \\`,
-      `  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"get_balance","arguments":{}}}'`,
-      ``,
-      `# get_payment_status`,
-      `curl -s ${apiBase}/api/mcp \\`,
-      `  -H "Authorization: Bearer ${apiKey}" \\`,
-      `  -H "Content-Type: application/json" \\`,
-      `  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"get_payment_status","arguments":{}}}'`,
-    ].join("\n")
-    : "";
+  const payValidation = agent ? validateMachineSpend(FIRST_PAY_AMOUNT, agent) : null;
+  const canMerchantPay = Boolean(agent && !payValidation);
 
   return (
     <div className="space-y-8">
-      {error ? (
-        <div className="sticky top-0 z-50 -mx-1">
-          <DismissibleError
-            message={error}
-            onDismiss={() => setError(null)}
-            autoHideMs={2000}
-          />
-        </div>
-      ) : null}
-
       <PageHeader icon={Zap} title="创建 Agent" />
+      <p className="-mt-4 max-w-2xl text-sm text-muted-foreground">
+        生成受限钱包并设置 USDC 支付上限。固定 Base Sepolia + USDC（对接公开
+        x402）；转入额度会真实发到 Agent 地址。
+      </p>
+
       <ol className="flex flex-wrap gap-3 text-sm text-muted-foreground">
         {[
           { n: 1 as const, label: "创建受限钱包" },
@@ -438,6 +356,8 @@ export function CreateAgentPage() {
         ))}
       </ol>
 
+      {error ? <DismissibleError message={error} onDismiss={() => setError(null)} /> : null}
+
       {step === 1 ? (
         <Card>
           <CardHeader>
@@ -446,7 +366,7 @@ export function CreateAgentPage() {
               配置 Agent
             </CardTitle>
             <CardDescription>
-              系统会生成独立 EOA 钱包（私钥密封在服务端，不返回浏览器），并按链 / 币种与总额、单笔上限限制机器支付。
+              创建时会同时生成 Agent 受限钱包（独立 EOA）。按总额 / 单笔上限限制 USDC 机器支付。私钥密封在服务端，不会返回给浏览器。
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -460,39 +380,14 @@ export function CreateAgentPage() {
                   placeholder="例如 travel-bot"
                 />
               </label>
+              <p className="rounded-md border border-[var(--color-border)] px-3 py-2 text-sm">
+                <span className="text-muted-foreground">运行网络与币种</span>
+                <br />
+                Base Sepolia · USDC
+              </p>
               <div className="grid gap-4 sm:grid-cols-2">
                 <label className="block space-y-1.5 text-sm">
-                  <span className="text-muted-foreground">运行 Chain</span>
-                  <select
-                    className="flex h-10 w-full rounded-md border border-border bg-white px-3 text-sm"
-                    value={chain}
-                    onChange={(e) => setChain(e.target.value as AgentChain)}
-                  >
-                    {CHAIN_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="block space-y-1.5 text-sm">
-                  <span className="text-muted-foreground">允许的币</span>
-                  <select
-                    className="flex h-10 w-full rounded-md border border-border bg-white px-3 text-sm"
-                    value={asset}
-                    onChange={(e) => setAsset(e.target.value as AgentAsset)}
-                  >
-                    {chain === "ethereum-sepolia" ? (
-                      <option value="ETH">ETH</option>
-                    ) : (
-                      <option value="USDC">USDC</option>
-                    )}
-                  </select>
-                </label>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <label className="block space-y-1.5 text-sm">
-                  <span className="text-muted-foreground">总额上限 ({asset})</span>
+                  <span className="text-muted-foreground">总额上限 (USDC)</span>
                   <Input
                     value={maxAmount}
                     onChange={(e) => setMaxAmount(e.target.value)}
@@ -500,7 +395,7 @@ export function CreateAgentPage() {
                   />
                 </label>
                 <label className="block space-y-1.5 text-sm">
-                  <span className="text-muted-foreground">单笔上限 ({asset})</span>
+                  <span className="text-muted-foreground">单笔上限 (USDC)</span>
                   <Input
                     value={maxSingle}
                     onChange={(e) => setMaxSingle(e.target.value)}
@@ -508,18 +403,8 @@ export function CreateAgentPage() {
                   />
                 </label>
               </div>
-              {chain === "base-sepolia" ? (
-                <p className="text-xs text-muted-foreground">
-                  Base Sepolia + USDC 可对接公开 x402 facilitator（如 x402.org）与已部署商家{" "}
-                  https://xone-x402-seller.tskwangyi.workers.dev 。
-                </p>
-              ) : (
-                <p className="text-xs text-muted-foreground">
-                  Ethereum Sepolia + ETH 不走公开 x402 facilitator，仅适合本产品内部额度测试。
-                </p>
-              )}
-              <Button type="submit" disabled={busy || !owner} className="w-full sm:w-auto">
-                {busy ? "创建中…" : "创建 Agent"}
+              <Button type="submit" disabled={busy} className="w-full sm:w-auto">
+                {busy ? "正在创建钱包…" : "创建 Agent"}
               </Button>
             </form>
           </CardContent>
@@ -531,19 +416,22 @@ export function CreateAgentPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <KeyRound className="size-4" />
-              API Key（仅显示一次）
+              API Key
             </CardTitle>
             <CardDescription>
-              {agent.name} · {agent.chain} / {agent.asset} · 钱包{" "}
-              {shortAddress(agent.walletAddress)} · 可用额度 {agent.allowanceEth}{" "}
-              {agent.asset}
+              Agent 调 x402 / MCP 的机器凭证。
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <p className="rounded-md border border-border bg-neutral-50 px-3 py-2 text-xs text-muted-foreground">
-              已创建独立 EOA：<span className="font-mono text-foreground">{agent.walletAddress}</span>
-              。私钥仅服务端密封存储。
-            </p>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <code className="flex-1 break-all rounded-md border border-border bg-neutral-50 px-3 py-2 text-xs">
+                {apiKey}
+              </code>
+              <Button type="button" variant="outline" onClick={() => void onCopyKey()}>
+                {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+                {copied ? "已复制" : "复制"}
+              </Button>
+            </div>
 
             {step === 2 ? (
               <div className="space-y-4">
@@ -552,12 +440,16 @@ export function CreateAgentPage() {
                     <ArrowDownToLine className="size-4" />
                     ① 链上转入 Agent 钱包
                   </p>
+                  <p className="text-sm text-muted-foreground">
+                    将 USDC 真实转到 Agent 地址 {shortAddress(agent.walletAddress)}。需 ≤ 钱包可用{" "}
+                    {usdc} USDC，并支付少量 ETH 作为 gas。
+                  </p>
                   <div className="flex flex-col gap-2 sm:flex-row">
                     <Input
                       value={fundAmount}
                       onChange={(e) => setFundAmount(e.target.value)}
                       inputMode="decimal"
-                      className="sm:max-w-40"
+                      className="sm:max-w-[10rem]"
                     />
                     <Button
                       type="button"
@@ -589,101 +481,43 @@ export function CreateAgentPage() {
                 </div>
 
                 <div className="space-y-3 rounded-md border border-border p-3">
-                  <p className="text-sm font-medium">
-                    ② 机器消费（真实 x402 /weather）
+                  <p className="text-sm font-medium">② x402 机器消费</p>
+                  <p className="text-sm text-muted-foreground">
+                    调用公开商家 GET /weather，价格固定 0.001 USDC。
                   </p>
-                  {useExternalMerchant ? (
-                    <>
-                      <label className="block space-y-1.5 text-sm">
-                        <span className="text-muted-foreground">
-                          商家资源 URL（金额以商家 402 报价为准，约 $0.001 USDC）
-                        </span>
-                        <Input
-                          value={merchantUrl}
-                          onChange={(e) => setMerchantUrl(e.target.value)}
-                          className="font-mono text-xs"
-                        />
-                      </label>
-                      <div className="flex flex-wrap gap-3 text-xs">
-                        <button
-                          type="button"
-                          className="text-muted-foreground underline"
-                          onClick={() => setMerchantUrl(REMOTE_X402_MERCHANT_URL)}
-                        >
-                          线上 /weather
-                        </button>
-                        <button
-                          type="button"
-                          className="text-muted-foreground underline"
-                          onClick={() => setMerchantUrl(LOCAL_X402_MERCHANT_URL)}
-                        >
-                          本地 /weather
-                        </button>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <label className="block space-y-1.5 text-sm">
-                        <span className="text-muted-foreground">
-                          收款人（默认当前钱包，可改）
-                        </span>
-                        <Input
-                          value={payRecipient}
-                          onChange={(e) => setPayRecipient(e.target.value)}
-                          placeholder="0x…"
-                          className="font-mono text-xs"
-                        />
-                      </label>
-                      {owner ? (
-                        <button
-                          type="button"
-                          className="text-xs text-muted-foreground underline"
-                          onClick={() => setPayRecipient(owner)}
-                        >
-                          填回当前钱包 {shortAddress(owner)}
-                        </button>
-                      ) : null}
-                      <label className="block space-y-1.5 text-sm">
-                        <div className="text-muted-foreground mb-2">
-                          消费金额 ({agent.asset})
-                        </div>
-                        <Input
-                          value={payAmount}
-                          onChange={(e) => setPayAmount(e.target.value)}
-                          inputMode="decimal"
-                          className="sm:max-w-40"
-                          placeholder="0.001"
-                        />
-                      </label>
-                    </>
-                  )}
-
-                  {recipientValidation ||
-                    payValidation ||
-                    (useExternalMerchant && !merchantUrlOk) ? (
+                  <a
+                    className="inline-flex items-center gap-1 break-all text-xs underline"
+                    href={DEFAULT_X402_MERCHANT_URL}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {DEFAULT_X402_MERCHANT_URL}
+                    <ExternalLink className="size-3 shrink-0" />
+                  </a>
+                  <ul className="space-y-1 text-xs text-muted-foreground">
+                    <li>本次扣款 0.001 USDC</li>
+                    <li>单笔上限 {agent.maxSinglePayment} USDC</li>
+                    <li>
+                      总额剩余{" "}
+                      {Math.max(0, Number((agent.maxAmount - agent.spentAmount).toFixed(8)))} /{" "}
+                      {agent.maxAmount} USDC（已花 {agent.spentAmount}）
+                    </li>
+                    <li>可用额度 {agent.allowanceEth} USDC</li>
+                  </ul>
+                  {payValidation ? (
                     <p className="text-sm text-red-700" role="status">
-                      {recipientValidation ??
-                        payValidation ??
-                        (useExternalMerchant && !merchantUrlOk ? "商家 URL 无效" : null)}
+                      {payValidation}
                     </p>
                   ) : (
-                    <p className="text-sm text-muted-foreground">
-                      {useExternalMerchant
-                        ? "请求商家 → 读取 402 报价 → 策略校验 → Agent 签名结算"
-                        : "校验通过，可以发起支付"}
-                    </p>
+                    <p className="text-sm text-muted-foreground">额度充足，可以发起支付</p>
                   )}
                   <Button
                     type="button"
-                    disabled={busy || !owner || !canFirstPay}
-                    onClick={() => void onFirstPay()}
+                    disabled={busy || !canMerchantPay}
+                    onClick={() => void onMerchantPay()}
                   >
                     <Zap className="size-4" />
-                    {busy
-                      ? "支付中…"
-                      : useExternalMerchant
-                        ? "支付 /weather"
-                        : "完成机器支付"}
+                    {busy ? "支付中…" : "支付并获取天气"}
                   </Button>
                 </div>
               </div>
@@ -697,7 +531,7 @@ export function CreateAgentPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Check className="size-4" />
-              首次机器支付已确认
+              x402 支付已确认
             </CardTitle>
             <CardDescription>Payment ID：{receiptId}</CardDescription>
           </CardHeader>
@@ -707,33 +541,41 @@ export function CreateAgentPage() {
               <strong>
                 {paidAmount} {agent.asset}
               </strong>{" "}
-              → 收款人 <strong>{paidTo ? shortAddress(paidTo) : "—"}</strong>
+              →{" "}
+              <a
+                className="underline"
+                href={DEFAULT_X402_MERCHANT_URL}
+                target="_blank"
+                rel="noreferrer"
+              >
+                /weather
+              </a>
             </p>
-            {settlementTx ? (
-              <p>
-                结算 tx{" "}
-                <a
-                  className="inline-flex items-center gap-1 underline"
-                  href={getTxExplorerUrl(settlementTx)}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  {shortAddress(settlementTx)}
-                  <ExternalLink className="size-3" />
-                </a>
+            {paidTo ? (
+              <p className="break-all font-mono text-xs text-muted-foreground">
+                商家收款地址 {paidTo}
               </p>
             ) : null}
-            {merchantBody != null ? (
-              <pre className="overflow-x-auto rounded-md border border-border bg-neutral-50 p-3 text-[11px] leading-relaxed">
-                {typeof merchantBody === "string"
-                  ? merchantBody
-                  : "天气结果：" + JSON.stringify(merchantBody, null, 2)}
-              </pre>
+            {settlementTx ? (
+              <a
+                className="inline-flex items-center gap-1 text-xs underline"
+                href={getTxExplorerUrl(settlementTx)}
+                target="_blank"
+                rel="noreferrer"
+              >
+                结算交易 {shortAddress(settlementTx)}
+                <ExternalLink className="size-3" />
+              </a>
             ) : null}
             <p className="text-muted-foreground">
               剩余可用 {agent.allowanceEth} {agent.asset} · 已花费 {agent.spentAmount}{" "}
               {agent.asset}
             </p>
+            {merchantBody ? (
+              <pre className="overflow-x-auto rounded-md border border-border bg-neutral-50 p-3 text-[11px] leading-relaxed">
+                {JSON.stringify(merchantBody, null, 2)}
+              </pre>
+            ) : null}
             <Button asChild variant="outline">
               <Link to="/app/developers/agents">查看我的 Agents</Link>
             </Button>
@@ -746,7 +588,7 @@ export function CreateAgentPage() {
           <DialogHeader>
             <DialogTitle>确认链上转入</DialogTitle>
             <DialogDescription>
-              将从你的钱包发送 {agent?.asset ?? "资产"} 到 Agent 地址，确认后余额会减少。
+              将从你的钱包发送 USDC 到 Agent 地址，确认后余额会减少。
             </DialogDescription>
           </DialogHeader>
           {agent ? (
@@ -771,23 +613,23 @@ export function CreateAgentPage() {
                 {fundTransaction.message}
               </p>
             ) : fundTransaction ? (
-              <TransactionButton
-                transaction={() => fundTransaction}
-                theme={connectTheme}
-                className="!h-10 !w-full !rounded-md !bg-[var(--color-foreground)] !text-sm !font-medium !text-[var(--color-background)]"
-                payModal={false}
-                onTransactionSent={(result) => {
-                  void onFundTxSent(result.transactionHash);
-                }}
-                onError={(err) => {
-                  setError(err.message || "链上转入失败");
-                  setFundOpen(false);
-                }}
+              <Button
+                type="button"
+                className="w-full"
+                disabled={funding}
+                onClick={() => void onConfirmFundSend()}
               >
-                确认发送
-              </TransactionButton>
+                {funding ? (
+                  <>
+                    <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden />
+                    发送中…
+                  </>
+                ) : (
+                  "确认发送"
+                )}
+              </Button>
             ) : null}
-            <Button type="button" variant="outline" onClick={() => setFundOpen(false)}>
+            <Button type="button" variant="outline" disabled={funding} onClick={() => setFundOpen(false)}>
               取消
             </Button>
           </DialogFooter>

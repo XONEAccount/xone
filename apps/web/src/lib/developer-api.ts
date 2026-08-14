@@ -38,18 +38,18 @@ export async function createDeveloperAgent(input: {
 export async function listDeveloperAgents(
   ownerAddress: string,
 ): Promise<DeveloperAgent[]> {
-  const data = await apiFetch<{ agents: DeveloperAgent[] }>(
+  const data = await apiFetch<{ agents?: DeveloperAgent[] }>(
     `/api/developer/agents?address=${encodeURIComponent(ownerAddress)}`,
     { token: "demo" },
   );
-  return data.agents;
+  return Array.isArray(data.agents) ? data.agents : [];
 }
 
 /**
- * Credits restricted ETH allowance after an on-chain transfer to the agent wallet.
+ * Credits restricted USDC allowance after an on-chain transfer to the agent wallet.
  * @param agentId - Agent id
  * @param ownerAddress - Owner wallet
- * @param amount - ETH amount
+ * @param amount - USDC amount
  * @param txHash - Funding transaction hash
  */
 export async function fundDeveloperAgent(
@@ -238,18 +238,25 @@ export async function getDeveloperAgentDetail(
   agentId: string,
   ownerAddress: string,
 ): Promise<{ agent: DeveloperAgent; payments: AgentPayment[] }> {
-  return apiFetch<{ agent: DeveloperAgent; payments: AgentPayment[] }>(
+  const data = await apiFetch<{ agent?: DeveloperAgent; payments?: AgentPayment[] }>(
     `/api/developer/agents/${agentId}?address=${encodeURIComponent(ownerAddress)}`,
     { token: "demo" },
   );
+  if (!data.agent) {
+    throw new Error("Agent not found");
+  }
+  return {
+    agent: data.agent,
+    payments: Array.isArray(data.payments) ? data.payments : [],
+  };
 }
 
 /**
- * Updates maxAmount and maxSinglePayment for an owned agent.
+ * Updates spend caps for an owned developer agent.
  * @param agentId - Agent id
  * @param ownerAddress - Owner wallet
- * @param maxAmount - New lifetime cap
- * @param maxSinglePayment - New per-payment cap
+ * @param maxAmount - Total spend cap
+ * @param maxSinglePayment - Per-payment cap
  */
 export async function updateDeveloperAgent(
   agentId: string,
@@ -269,7 +276,7 @@ export async function updateDeveloperAgent(
 }
 
 /**
- * Soft-deletes (disables) an owned agent.
+ * Soft-deletes (disables) an owned developer agent.
  * @param agentId - Agent id
  * @param ownerAddress - Owner wallet
  */

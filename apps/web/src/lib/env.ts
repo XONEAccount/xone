@@ -6,6 +6,8 @@ export function getWebEnv() {
     apiUrl: import.meta.env.VITE_API_URL ?? "http://localhost:4396",
     supabaseUrl: import.meta.env.VITE_SUPABASE_URL ?? "",
     supabaseAnonKey: import.meta.env.VITE_SUPABASE_ANON_KEY ?? "",
-    thirdwebClientId: import.meta.env.VITE_THIRDWEB_CLIENT_ID ?? "",
+    privyAppId: import.meta.env.VITE_PRIVY_APP_ID ?? "",
+    privyClientId: import.meta.env.VITE_PRIVY_CLIENT_ID ?? "",
+    rpcUrl: import.meta.env.VITE_RPC_URL ?? "",
   };
 }

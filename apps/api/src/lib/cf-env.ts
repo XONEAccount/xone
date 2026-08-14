@@ -7,8 +7,6 @@ export type WorkerBindings = {
   SUPABASE_URL?: string;
   SUPABASE_ANON_KEY?: string;
   SUPABASE_SERVICE_ROLE_KEY?: string;
-  THIRDWEB_CLIENT_ID?: string;
-  THIRDWEB_SECRET_KEY?: string;
   OPENAI_API_KEY?: string;
   DEEPSEEK_API_KEY?: string;
   LLM_PROVIDER?: string;
@@ -26,8 +24,6 @@ const BINDING_KEYS: (keyof WorkerBindings)[] = [
   "SUPABASE_URL",
   "SUPABASE_ANON_KEY",
   "SUPABASE_SERVICE_ROLE_KEY",
-  "THIRDWEB_CLIENT_ID",
-  "THIRDWEB_SECRET_KEY",
   "OPENAI_API_KEY",
   "DEEPSEEK_API_KEY",
   "LLM_PROVIDER",

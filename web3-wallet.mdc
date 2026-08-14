@@ -51,10 +51,9 @@ The product should feel closer to a modern fintech app than a crypto developer d
 - TypeScript
 
 ## Web3
-- thirdweb
-- thirdweb User / In-App Wallets
-- thirdweb Smart Accounts when useful
-- thirdweb Server SDK for server-side Web3 operations
+- Privy (embedded wallets, social login, external wallets)
+- viem for RPC reads, ERC-20 encoding, and gas estimates
+- Privy Smart Wallets / gas sponsorship when useful
 - x402 when supported by external services
 
 ## Database / Auth / Infrastructure
@@ -69,7 +68,6 @@ The product should feel closer to a modern fintech app than a crypto developer d
 - OpenAI for reasoning and tool selection
 - A2A client for external agent-to-agent integrations
 - MCP client for tool integrations
-- thirdweb MCP where useful for blockchain execution
 
 Do not introduce an additional framework or infrastructure dependency unless it solves a real problem that the current stack cannot solve cleanly.
 
@@ -89,7 +87,7 @@ Hono API / Agent Orchestrator
   ├── A2A Clients
   ├── MCP Clients
   └── Payment Router
-        └── thirdweb
+        └── Privy
               ↓
           Blockchain
 
@@ -124,7 +122,7 @@ Responsible for:
 - payment confirmation
 - webhook handling
 - idempotency
-- server-side thirdweb operations
+- server-side Privy / viem operations
 
 ## Supabase
 Responsible for:
@@ -137,17 +135,17 @@ Responsible for:
 - payments
 - audit logs
 
-## thirdweb
+## Privy
 Responsible for:
 - wallet infrastructure
-- blockchain transactions
+- key management and signing
+- embedded / in-app wallets
 - Smart Accounts
 - gas sponsorship
-- contract interaction
-- Web3 payment execution
-- x402-related blockchain payment flows where applicable
+- Web3 payment execution where applicable
 
-thirdweb is NOT the source of truth for application business identity.
+Privy is NOT the source of truth for application business identity.
+x402 facilitators and RPC/indexers are separate providers.
 
 Supabase user ID is the canonical application user ID.
 
@@ -163,7 +161,7 @@ Supabase User
   ↓
 Wallet Mapping
   ↓
-thirdweb Wallet
+Privy Wallet
   ↓
 0x Address
 
@@ -176,7 +174,7 @@ users
 - email
 - phone
 - display_name
-- thirdweb_user_id nullable
+- privy_user_id nullable
 - primary_wallet_address nullable
 - created_at
 - updated_at
@@ -298,7 +296,7 @@ Recommended audit_logs fields:
 
 # 7. Payment Architecture
 
-Do not hard-code thirdweb as the only possible payment method.
+Do not hard-code Privy as the only possible payment method.
 
 Use a Payment Router abstraction.
 
@@ -316,13 +314,13 @@ export interface PaymentProvider {
 ```
 
 Possible providers:
-- ThirdwebPaymentProvider
+- PrivyPaymentProvider
 - StripePaymentProvider
 - AlipayPaymentProvider
 - WeChatPayProvider
 - BankPaymentProvider
 
-For the MVP, thirdweb may be the only implemented provider, but the architecture must remain provider-agnostic.
+For the MVP, Privy may be the only implemented wallet provider, but the architecture must remain provider-agnostic.
 
 ---
 
@@ -395,7 +393,7 @@ Quote / Order / Payment Request
   ↓
 Our Payment Router
   ↓
-thirdweb or another provider
+Privy or another provider
 
 The external agent must never directly control the user's wallet.
 
@@ -423,7 +421,7 @@ MCP is for tool access.
 Suggested structure:
 
 AI Agent
-  ├── MCP → thirdweb
+  ├── MCP → viem / internal tools
   ├── MCP → internal tools
   ├── A2A → external agents
   └── API → internal Hono routes
@@ -445,7 +443,7 @@ Avoid exposing generic unrestricted "sendTransaction" capabilities directly to a
 
 # 11. Wallet Layer
 
-Do not import thirdweb throughout every React component.
+Do not import Privy throughout every React component.
 
 Create an abstraction layer.
 
@@ -470,7 +468,7 @@ wallet.getAddress()
 wallet.prepareTransaction()
 ```
 
-instead of depending directly on thirdweb primitives everywhere.
+instead of depending directly on Privy primitives everywhere.
 
 This reduces vendor lock-in.
 
@@ -892,7 +890,7 @@ Build the MVP in this order:
 
 Phase 1:
 - Supabase auth
-- thirdweb wallet creation/linking
+- Privy wallet creation/linking
 - wallet address
 - balance display
 - receive
@@ -936,7 +934,7 @@ When generating code for this project:
 6. Use Zod for all untrusted input.
 7. Separate payment intent from payment execution.
 8. Use Supabase as canonical application identity.
-9. Hide thirdweb behind a wallet/payment abstraction.
+9. Hide Privy behind a wallet/payment abstraction.
 10. Build features vertically: UI + API + schema + validation + error states.
 11. Do not create fake blockchain/payment success states.
 12. Do not silently auto-pay unless policy explicitly allows it.

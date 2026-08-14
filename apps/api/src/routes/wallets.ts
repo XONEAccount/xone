@@ -1,9 +1,8 @@
 import { DEFAULT_CHAIN, SUPPORTED_ASSETS } from "@wallet/config";
-import { createThirdwebClient } from "thirdweb";
-import { baseSepolia } from "thirdweb/chains";
-import { getWalletBalance } from "thirdweb/wallets";
 import { Hono } from "hono";
+import type { Address } from "viem";
 import { getEnv } from "../lib/env.js";
+import { fetchDisplayBalance } from "../lib/evm.js";
 import type { AuthVariables } from "../middleware/auth.js";
 import { requireAuth } from "../middleware/auth.js";
 import { getSupabaseAdmin } from "../lib/supabase.js";
@@ -49,7 +48,7 @@ wallets.get("/", async (c) => {
       {
         id: "00000000-0000-4000-8000-000000000010",
         userId,
-        provider: env.thirdwebClientId ? "thirdweb" : env.custodyAddress ? "custody" : "demo",
+        provider: env.custodyAddress ? "custody" : "privy",
         providerWalletId: null,
         address,
         chainType: "evm",
@@ -61,7 +60,7 @@ wallets.get("/", async (c) => {
 });
 
 /**
- * Returns balances for a wallet (live via thirdweb when possible).
+ * Returns balances for a wallet (live via RPC when possible).
  */
 wallets.get("/:id/balances", async (c) => {
   const env = getEnv();
@@ -82,7 +81,7 @@ wallets.get("/:id/balances", async (c) => {
     address = env.custodyAddress?.toLowerCase() ?? "";
   }
 
-  if (!address || !env.thirdwebClientId) {
+  if (!address || !/^0x[a-fA-F0-9]{40}$/.test(address)) {
     return c.json({
       balances: SUPPORTED_ASSETS.map((asset) => ({
         symbol: asset.symbol,
@@ -96,26 +95,21 @@ wallets.get("/:id/balances", async (c) => {
     });
   }
 
-  const client = createThirdwebClient({
-    clientId: env.thirdwebClientId,
-    secretKey: env.thirdwebSecretKey || undefined,
-  });
-
+  const owner = address as Address;
   const balances = await Promise.all(
     SUPPORTED_ASSETS.map(async (asset) => {
       try {
-        const balance = await getWalletBalance({
-          address,
-          client,
-          chain: baseSepolia,
-          ...(asset.address ? { tokenAddress: asset.address } : {}),
-        });
+        const display = await fetchDisplayBalance(
+          owner,
+          asset.address ? (asset.address as Address) : undefined,
+          asset.decimals,
+        );
         return {
           symbol: asset.symbol,
           name: asset.name,
           address: asset.address,
           decimals: asset.decimals,
-          balance: balance.displayValue,
+          balance: display,
           balanceUsd: null,
           chainId: DEFAULT_CHAIN.id,
         };

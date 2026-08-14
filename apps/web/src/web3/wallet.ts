@@ -3,12 +3,12 @@ import { prepareSendPreview } from "@/web3/transactions";
 
 /**
  * Application-level wallet facade for non-hook call sites.
- * Live address/balance/send should prefer thirdweb React hooks in components.
+ * Live address/balance/send should prefer `useWalletAccount` in components.
  */
 export const wallet = {
   /**
    * Placeholder until a connected account is available in the component tree.
-   * @returns Empty string; UI should use useActiveAccount
+   * @returns Empty string; UI should use useWalletAccount
    */
   async getAddress(): Promise<string> {
     return "";

@@ -1,0 +1,19 @@
+name = "xone-sdk-api"
+main = "src/index.ts"
+compatibility_date = "2025-05-01"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+
+# Public vars (non-secret). Secrets via `wrangler secret put`.
+[vars]
+SUPABASE_URL = "https://gniwqisprnldgdlvruyd.supabase.co"
+CORS_ORIGIN = "http://localhost:5180,http://127.0.0.1:5180,http://localhost:5181,http://127.0.0.1:5181,https://xone-console.pages.dev"
+
+# Secrets (set via `wrangler secret put`):
+#   SUPABASE_ANON_KEY
+#   SUPABASE_SERVICE_ROLE_KEY
+#   SUPABASE_JWT_SECRET
+#   WALLET_ENCRYPTION_KEY
+
+[dev]
+port = 8787

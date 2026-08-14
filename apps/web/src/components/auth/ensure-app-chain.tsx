@@ -1,38 +1,33 @@
 import { useEffect, useRef } from "react";
-import {
-  useActiveAccount,
-  useActiveWalletChain,
-  useSwitchActiveWalletChain,
-} from "thirdweb/react";
 import { appChain } from "@/web3";
+import { useWalletAccount } from "@/hooks/use-wallet-account";
 
 /**
- * Automatically switches the connected wallet to the app chain (Sepolia).
- * In-App / social logins often land on the wrong network and show "Switch Network".
+ * Automatically switches the connected wallet to the app chain (Base Sepolia).
  */
 export function EnsureAppChain() {
-  const account = useActiveAccount();
-  const activeChain = useActiveWalletChain();
-  const switchChain = useSwitchActiveWalletChain();
+  const { wallet } = useWalletAccount();
   const switchingRef = useRef(false);
 
   useEffect(() => {
-    if (!account || !activeChain) return;
-    if (activeChain.id === appChain.id) {
+    if (!wallet) return;
+    const current = Number(String(wallet.chainId).split(":").pop());
+    if (current === appChain.id) {
       switchingRef.current = false;
       return;
     }
     if (switchingRef.current) return;
 
     switchingRef.current = true;
-    void switchChain(appChain)
+    void wallet
+      .switchChain(appChain.id)
       .catch((error) => {
         console.warn("[web3] auto switch chain failed", error);
       })
       .finally(() => {
         switchingRef.current = false;
       });
-  }, [account, activeChain, switchChain]);
+  }, [wallet, wallet?.chainId]);
 
   return null;
 }

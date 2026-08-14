@@ -24,7 +24,7 @@ export interface User {
   email: string | null;
   phone: string | null;
   displayName: string | null;
-  thirdwebUserId: string | null;
+  privyUserId: string | null;
   primaryWalletAddress: string | null;
   createdAt: string;
   updatedAt: string;

@@ -76,7 +76,7 @@ export const linkWalletSchema = z.object({
   address: z
     .string()
     .regex(/^0x[a-fA-F0-9]{40}$/, "Invalid EVM address"),
-  provider: z.string().min(1).max(64).default("thirdweb"),
+  provider: z.string().min(1).max(64).default("privy"),
   providerWalletId: z.string().max(128).optional(),
   chainType: z.enum(["evm", "solana"]).default("evm"),
   email: z.string().email().optional(),

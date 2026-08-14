@@ -1,0 +1,8 @@
+name = "xone-admin-api"
+main = "src/index.ts"
+compatibility_date = "2025-08-10"
+compatibility_flags = ["nodejs_compat"]
+account_id = "02dd7efa4ca7a4f45fe830c2636bfbff"
+
+[vars]
+API_CORS_ORIGIN = "*"

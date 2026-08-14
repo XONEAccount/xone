@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Check, Copy, CreditCard, ExternalLink } from "lucide-react";
-import { useActiveAccount } from "thirdweb/react";
 import { DEFAULT_CHAIN } from "@wallet/config";
+import { useWalletAccount } from "@/hooks/use-wallet-account";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,15 +12,25 @@ const FAUCETS = [
     name: "Circle Base Sepolia USDC",
     href: "https://faucet.circle.com/",
     note: "领取测试 USDC（选择 Base Sepolia）",
-  }
+  },
+  {
+    name: "Coinbase Base Sepolia Faucet",
+    href: "https://www.coinbase.com/faucets/base-ethereum-sepolia-faucet",
+    note: "领取测试 ETH（付 gas）",
+  },
+  {
+    name: "Alchemy Base Sepolia Faucet",
+    href: "https://www.alchemy.com/faucets/base-sepolia",
+    note: "领取测试 ETH（付 gas）",
+  },
 ] as const;
 
 /**
  * 充值页（Sepolia）：BuyWidget 在测试网会因法币汇率崩溃，改为水龙头引导。
  */
 export function PayPage() {
-  const account = useActiveAccount();
-  const address = account?.address ?? "";
+  const { address: connected } = useWalletAccount();
+  const address = connected ?? "";
   const [copied, setCopied] = useState(false);
 
   /**
@@ -43,10 +53,11 @@ export function PayPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            当前网络是 {appChainLabel}。
+            当前网络是 {appChainLabel}。测试网请用水龙头领取，向他人转账请用「转账」。
+            向他人转账请用「转账」。
           </p>
 
-          <div className="rounded-md border border-border bg-muted p-4">
+          <div className="rounded-md border border-border bg-[var(--color-muted)] p-4">
             <p className="text-xs text-muted-foreground">收款地址</p>
             <p className="mt-1 break-all font-mono text-sm">{address || "未连接钱包"}</p>
             <Button
@@ -70,7 +81,19 @@ export function PayPage() {
             </Button>
           </div>
 
-
+          <div className="space-y-2 text-sm">
+            <p className="font-medium">资产说明</p>
+            <ul className="list-inside list-disc space-y-1 text-muted-foreground">
+              <li>网络：{DEFAULT_CHAIN.name}（chainId {DEFAULT_CHAIN.id}）</li>
+              <li>原生币：ETH</li>
+              <li>
+                USDC：
+                <span className="break-all font-mono text-xs">
+                  {USDC_ADDRESS ?? "未配置"}
+                </span>
+              </li>
+            </ul>
+          </div>
 
           <div className="space-y-2">
             <p className="text-sm font-medium">水龙头</p>
@@ -80,7 +103,7 @@ export function PayPage() {
                 href={faucet.href}
                 target="_blank"
                 rel="noreferrer"
-                className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-3 text-sm transition-colors hover:bg-muted"
+                className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-3 text-sm transition-colors hover:bg-[var(--color-muted)]"
               >
                 <span>
                   <span className="font-medium">{faucet.name}</span>

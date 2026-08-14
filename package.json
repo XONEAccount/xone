@@ -7,13 +7,24 @@
     "dev": "pnpm -r --parallel --filter @wallet/web --filter @wallet/api run dev",
     "dev:web": "pnpm --filter @wallet/web dev",
     "dev:api": "pnpm --filter @wallet/api dev",
+    "dev:admin": "pnpm -r --parallel --filter @wallet/admin --filter @wallet/admin-api run dev",
+    "dev:admin-web": "pnpm --filter @wallet/admin dev",
+    "dev:admin-api": "pnpm --filter @wallet/admin-api dev",
     "build": "pnpm -r run build",
     "typecheck": "pnpm -r run typecheck",
     "lint": "pnpm -r run lint",
     "deploy:api": "pnpm --filter @wallet/api run deploy",
     "deploy:web": "pnpm --filter @wallet/web run deploy",
+    "deploy:admin-api": "pnpm --filter @wallet/admin-api run deploy",
+    "deploy:admin": "pnpm --filter @wallet/admin run deploy",
     "deploy:x402-seller": "pnpm --filter @wallet/x402-seller run deploy",
-    "deploy": "pnpm run deploy:api && pnpm run deploy:web"
+    "deploy:sdk-api": "pnpm --filter @xone/api run deploy",
+    "deploy:sdk-console": "pnpm --filter @xone/console run deploy",
+    "deploy": "pnpm run deploy:api && pnpm run deploy:web",
+    "deploy:ops": "pnpm run deploy:admin-api && pnpm run deploy:admin",
+    "dev:sdk-api": "pnpm --filter @xone/api dev",
+    "build:sdk": "pnpm --filter @xone/sdk build",
+    "typecheck:sdk": "pnpm --filter @xone/sdk typecheck && pnpm --filter @xone/api typecheck"
   },
   "engines": {
     "node": ">=22"

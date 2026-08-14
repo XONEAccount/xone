@@ -1,16 +1,14 @@
 import {
-  estimateGasCost,
-  getContract,
-  prepareTransaction,
-  toEther,
-  toWei,
-} from "thirdweb";
-import type { PreparedTransaction } from "thirdweb";
-import type { Account } from "thirdweb/wallets";
-import { transfer } from "thirdweb/extensions/erc20";
+  encodeFunctionData,
+  erc20Abi,
+  formatEther,
+  parseEther,
+  parseUnits,
+  type Hex,
+} from "viem";
 import { DEFAULT_CHAIN, SUPPORTED_ASSETS } from "@wallet/config";
-import { thirdwebClient } from "@/web3/client";
-import { appChain } from "@/web3/chains";
+import { chainFromSlug } from "@/web3/chains";
+import { getPublicClientBySlug } from "@/web3/client";
 
 export interface PreparedSend {
   to: string;
@@ -18,6 +16,13 @@ export interface PreparedSend {
   asset: string;
   chain: string;
   estimatedFee: string;
+}
+
+export interface PreparedTxRequest {
+  to: Hex;
+  value?: bigint;
+  data?: Hex;
+  chainId: number;
 }
 
 /**
@@ -43,18 +48,20 @@ export function prepareSendPreview(
 }
 
 /**
- * Validates send inputs and builds a thirdweb PreparedTransaction.
+ * Validates send inputs and builds an unsigned EVM transaction request.
  * @param to - Recipient address
  * @param amount - Decimal amount
  * @param asset - Asset symbol (ETH / USDC)
- * @returns Prepared transaction for TransactionButton / TransactionWidget
+ * @param chainSlug - Optional product chain slug
+ * @returns Unsigned tx for Privy `sendTransaction`
  * @throws When asset is unsupported or inputs are invalid
  */
 export function buildSendTransaction(
   to: string,
   amount: string,
   asset: string,
-): PreparedTransaction {
+  chainSlug?: string,
+): PreparedTxRequest {
   const parsed = Number(amount);
   if (!Number.isFinite(parsed) || parsed <= 0) {
     throw new Error("请输入有效金额");
@@ -69,26 +76,27 @@ export function buildSendTransaction(
     throw new Error("暂不支持该资产");
   }
 
+  const chain = chainFromSlug(chainSlug);
+  const recipient = to as Hex;
+
   if (!token.address) {
-    return prepareTransaction({
-      to,
-      client: thirdwebClient,
-      chain: appChain,
-      value: toWei(amount),
-    });
+    return {
+      to: recipient,
+      value: parseEther(amount),
+      chainId: chain.id,
+    };
   }
 
-  const contract = getContract({
-    client: thirdwebClient,
-    chain: appChain,
-    address: token.address,
-  });
-
-  return transfer({
-    contract,
-    to,
-    amount,
-  });
+  return {
+    to: token.address as Hex,
+    data: encodeFunctionData({
+      abi: erc20Abi,
+      functionName: "transfer",
+      args: [recipient, parseUnits(amount, token.decimals)],
+    }),
+    value: 0n,
+    chainId: chain.id,
+  };
 }
 
 /**
@@ -96,22 +104,32 @@ export function buildSendTransaction(
  * @param to - Recipient address
  * @param amount - Decimal amount
  * @param asset - Asset symbol
- * @param account - Optional connected account for better estimation
+ * @param from - Optional sender for more accurate estimation
+ * @param chainSlug - Optional product chain slug
  * @returns Human-readable fee in ETH, e.g. "~0.000021 ETH"
  */
 export async function estimateSendFee(
   to: string,
   amount: string,
   asset: string,
-  account?: Account,
+  from?: string,
+  chainSlug?: string,
 ): Promise<string> {
-  const transaction = buildSendTransaction(to, amount, asset);
-  const cost = await estimateGasCost({
-    transaction,
-    account,
-  });
+  const tx = buildSendTransaction(to, amount, asset, chainSlug);
+  const client = getPublicClientBySlug(chainSlug);
+  const account = from && /^0x[a-fA-F0-9]{40}$/.test(from) ? (from as Hex) : undefined;
 
-  const ether = Number(toEther(cost.wei));
+  const [gas, gasPrice] = await Promise.all([
+    client.estimateGas({
+      account,
+      to: tx.to,
+      value: tx.value,
+      data: tx.data,
+    }),
+    client.getGasPrice(),
+  ]);
+
+  const ether = Number(formatEther(gas * gasPrice));
   if (!Number.isFinite(ether) || ether <= 0) {
     return "< 0.000001 ETH";
   }

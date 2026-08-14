@@ -67,7 +67,7 @@ export function LedgerTablePage({
                     {showTitleColumn ? (
                       <TableCell className="font-medium">{item.title}</TableCell>
                     ) : null}
-                    <TableCell className="max-w-40 truncate">{item.counterparty}</TableCell>
+                    <TableCell className="max-w-[160px] truncate">{item.counterparty}</TableCell>
                     <TableCell className="font-mono whitespace-nowrap">
                       {signedAmount ? (item.direction === "in" ? "+" : "-") : ""}
                       {item.amount} {item.asset}
@@ -75,7 +75,7 @@ export function LedgerTablePage({
                     <TableCell>
                       <StatusBadge status={item.status} />
                     </TableCell>
-                    <TableCell className="max-w-60">
+                    <TableCell className="max-w-[240px]">
                       <TxHashCell note={item.note} />
                     </TableCell>
                   </TableRow>
@@ -108,7 +108,7 @@ function TxHashCell({ note }: { note: string }) {
       href={getTxExplorerUrl(hash)}
       target="_blank"
       rel="noreferrer"
-      className="inline-flex max-w-full items-center gap-1 font-mono text-xs text-(--color-foreground) underline-offset-2 hover:underline"
+      className="inline-flex max-w-full items-center gap-1 font-mono text-xs text-[var(--color-foreground)] underline-offset-2 hover:underline"
       title="在 Sepolia Etherscan 查看"
     >
       <span className="truncate">{shortHash(hash)}</span>
@@ -140,8 +140,8 @@ function StatusBadge({ status }: { status: LedgerRecord["status"] }) {
       className={cn(
         "inline-flex rounded-md px-2 py-0.5 text-xs",
         status === "success"
-          ? "bg-muted text-(--color-foreground)"
-          : "bg-red-50 text-destructive",
+          ? "bg-[var(--color-muted)] text-[var(--color-foreground)]"
+          : "bg-red-50 text-[var(--color-destructive)]",
       )}
     >
       {label}

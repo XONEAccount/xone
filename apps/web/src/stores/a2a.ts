@@ -126,13 +126,17 @@ interface A2AState {
  */
 function applyAccount(
   set: (partial: Partial<A2AState>) => void,
-  account: A2AAccountDto,
+  account: A2AAccountDto | null | undefined,
 ): void {
+  if (!account?.walletAddress) {
+    set({ loading: false });
+    return;
+  }
   set({
     ownerAddress: account.walletAddress,
     a2aBalance: account.balance,
-    agents: account.agents,
-    ledger: mapA2ALedger(account.ledger),
+    agents: Array.isArray(account.agents) ? account.agents : DEFAULT_AGENTS,
+    ledger: mapA2ALedger(Array.isArray(account.ledger) ? account.ledger : []),
     loading: false,
   });
 }

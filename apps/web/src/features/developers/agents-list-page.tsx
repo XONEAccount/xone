@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent, type MouseEvent } from "react";
 import { Link } from "react-router-dom";
-import { useActiveAccount } from "thirdweb/react";
 import { getAddressExplorerUrl } from "@wallet/config";
+import { useWalletAccount } from "@/hooks/use-wallet-account";
 import { Bot, ExternalLink, Plus } from "lucide-react";
 import type { AgentPayment, DeveloperAgent } from "@wallet/types";
 import { PageHeader } from "@/components/layout/page-header";
@@ -48,8 +48,8 @@ function displayWalletAddress(address: string): string {
  * Click name for payment history; wallet opens the block explorer.
  */
 export function AgentsListPage() {
-  const account = useActiveAccount();
-  const owner = account?.address?.toLowerCase() ?? "";
+  const { address } = useWalletAccount();
+  const owner = address?.toLowerCase() ?? "";
   const [agents, setAgents] = useState<DeveloperAgent[]>([]);
   const [selected, setSelected] = useState<DeveloperAgent | null>(null);
   const [payments, setPayments] = useState<AgentPayment[]>([]);
@@ -213,7 +213,9 @@ export function AgentsListPage() {
           </Link>
         </Button>
       </div>
-
+      <p className="-mt-4 max-w-2xl text-sm text-muted-foreground">
+        当前钱包名下的受限 Agent。点击名称查看支付记录；点击钱包地址打开区块链浏览器。
+      </p>
 
       {error ? (
         <DismissibleError
@@ -394,7 +396,7 @@ export function AgentsListPage() {
           <form className="space-y-4" onSubmit={(event) => void onSaveEdit(event)}>
             <label className="block space-y-1.5 text-sm">
               <span className="text-muted-foreground">
-                总额上限 ({editAgent?.asset ?? "ETH"})
+                总额上限 ({editAgent?.asset ?? "USDC"})
               </span>
               <Input
                 value={editMaxAmount}
@@ -404,7 +406,7 @@ export function AgentsListPage() {
             </label>
             <label className="block space-y-1.5 text-sm">
               <span className="text-muted-foreground">
-                单笔最大值 ({editAgent?.asset ?? "ETH"})
+                单笔最大值 ({editAgent?.asset ?? "USDC"})
               </span>
               <Input
                 value={editMaxSingle}
@@ -440,7 +442,8 @@ export function AgentsListPage() {
           <DialogHeader>
             <DialogTitle>确认删除</DialogTitle>
             <DialogDescription>
-              确定删除 Agent「{deleteAgent?.name ?? "—"}」吗？
+              确定删除 Agent「{deleteAgent?.name ?? "—"}」吗？删除后将无法再用于 MCP /
+              x402 支付（历史记录仍保留）。
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

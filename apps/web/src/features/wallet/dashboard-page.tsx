@@ -6,7 +6,6 @@ import {
   MessageSquare,
   QrCode,
 } from "lucide-react";
-import { useActiveAccount } from "thirdweb/react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useWalletBalances } from "@/hooks/use-wallet-balances";
@@ -26,8 +25,7 @@ const actions = [
  * 钱包首页：链上余额总览与快捷入口。
  */
 export function DashboardPage() {
-  const account = useActiveAccount();
-  const { usdc, eth, balances, isLoading } = useWalletBalances();
+  const { address, usdc, eth, balances, isLoading } = useWalletBalances();
   const a2aBalance = useA2AStore((s) => s.a2aBalance);
   const agents = useA2AStore((s) => s.agents);
   const enabledAgents = agents.filter((agent) => agent.enabled).length;
@@ -35,6 +33,7 @@ export function DashboardPage() {
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-8 animate-in">
       <section className="space-y-2 fade-up">
+        
         <p className="text-sm text-muted-foreground">
           钱包可用 · {appChainLabel}
         </p>
@@ -45,8 +44,8 @@ export function DashboardPage() {
             {usdc.toFixed(2)} <span className="text-lg font-medium">USDC</span>
           </h1>
         )}
-        <p className="text-sm text-muted-foreground">
-          ETH {isLoading ? "…" : eth.toFixed(6)} · A2A 可支付 {a2aBalance.toFixed(2)} USDC · 已启用{" "}
+        <p className="text-md text-muted-foreground">
+           A2A 可支付 {a2aBalance.toFixed(2)} USDC · 已启用{" "}
           {enabledAgents}/{agents.length} 个 Agent
         </p>
       </section>
@@ -72,13 +71,13 @@ export function DashboardPage() {
 
       <section className="space-y-3 fade-up delay-2">
         <h2 className="text-sm font-medium">资产</h2>
-        <div className="divide-y divide-[var(--color-border)] rounded-md border border-border bg-white">
+        <div className="divide-y divide-border rounded-md border border-border bg-white">
           {(balances.length
             ? [...balances].sort((a, b) => (a.symbol === "USDC" ? -1 : b.symbol === "USDC" ? 1 : 0))
             : [
-              { symbol: "USDC", name: "USD Coin", displayValue: "0" },
-              { symbol: "ETH", name: "Ether", displayValue: "0" },
-            ]
+                { symbol: "USDC", name: "USD Coin", displayValue: "0" },
+                { symbol: "ETH", name: "Ether", displayValue: "0" },
+              ]
           ).map((asset) => (
             <div key={asset.symbol} className="flex items-center justify-between px-4 py-3 text-sm">
               <div>

@@ -5,7 +5,7 @@ import { getSupabaseAdmin } from "../lib/supabase.js";
 const auth = new Hono();
 
 /**
- * Links a thirdweb-connected wallet to the application profile.
+ * Links a Privy-connected wallet to the application profile.
  * Uses public.profiles (wallet_address PK) which exists in the current Supabase project.
  */
 auth.post("/link-wallet", async (c) => {
