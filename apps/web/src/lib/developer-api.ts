@@ -12,21 +12,37 @@ export type CreateAgentResponse = {
 
 /**
  * Creates a developer agent with a restricted spending wallet.
- * @param input - Name, spend limits, chain, and allowed asset
+ * Params aligned with `@xone/sdk` `AgentCreateParams`.
+ * @param input - Name, chain, dailyLimit, perTransaction, allowlists
  */
 export async function createDeveloperAgent(input: {
   ownerAddress: string;
   name: string;
   description?: string;
-  maxAmount: number;
-  maxSinglePayment: number;
+  /** SDK dailyLimit */
+  dailyLimit: number;
+  /** SDK perTransaction */
+  perTransaction: number;
+  chain?: "base-sepolia" | "base" | "polygon" | "arbitrum" | "ethereum-sepolia";
+  currency?: "USDC" | "ETH";
+  allowedHosts?: string[];
+  allowedPayees?: string[];
   initialAllowance?: number;
-  chain?: "ethereum-sepolia" | "base-sepolia";
-  asset?: "ETH" | "USDC";
 }): Promise<CreateAgentResponse> {
   return apiFetch<CreateAgentResponse>("/api/developer/agents", {
     method: "POST",
-    body: input,
+    body: {
+      ownerAddress: input.ownerAddress,
+      name: input.name,
+      description: input.description,
+      dailyLimit: input.dailyLimit,
+      perTransaction: input.perTransaction,
+      chain: input.chain ?? "base-sepolia",
+      currency: input.currency ?? "USDC",
+      allowedHosts: input.allowedHosts,
+      allowedPayees: input.allowedPayees,
+      initialAllowance: input.initialAllowance,
+    },
     token: "demo",
   });
 }
@@ -255,20 +271,28 @@ export async function getDeveloperAgentDetail(
  * Updates spend caps for an owned developer agent.
  * @param agentId - Agent id
  * @param ownerAddress - Owner wallet
- * @param maxAmount - Total spend cap
- * @param maxSinglePayment - Per-payment cap
+ * @param dailyLimit - SDK daily spend cap
+ * @param perTransaction - SDK per-payment cap
+ * @param extras - Optional allowlists
  */
 export async function updateDeveloperAgent(
   agentId: string,
   ownerAddress: string,
-  maxAmount: number,
-  maxSinglePayment: number,
+  dailyLimit: number,
+  perTransaction: number,
+  extras?: { allowedHosts?: string[]; allowedPayees?: string[] },
 ): Promise<DeveloperAgent> {
   const data = await apiFetch<{ ok: true; agent: DeveloperAgent }>(
     `/api/developer/agents/${agentId}`,
     {
       method: "PATCH",
-      body: { ownerAddress, maxAmount, maxSinglePayment },
+      body: {
+        ownerAddress,
+        dailyLimit,
+        perTransaction,
+        allowedHosts: extras?.allowedHosts,
+        allowedPayees: extras?.allowedPayees,
+      },
       token: "demo",
     },
   );

@@ -12,7 +12,12 @@ import { getEnv } from "../../lib/env.js";
 import { chainFromSlug, fetchDisplayBalance } from "../../lib/evm.js";
 
 type AgentAsset = "ETH" | "USDC";
-type AgentChain = "ethereum-sepolia" | "base-sepolia";
+type AgentChain =
+  | "ethereum-sepolia"
+  | "base-sepolia"
+  | "base"
+  | "polygon"
+  | "arbitrum";
 
 export type DeveloperAgentRow = {
   id: string;
@@ -29,6 +34,8 @@ export type DeveloperAgentRow = {
   asset: string;
   chain: string;
   status: "active" | "disabled";
+  allowed_hosts?: string[] | null;
+  allowed_payees?: string[] | null;
   created_at: string;
   updated_at: string;
 };
@@ -108,6 +115,8 @@ export type X402Challenge = {
  */
 export function toDeveloperAgent(row: DeveloperAgentRow): DeveloperAgent {
   const asset = row.asset === "USDC" ? "USDC" : "ETH";
+  const maxAmount = Number(row.max_amount);
+  const maxSinglePayment = Number(row.max_single_payment);
   return {
     id: row.id,
     ownerWallet: row.owner_wallet,
@@ -115,13 +124,18 @@ export function toDeveloperAgent(row: DeveloperAgentRow): DeveloperAgent {
     description: row.description,
     apiKeyPrefix: row.api_key_prefix,
     walletAddress: row.wallet_address,
-    maxAmount: Number(row.max_amount),
-    maxSinglePayment: Number(row.max_single_payment),
+    maxAmount,
+    maxSinglePayment,
+    dailyLimit: maxAmount,
+    perTransaction: maxSinglePayment,
     spentAmount: Number(row.spent_amount),
     allowanceEth: Number(row.allowance_eth),
     asset,
+    currency: asset,
     chain: row.chain,
     status: row.status,
+    allowedHosts: Array.isArray(row.allowed_hosts) ? row.allowed_hosts : [],
+    allowedPayees: Array.isArray(row.allowed_payees) ? row.allowed_payees : [],
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -179,17 +193,25 @@ export async function createDeveloperAgent(
     description?: string;
     maxAmount: number;
     maxSinglePayment: number;
+    dailyLimit?: number;
+    perTransaction?: number;
     initialAllowance?: number;
     chain?: AgentChain;
     asset?: AgentAsset;
+    currency?: string;
+    allowedHosts?: string[];
+    allowedPayees?: string[];
   },
 ): Promise<CreateDeveloperAgentResult> {
   const env = getEnv();
   if (!env.jwtSecret && !env.supabaseServiceRoleKey) {
     throw new Error("JWT_SECRET (or service role) required to seal agent keys");
   }
-  if (input.maxSinglePayment > input.maxAmount) {
-    throw new Error("maxSinglePayment cannot exceed maxAmount");
+
+  const maxAmount = input.dailyLimit ?? input.maxAmount;
+  const maxSinglePayment = input.perTransaction ?? input.maxSinglePayment;
+  if (maxSinglePayment > maxAmount) {
+    throw new Error("perTransaction cannot exceed dailyLimit");
   }
 
   const owner = input.ownerAddress.toLowerCase();
@@ -197,13 +219,14 @@ export async function createDeveloperAgent(
   if (!name) throw new Error("Agent name is required");
 
   const chain: AgentChain = input.chain ?? "base-sepolia";
-  const asset: AgentAsset = input.asset ?? "USDC";
-  // Base Sepolia + USDC is the x402 test path; Ethereum Sepolia remains ETH-only.
-  if (chain === "ethereum-sepolia" && asset !== "ETH") {
-    throw new Error("Ethereum Sepolia 当前仅支持 ETH");
-  }
-  if (chain === "base-sepolia" && asset !== "USDC") {
-    throw new Error("Base Sepolia 当前仅支持 USDC（x402 测试）");
+  const asset: AgentAsset =
+    input.asset ?? (input.currency === "ETH" ? "ETH" : "USDC");
+
+  // Wallet app x402 settle path currently supports Base Sepolia + USDC only.
+  if (chain !== "base-sepolia" || asset !== "USDC") {
+    throw new Error(
+      "当前钱包创建 Agent 仅支持 chain=base-sepolia 且 currency=USDC（与 SDK x402 测试网一致）",
+    );
   }
 
   await ensureProfile(admin, owner);
@@ -232,36 +255,62 @@ export async function createDeveloperAgent(
   const apiKey = generateAgentApiKey();
   const apiKeyHash = await hashApiKey(apiKey);
   const encryptedPrivateKey = await encryptSecret(privateKey, sealSecret);
-  const initial = Math.min(input.initialAllowance ?? 0, input.maxAmount);
+  const initial = Math.min(input.initialAllowance ?? 0, maxAmount);
   const now = new Date().toISOString();
+  const allowedHosts = input.allowedHosts ?? [];
+  const allowedPayees = (input.allowedPayees ?? []).map((a) => a.toLowerCase());
 
-  const { data, error } = await admin
-    .from("developer_agents")
-    .insert({
-      owner_wallet: owner,
-      name,
-      description: (input.description ?? "").trim(),
-      api_key_hash: apiKeyHash,
-      api_key_prefix: apiKey.slice(0, 16),
-      wallet_address: walletAddress,
-      encrypted_private_key: encryptedPrivateKey,
-      max_amount: input.maxAmount,
-      max_single_payment: input.maxSinglePayment,
-      spent_amount: 0,
-      allowance_eth: initial,
-      asset,
-      chain,
-      status: "active",
-      updated_at: now,
-    })
-    .select("*")
-    .single();
+  const baseRow = {
+    owner_wallet: owner,
+    name,
+    description: (input.description ?? "").trim(),
+    api_key_hash: apiKeyHash,
+    api_key_prefix: apiKey.slice(0, 16),
+    wallet_address: walletAddress,
+    encrypted_private_key: encryptedPrivateKey,
+    max_amount: maxAmount,
+    max_single_payment: maxSinglePayment,
+    spent_amount: 0,
+    allowance_eth: initial,
+    asset,
+    chain,
+    status: "active" as const,
+    updated_at: now,
+  };
+
+  let data: DeveloperAgentRow | null = null;
+  let error: { message: string } | null = null;
+
+  {
+    const first = await admin
+      .from("developer_agents")
+      .insert({
+        ...baseRow,
+        allowed_hosts: allowedHosts,
+        allowed_payees: allowedPayees,
+      })
+      .select("*")
+      .single();
+    data = (first.data as DeveloperAgentRow | null) ?? null;
+    error = first.error;
+  }
+
+  // Columns may be missing before migration — retry without allowlists.
+  if (error && /allowed_hosts|allowed_payees|schema cache/i.test(error.message)) {
+    const second = await admin
+      .from("developer_agents")
+      .insert(baseRow)
+      .select("*")
+      .single();
+    data = (second.data as DeveloperAgentRow | null) ?? null;
+    error = second.error;
+  }
 
   if (error || !data) {
     throw new Error(error?.message ?? "Failed to create developer agent");
   }
 
-  const agent = toDeveloperAgent(data as DeveloperAgentRow);
+  const agent = toDeveloperAgent(data);
   return {
     agent,
     apiKey,
@@ -311,6 +360,28 @@ export async function getDeveloperAgentForOwner(
 }
 
 /**
+ * Loads the raw agent row (incl. sealed key) for an owner — used by server-side x402 settle.
+ * @param admin - Supabase admin
+ * @param id - Agent id
+ * @param ownerAddress - Owner wallet
+ */
+export async function getDeveloperAgentRowForOwner(
+  admin: SupabaseClient,
+  id: string,
+  ownerAddress: string,
+): Promise<DeveloperAgentRow | null> {
+  const { data, error } = await admin
+    .from("developer_agents")
+    .select("*")
+    .eq("id", id)
+    .eq("owner_wallet", ownerAddress.toLowerCase())
+    .eq("status", "active")
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return (data as DeveloperAgentRow | null) ?? null;
+}
+
+/**
  * Updates total / single-payment caps for an owned agent.
  * @param admin - Supabase admin
  * @param id - Agent id
@@ -324,9 +395,13 @@ export async function updateDeveloperAgentLimits(
   ownerAddress: string,
   maxAmount: number,
   maxSinglePayment: number,
+  extras?: {
+    allowedHosts?: string[];
+    allowedPayees?: string[];
+  },
 ): Promise<DeveloperAgent> {
   if (maxSinglePayment > maxAmount) {
-    throw new Error("单笔上限不能超过总额上限");
+    throw new Error("perTransaction cannot exceed dailyLimit");
   }
 
   const agent = await getDeveloperAgentForOwner(admin, id, ownerAddress);
@@ -334,19 +409,27 @@ export async function updateDeveloperAgentLimits(
     throw new Error("Agent not found");
   }
   if (maxAmount < agent.spentAmount) {
-    throw new Error(`总额上限不能低于已花费 ${agent.spentAmount}`);
+    throw new Error(`dailyLimit 不能低于已花费 ${agent.spentAmount}`);
   }
   if (maxAmount < agent.allowanceEth) {
-    throw new Error(`总额上限不能低于当前可用额度 ${agent.allowanceEth}`);
+    throw new Error(`dailyLimit 不能低于当前可用额度 ${agent.allowanceEth}`);
+  }
+
+  const patch: Record<string, unknown> = {
+    max_amount: maxAmount,
+    max_single_payment: maxSinglePayment,
+    updated_at: new Date().toISOString(),
+  };
+  if (extras?.allowedHosts !== undefined) {
+    patch.allowed_hosts = extras.allowedHosts;
+  }
+  if (extras?.allowedPayees !== undefined) {
+    patch.allowed_payees = extras.allowedPayees;
   }
 
   const { data, error } = await admin
     .from("developer_agents")
-    .update({
-      max_amount: maxAmount,
-      max_single_payment: maxSinglePayment,
-      updated_at: new Date().toISOString(),
-    })
+    .update(patch)
     .eq("id", id)
     .eq("owner_wallet", ownerAddress.toLowerCase())
     .eq("status", "active")

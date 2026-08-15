@@ -131,7 +131,7 @@ developer.post("/agents/:id/fund", async (c) => {
 });
 
 /**
- * PATCH /api/developer/agents/:id — update maxAmount / maxSinglePayment.
+ * PATCH /api/developer/agents/:id — update dailyLimit / perTransaction / allowlists.
  */
 developer.patch("/agents/:id", async (c) => {
   const parsed = updateDeveloperAgentSchema.safeParse(await c.req.json());
@@ -149,6 +149,10 @@ developer.patch("/agents/:id", async (c) => {
       parsed.data.ownerAddress,
       parsed.data.maxAmount,
       parsed.data.maxSinglePayment,
+      {
+        allowedHosts: parsed.data.allowedHosts,
+        allowedPayees: parsed.data.allowedPayees,
+      },
     );
     return c.json({ ok: true, agent });
   } catch (error) {

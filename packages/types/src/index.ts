@@ -161,13 +161,25 @@ export interface DeveloperAgent {
   description: string;
   apiKeyPrefix: string;
   walletAddress: string;
+  /**
+   * Policy spend cap. Same value as `dailyLimit` (SDK-aligned alias).
+   */
   maxAmount: number;
+  /** Per-payment cap. Same value as `perTransaction`. */
   maxSinglePayment: number;
+  /** SDK-aligned alias of `maxAmount`. */
+  dailyLimit: number;
+  /** SDK-aligned alias of `maxSinglePayment`. */
+  perTransaction: number;
   spentAmount: number;
   allowanceEth: number;
   asset: "ETH" | "USDC";
-  chain: "ethereum-sepolia" | "base-sepolia" | string;
+  /** Settlement currency (SDK `currency`). */
+  currency: string;
+  chain: string;
   status: "active" | "disabled";
+  allowedHosts: string[];
+  allowedPayees: string[];
   createdAt: string;
   updatedAt: string;
 }

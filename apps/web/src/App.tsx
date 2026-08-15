@@ -12,6 +12,7 @@ import { ChatPage } from "@/features/chat/chat-page";
 import { SignInPage } from "@/features/auth/sign-in-page";
 import { AgentsListPage } from "@/features/developers/agents-list-page";
 import { CreateAgentPage } from "@/features/developers/create-agent-page";
+import { X402AgentsPage } from "@/features/x402-agents/x402-agents-page";
 import { DashboardPage } from "@/features/wallet/dashboard-page";
 import { AssetsPage } from "@/features/wallet/assets-page";
 import {
@@ -54,6 +55,7 @@ export function App() {
               <Route path="merchants" element={<A2APayPage />} />
               <Route path="developers" element={<CreateAgentPage />} />
               <Route path="developers/agents" element={<AgentsListPage />} />
+              <Route path="agents" element={<X402AgentsPage />} />
               <Route path="a2a" element={<Navigate to="/app/a2a/fund" replace />} />
               <Route path="a2a/fund" element={<A2AFundPage />} />
               <Route path="ledger" element={<Navigate to="/app/ledger/payments" replace />} />

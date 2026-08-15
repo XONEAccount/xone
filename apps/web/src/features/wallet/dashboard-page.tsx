@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import {
   ArrowLeftRight,
   ArrowUpRight,
@@ -8,7 +9,9 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useWalletAccount } from "@/hooks/use-wallet-account";
 import { useWalletBalances } from "@/hooks/use-wallet-balances";
+import { listDeveloperAgents } from "@/lib/developer-api";
 import { useA2AStore } from "@/stores/a2a";
 import { appChainLabel } from "@/web3";
 
@@ -25,15 +28,24 @@ const actions = [
  * 钱包首页：链上余额总览与快捷入口。
  */
 export function DashboardPage() {
-  const { address, usdc, eth, balances, isLoading } = useWalletBalances();
+  const { address, usdc, balances, isLoading } = useWalletBalances();
+  const { address: ownerAddress } = useWalletAccount();
   const a2aBalance = useA2AStore((s) => s.a2aBalance);
-  const agents = useA2AStore((s) => s.agents);
-  const enabledAgents = agents.filter((agent) => agent.enabled).length;
+  const owner = ownerAddress?.toLowerCase() ?? address?.toLowerCase() ?? "";
+
+  const myAgents = useQuery({
+    queryKey: ["developer-agents", owner],
+    enabled: Boolean(owner),
+    queryFn: () => listDeveloperAgents(owner),
+  });
+
+  const agentCount = myAgents.data?.length ?? 0;
+  const activeCount =
+    myAgents.data?.filter((agent) => agent.status === "active").length ?? 0;
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-8 animate-in">
       <section className="space-y-2 fade-up">
-        
         <p className="text-sm text-muted-foreground">
           钱包可用 · {appChainLabel}
         </p>
@@ -45,8 +57,12 @@ export function DashboardPage() {
           </h1>
         )}
         <p className="text-md text-muted-foreground">
-           A2A 可支付 {a2aBalance.toFixed(2)} USDC · 已启用{" "}
-          {enabledAgents}/{agents.length} 个 Agent
+          A2A 可支付 {a2aBalance.toFixed(2)} USDC · 我的 Agents{" "}
+          {!owner || myAgents.isLoading
+            ? "…"
+            : agentCount === 0
+              ? "0 个"
+              : `活跃 ${activeCount}/${agentCount}`}
         </p>
       </section>
 

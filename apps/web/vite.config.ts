@@ -15,6 +15,14 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  /**
+   * Privy / Coinbase pull in eventemitter3@5 whose index.mjs does
+   * `import … from './index.js'` (CJS). Vite serves that raw and browsers
+   * reject the missing default export — force esbuild prebundle for interop.
+   */
+  optimizeDeps: {
+    include: ["eventemitter3"],
+  },
   server: {
     port: 5173,
     headers: oauthHeaders,

@@ -48,8 +48,31 @@ const AGENT_CHAIN = "base-sepolia" as const;
 const AGENT_ASSET = "USDC" as const;
 const FIRST_PAY_AMOUNT = 0.001;
 
+const CHAINS = [
+  { label: "Base Sepolia", value: "base-sepolia" as const },
+  { label: "Base", value: "base" as const },
+  { label: "Polygon", value: "polygon" as const },
+  { label: "Arbitrum", value: "arbitrum" as const },
+];
+
+/**
+ * Parses newline / comma separated allowlist text.
+ * @param text - Raw textarea
+ */
+function parseList(text: string): string[] {
+  return [
+    ...new Set(
+      text
+        .split(/[\n,]+/)
+        .map((s) => s.trim())
+        .filter(Boolean),
+    ),
+  ];
+}
+
 /**
  * 5-minute developer flow: create restricted agent wallet → on-chain fund → first x402 pay.
+ * Create params aligned with `@xone/sdk` AgentCreateParams / Console.
  */
 export function CreateAgentPage() {
   const { address } = useWalletAccount();
@@ -61,8 +84,11 @@ export function CreateAgentPage() {
 
   const [step, setStep] = useState<Step>(1);
   const [name, setName] = useState("");
-  const [maxAmount, setMaxAmount] = useState("10");
-  const [maxSingle, setMaxSingle] = useState("1");
+  const [chain, setChain] = useState<(typeof CHAINS)[number]["value"]>("base-sepolia");
+  const [dailyLimit, setDailyLimit] = useState("10");
+  const [perTransaction, setPerTransaction] = useState("1");
+  const [allowedHostsText, setAllowedHostsText] = useState("");
+  const [allowedPayeesText, setAllowedPayeesText] = useState("");
   const [fundAmount, setFundAmount] = useState(String(FIRST_PAY_AMOUNT));
   const [fundOpen, setFundOpen] = useState(false);
   const [fundFee, setFundFee] = useState("估算中…");
@@ -117,10 +143,10 @@ export function CreateAgentPage() {
       setError("名称已存在，请换一个");
       return;
     }
-    const max = Number(maxAmount);
-    const single = Number(maxSingle);
-    if (!(max > 0) || !(single > 0) || single > max) {
-      setError("请检查限额：单笔不能超过总额");
+    const daily = Number(dailyLimit);
+    const perTx = Number(perTransaction);
+    if (!(daily > 0) || !(perTx > 0) || perTx > daily) {
+      setError("请检查限额：perTransaction 不能超过 dailyLimit");
       return;
     }
 
@@ -131,12 +157,14 @@ export function CreateAgentPage() {
       const result = await createDeveloperAgent({
         ownerAddress,
         name: trimmed,
-        description: "Restricted USDC wallet on Base Sepolia for MCP / x402",
-        maxAmount: max,
-        maxSinglePayment: single,
+        description: "Restricted USDC wallet for MCP / x402 (SDK-aligned)",
+        dailyLimit: daily,
+        perTransaction: perTx,
+        chain,
+        currency: "USDC",
+        allowedHosts: parseList(allowedHostsText),
+        allowedPayees: parseList(allowedPayeesText),
         initialAllowance: 0,
-        chain: AGENT_CHAIN,
-        asset: AGENT_ASSET,
       });
       setAgent(result.agent);
       setApiKey(result.apiKey);
@@ -177,8 +205,8 @@ export function CreateAgentPage() {
       setError(`钱包余额不足（可用 ${available} USDC）`);
       return;
     }
-    if (agent.allowanceEth + amount > agent.maxAmount) {
-      setError("转入后会超过总额上限");
+    if (agent.allowanceEth + amount > agent.dailyLimit) {
+      setError("转入后会超过 dailyLimit");
       return;
     }
 
@@ -269,13 +297,13 @@ export function CreateAgentPage() {
     if (!Number.isFinite(amount) || amount <= 0) {
       return "请输入有效的消费金额";
     }
-    const unit = current.asset;
-    if (amount > current.maxSinglePayment) {
-      return `超过单笔上限（最大 ${current.maxSinglePayment} ${unit}）`;
+    const unit = current.currency || current.asset;
+    if (amount > current.perTransaction) {
+      return `超过 perTransaction（最大 ${current.perTransaction} ${unit}）`;
     }
-    const remainingTotal = current.maxAmount - current.spentAmount;
-    if (amount > remainingTotal) {
-      return `超过剩余总额度（还可花 ${Math.max(0, remainingTotal)} / 上限 ${current.maxAmount} ${unit}）`;
+    const remaining = current.dailyLimit - current.spentAmount;
+    if (amount > remaining) {
+      return `超过 dailyLimit 剩余（还可花 ${Math.max(0, remaining)} / ${current.dailyLimit} ${unit}）`;
     }
     if (amount > current.allowanceEth) {
       return `超过可用额度（当前可用 ${current.allowanceEth} ${unit}，请先链上转入）`;
@@ -330,8 +358,8 @@ export function CreateAgentPage() {
     <div className="space-y-8">
       <PageHeader icon={Zap} title="创建 Agent" />
       <p className="-mt-4 max-w-2xl text-sm text-muted-foreground">
-        生成受限钱包并设置 USDC 支付上限。固定 Base Sepolia + USDC（对接公开
-        x402）；转入额度会真实发到 Agent 地址。
+        与 <code className="text-xs">@xone/sdk</code> / Console 一致：name、chain、dailyLimit、
+        perTransaction，可选 allowedHosts / allowedPayees。currency 默认 USDC。
       </p>
 
       <ol className="flex flex-wrap gap-3 text-sm text-muted-foreground">
@@ -366,43 +394,84 @@ export function CreateAgentPage() {
               配置 Agent
             </CardTitle>
             <CardDescription>
-              创建时会同时生成 Agent 受限钱包（独立 EOA）。按总额 / 单笔上限限制 USDC 机器支付。私钥密封在服务端，不会返回给浏览器。
+              创建时会同时生成 Agent 受限钱包（独立 EOA）。按 dailyLimit / perTransaction 限制
+              USDC 机器支付。私钥密封在服务端，不会返回给浏览器。
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form className="space-y-4" onSubmit={onCreate}>
               <label className="block space-y-1.5 text-sm">
-                <div className="text-muted-foreground mb-2">名称（不可与已有 Agent 重复）</div>
+                <div className="text-muted-foreground mb-2">name（不可与已有 Agent 重复）</div>
                 <Input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   maxLength={80}
-                  placeholder="例如 travel-bot"
+                  placeholder="例如 research-bot"
                 />
               </label>
-              <p className="rounded-md border border-[var(--color-border)] px-3 py-2 text-sm">
-                <span className="text-muted-foreground">运行网络与币种</span>
-                <br />
-                Base Sepolia · USDC
-              </p>
+
+              <label className="block space-y-1.5 text-sm">
+                <span className="text-muted-foreground">chain</span>
+                <select
+                  className="flex h-10 w-full rounded-md border border-border bg-white px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ring)]"
+                  value={chain}
+                  onChange={(e) =>
+                    setChain(e.target.value as (typeof CHAINS)[number]["value"])
+                  }
+                >
+                  {CHAINS.map((c) => (
+                    <option key={c.value} value={c.value}>
+                      {c.label}
+                      {c.value !== "base-sepolia" ? "（暂不支持结算）" : ""}
+                    </option>
+                  ))}
+                </select>
+                <span className="text-xs text-muted-foreground">
+                  currency 固定 USDC（与 SDK 默认一致；当前仅 base-sepolia 可结算）
+                </span>
+              </label>
+
               <div className="grid gap-4 sm:grid-cols-2">
                 <label className="block space-y-1.5 text-sm">
-                  <span className="text-muted-foreground">总额上限 (USDC)</span>
+                  <span className="text-muted-foreground">dailyLimit (USDC)</span>
                   <Input
-                    value={maxAmount}
-                    onChange={(e) => setMaxAmount(e.target.value)}
+                    value={dailyLimit}
+                    onChange={(e) => setDailyLimit(e.target.value)}
                     inputMode="decimal"
                   />
                 </label>
                 <label className="block space-y-1.5 text-sm">
-                  <span className="text-muted-foreground">单笔上限 (USDC)</span>
+                  <span className="text-muted-foreground">perTransaction (USDC)</span>
                   <Input
-                    value={maxSingle}
-                    onChange={(e) => setMaxSingle(e.target.value)}
+                    value={perTransaction}
+                    onChange={(e) => setPerTransaction(e.target.value)}
                     inputMode="decimal"
                   />
                 </label>
               </div>
+
+              <label className="block space-y-1.5 text-sm">
+                <span className="text-muted-foreground">allowedHosts（可选，每行一个）</span>
+                <textarea
+                  value={allowedHostsText}
+                  onChange={(e) => setAllowedHostsText(e.target.value)}
+                  placeholder={"seller.example.com\n*.example.com"}
+                  rows={3}
+                  className="flex w-full rounded-md border border-border bg-white px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-[var(--color-ring)]"
+                />
+              </label>
+
+              <label className="block space-y-1.5 text-sm">
+                <span className="text-muted-foreground">allowedPayees（可选，每行一个 0x）</span>
+                <textarea
+                  value={allowedPayeesText}
+                  onChange={(e) => setAllowedPayeesText(e.target.value)}
+                  placeholder="0x…"
+                  rows={2}
+                  className="flex w-full rounded-md border border-border bg-white px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-[var(--color-ring)]"
+                />
+              </label>
+
               <Button type="submit" disabled={busy} className="w-full sm:w-auto">
                 {busy ? "正在创建钱包…" : "创建 Agent"}
               </Button>
@@ -496,11 +565,11 @@ export function CreateAgentPage() {
                   </a>
                   <ul className="space-y-1 text-xs text-muted-foreground">
                     <li>本次扣款 0.001 USDC</li>
-                    <li>单笔上限 {agent.maxSinglePayment} USDC</li>
+                    <li>perTransaction {agent.perTransaction} USDC</li>
                     <li>
-                      总额剩余{" "}
-                      {Math.max(0, Number((agent.maxAmount - agent.spentAmount).toFixed(8)))} /{" "}
-                      {agent.maxAmount} USDC（已花 {agent.spentAmount}）
+                      dailyLimit 剩余{" "}
+                      {Math.max(0, Number((agent.dailyLimit - agent.spentAmount).toFixed(8)))} /{" "}
+                      {agent.dailyLimit} USDC（已花 {agent.spentAmount}）
                     </li>
                     <li>可用额度 {agent.allowanceEth} USDC</li>
                   </ul>

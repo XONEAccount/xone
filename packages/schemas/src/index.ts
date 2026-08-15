@@ -102,24 +102,84 @@ export const a2aSettleSchema = z.object({
   title: z.string().min(1).max(200),
 });
 
-/** Create a developer agent with a restricted ETH wallet and spend caps. */
-export const createDeveloperAgentSchema = z.object({
-  ownerAddress: evmAddress,
-  name: z.string().min(1).max(80),
-  description: z.string().max(500).optional(),
-  /** Total ETH the agent may spend over its lifetime (policy cap). */
-  maxAmount: z.number().positive().max(100),
-  /** Max ETH per single machine payment. */
-  maxSinglePayment: z.number().positive().max(100),
-  /** Optional initial allowance credited after create (ETH). */
-  initialAllowance: z.number().min(0).max(100).optional(),
-  /** Runtime chain — default Base Sepolia (x402 testnet). */
-  chain: z
-    .enum(["ethereum-sepolia", "base-sepolia"])
-    .default("base-sepolia"),
-  /** Allowed spend asset — default USDC. */
-  asset: z.enum(["ETH", "USDC"]).default("USDC"),
-});
+/** Create a developer agent — params aligned with @xone/sdk `AgentCreateParams`. */
+export const createDeveloperAgentSchema = z
+  .object({
+    ownerAddress: evmAddress,
+    name: z.string().min(1).max(80),
+    description: z.string().max(500).optional(),
+    /**
+     * Settlement chain (SDK `XOneChain`).
+     * Wallet x402 settle currently requires `base-sepolia` + USDC.
+     */
+    chain: z
+      .enum(["base-sepolia", "base", "polygon", "arbitrum", "ethereum-sepolia"])
+      .default("base-sepolia"),
+    /** Settlement currency (SDK `currency`). */
+    currency: z.enum(["USDC", "ETH"]).default("USDC"),
+    /** SDK `dailyLimit` — max spend per policy window. */
+    dailyLimit: z.number().positive().max(100).optional(),
+    /** SDK `perTransaction` — max spend per payment. */
+    perTransaction: z.number().positive().max(100).optional(),
+    /** Legacy aliases kept for older clients. */
+    maxAmount: z.number().positive().max(100).optional(),
+    maxSinglePayment: z.number().positive().max(100).optional(),
+    asset: z.enum(["ETH", "USDC"]).optional(),
+    /** Optional x402 hostname allowlist. */
+    allowedHosts: z.array(z.string().min(1).max(253)).max(50).optional(),
+    /** Optional 0x payTo allowlist. */
+    allowedPayees: z
+      .array(z.string().regex(/^0x[a-fA-F0-9]{40}$/))
+      .max(50)
+      .optional(),
+    /** Optional initial allowance credited after create. */
+    initialAllowance: z.number().min(0).max(100).optional(),
+  })
+  .superRefine((val, ctx) => {
+    const daily = val.dailyLimit ?? val.maxAmount;
+    const perTx = val.perTransaction ?? val.maxSinglePayment;
+    if (daily === undefined) {
+      ctx.addIssue({
+        code: "custom",
+        message: "dailyLimit is required",
+        path: ["dailyLimit"],
+      });
+    }
+    if (perTx === undefined) {
+      ctx.addIssue({
+        code: "custom",
+        message: "perTransaction is required",
+        path: ["perTransaction"],
+      });
+    }
+    if (daily !== undefined && perTx !== undefined && perTx > daily) {
+      ctx.addIssue({
+        code: "custom",
+        message: "perTransaction cannot exceed dailyLimit",
+        path: ["perTransaction"],
+      });
+    }
+  })
+  .transform((val) => {
+    const dailyLimit = (val.dailyLimit ?? val.maxAmount)!;
+    const perTransaction = (val.perTransaction ?? val.maxSinglePayment)!;
+    const asset = val.asset ?? val.currency;
+    return {
+      ownerAddress: val.ownerAddress,
+      name: val.name,
+      description: val.description,
+      chain: val.chain,
+      currency: val.currency,
+      asset: asset as "ETH" | "USDC",
+      dailyLimit,
+      perTransaction,
+      maxAmount: dailyLimit,
+      maxSinglePayment: perTransaction,
+      allowedHosts: val.allowedHosts ?? [],
+      allowedPayees: (val.allowedPayees ?? []).map((a) => a.toLowerCase()),
+      initialAllowance: val.initialAllowance,
+    };
+  });
 
 export const fundDeveloperAgentSchema = z.object({
   ownerAddress: evmAddress,
@@ -128,12 +188,50 @@ export const fundDeveloperAgentSchema = z.object({
   txHash,
 });
 
-/** Update developer agent spend caps (owner only). */
-export const updateDeveloperAgentSchema = z.object({
-  ownerAddress: evmAddress,
-  maxAmount: z.number().positive().max(100),
-  maxSinglePayment: z.number().positive().max(100),
-});
+/** Update developer agent spend caps (owner only) — SDK-aligned names. */
+export const updateDeveloperAgentSchema = z
+  .object({
+    ownerAddress: evmAddress,
+    dailyLimit: z.number().positive().max(100).optional(),
+    perTransaction: z.number().positive().max(100).optional(),
+    maxAmount: z.number().positive().max(100).optional(),
+    maxSinglePayment: z.number().positive().max(100).optional(),
+    allowedHosts: z.array(z.string().min(1).max(253)).max(50).optional(),
+    allowedPayees: z
+      .array(z.string().regex(/^0x[a-fA-F0-9]{40}$/))
+      .max(50)
+      .optional(),
+  })
+  .superRefine((val, ctx) => {
+    const daily = val.dailyLimit ?? val.maxAmount;
+    const perTx = val.perTransaction ?? val.maxSinglePayment;
+    if (daily === undefined || perTx === undefined) {
+      ctx.addIssue({
+        code: "custom",
+        message: "dailyLimit and perTransaction are required",
+        path: ["dailyLimit"],
+      });
+    } else if (perTx > daily) {
+      ctx.addIssue({
+        code: "custom",
+        message: "perTransaction cannot exceed dailyLimit",
+        path: ["perTransaction"],
+      });
+    }
+  })
+  .transform((val) => {
+    const dailyLimit = (val.dailyLimit ?? val.maxAmount)!;
+    const perTransaction = (val.perTransaction ?? val.maxSinglePayment)!;
+    return {
+      ownerAddress: val.ownerAddress,
+      dailyLimit,
+      perTransaction,
+      maxAmount: dailyLimit,
+      maxSinglePayment: perTransaction,
+      allowedHosts: val.allowedHosts,
+      allowedPayees: val.allowedPayees?.map((a) => a.toLowerCase()),
+    };
+  });
 
 /** Soft-delete / disable a developer agent (owner only). */
 export const deleteDeveloperAgentSchema = z.object({
@@ -145,6 +243,40 @@ export const developerAgentChatSchema = z.object({
   ownerAddress: evmAddress,
   /** UIMessage[] from `@ai-sdk/react` useChat */
   messages: z.array(z.any()).min(1),
+});
+
+/** x402 catalog entry sent with assistant chat for routing. */
+export const x402CatalogEntrySchema = z.object({
+  id: z.string().min(1).max(80),
+  name: z.string().min(1).max(80),
+  url: z.string().url().max(500),
+  description: z.string().min(1).max(1000),
+  enabled: z.boolean(),
+});
+
+/**
+ * Main 对话 stream: match x402 catalog + pick developer agent wallet + optional pay.
+ */
+export const assistantChatSchema = z.object({
+  ownerAddress: evmAddress,
+  messages: z.array(z.any()).min(1),
+  /** Enabled (and optionally disabled) catalog from the client Agent List. */
+  x402Services: z.array(x402CatalogEntrySchema).max(50).default([]),
+});
+
+/** Load / save persisted assistant chat (UIMessage[]). */
+export const assistantChatSessionQuerySchema = z.object({
+  address: evmAddress,
+});
+
+export const assistantChatSessionSaveSchema = z.object({
+  ownerAddress: evmAddress,
+  messages: z.array(z.any()).max(200),
+  title: z.string().max(80).optional(),
+});
+
+export const assistantChatSessionClearSchema = z.object({
+  ownerAddress: evmAddress,
 });
 
 /** Machine payment via MCP tool or x402 endpoint. */
@@ -188,6 +320,10 @@ export type FundDeveloperAgentInput = z.infer<typeof fundDeveloperAgentSchema>;
 export type UpdateDeveloperAgentInput = z.infer<typeof updateDeveloperAgentSchema>;
 export type DeleteDeveloperAgentInput = z.infer<typeof deleteDeveloperAgentSchema>;
 export type DeveloperAgentChatInput = z.infer<typeof developerAgentChatSchema>;
+export type AssistantChatInput = z.infer<typeof assistantChatSchema>;
+export type AssistantChatSessionSaveInput = z.infer<
+  typeof assistantChatSessionSaveSchema
+>;
 export type MachinePayInput = z.infer<typeof machinePaySchema>;
 export type MerchantPayInput = z.infer<typeof merchantPaySchema>;
 export type McpJsonRpcInput = z.infer<typeof mcpJsonRpcSchema>;

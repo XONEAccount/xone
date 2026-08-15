@@ -5,6 +5,7 @@ import {
   ChevronRight,
   ClipboardList,
   Home,
+  List,
   MessageSquare,
   Settings,
   Wallet,
@@ -45,6 +46,7 @@ const navEntries: NavEntry[] = [
       { to: "/app/receive", label: "收款" },
     ],
   },
+  { kind: "link", to: "/app/agents", label: "X402 List", icon: List },
   {
     kind: "group",
     id: "agents",

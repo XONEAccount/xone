@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState, type FormEvent, type MouseEvent } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { getAddressExplorerUrl } from "@wallet/config";
 import { useWalletAccount } from "@/hooks/use-wallet-account";
-import { Bot, ExternalLink, Plus } from "lucide-react";
+import { Bot, ExternalLink, Plus, RefreshCw } from "lucide-react";
 import type { AgentPayment, DeveloperAgent } from "@wallet/types";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
@@ -33,6 +34,8 @@ import {
   updateDeveloperAgent,
 } from "@/lib/developer-api";
 import { shortAddress } from "@/lib/address";
+import { cn } from "@/lib/utils";
+import { fetchTokenBalances, findDisplayBalance } from "@/web3";
 
 /**
  * Formats a wallet address with a longer visible prefix/suffix.
@@ -45,7 +48,7 @@ function displayWalletAddress(address: string): string {
 
 /**
  * Dedicated list of developer agents owned by the connected wallet.
- * Click name for payment history; wallet opens the block explorer.
+ * Shows balance + max limit; click name for payment history.
  */
 export function AgentsListPage() {
   const { address } = useWalletAccount();
@@ -61,8 +64,10 @@ export function AgentsListPage() {
 
   const [editOpen, setEditOpen] = useState(false);
   const [editAgent, setEditAgent] = useState<DeveloperAgent | null>(null);
-  const [editMaxAmount, setEditMaxAmount] = useState("");
-  const [editMaxSingle, setEditMaxSingle] = useState("");
+  const [editDailyLimit, setEditDailyLimit] = useState("");
+  const [editPerTransaction, setEditPerTransaction] = useState("");
+  const [editAllowedHosts, setEditAllowedHosts] = useState("");
+  const [editAllowedPayees, setEditAllowedPayees] = useState("");
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteAgent, setDeleteAgent] = useState<DeveloperAgent | null>(null);
@@ -87,6 +92,30 @@ export function AgentsListPage() {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  const walletKeys = agents.map((a) => `${a.id}:${a.walletAddress}`).join("|");
+  const onChainBalances = useQuery({
+    queryKey: ["developer-agent-balances", walletKeys],
+    enabled: agents.length > 0,
+    queryFn: async () => {
+      const entries = await Promise.all(
+        agents.map(async (agent) => {
+          const balances = await fetchTokenBalances(agent.walletAddress);
+          const display = findDisplayBalance(balances, agent.asset);
+          return [agent.id, display] as const;
+        }),
+      );
+      return Object.fromEntries(entries) as Record<string, string>;
+    },
+  });
+
+  /**
+   * Reloads agent rows and on-chain balances.
+   */
+  async function onRefreshAll() {
+    await refresh();
+    await onChainBalances.refetch();
+  }
 
   /**
    * Opens the payment-records dialog for one agent.
@@ -118,8 +147,10 @@ export function AgentsListPage() {
   function onOpenEdit(event: MouseEvent, agent: DeveloperAgent) {
     event.stopPropagation();
     setEditAgent(agent);
-    setEditMaxAmount(String(agent.maxAmount));
-    setEditMaxSingle(String(agent.maxSinglePayment));
+    setEditDailyLimit(String(agent.dailyLimit ?? agent.maxAmount));
+    setEditPerTransaction(String(agent.perTransaction ?? agent.maxSinglePayment));
+    setEditAllowedHosts((agent.allowedHosts ?? []).join("\n"));
+    setEditAllowedPayees((agent.allowedPayees ?? []).join("\n"));
     setEditOpen(true);
   }
 
@@ -146,23 +177,40 @@ export function AgentsListPage() {
   }
 
   /**
-   * Saves new maxAmount / maxSinglePayment for the selected agent.
+   * Saves dailyLimit / perTransaction (and optional allowlists) for the selected agent.
    * @param event - Form submit
    */
   async function onSaveEdit(event: FormEvent) {
     event.preventDefault();
     if (!owner || !editAgent) return;
 
-    const maxAmount = Number(editMaxAmount);
-    const maxSinglePayment = Number(editMaxSingle);
-    if (!(maxAmount > 0) || !(maxSinglePayment > 0)) {
-      setError("请输入有效的上限数值");
+    const dailyLimit = Number(editDailyLimit);
+    const perTransaction = Number(editPerTransaction);
+    if (!(dailyLimit > 0) || !(perTransaction > 0)) {
+      setError("请输入有效的 dailyLimit / perTransaction");
       return;
     }
-    if (maxSinglePayment > maxAmount) {
-      setError("单笔最大值不能超过总额上限");
+    if (perTransaction > dailyLimit) {
+      setError("perTransaction 不能超过 dailyLimit");
       return;
     }
+
+    const allowedHosts = [
+      ...new Set(
+        editAllowedHosts
+          .split(/[\n,]+/)
+          .map((s) => s.trim())
+          .filter(Boolean),
+      ),
+    ];
+    const allowedPayees = [
+      ...new Set(
+        editAllowedPayees
+          .split(/[\n,]+/)
+          .map((s) => s.trim())
+          .filter(Boolean),
+      ),
+    ];
 
     setBusy(true);
     setError(null);
@@ -170,8 +218,9 @@ export function AgentsListPage() {
       const updated = await updateDeveloperAgent(
         editAgent.id,
         owner,
-        maxAmount,
-        maxSinglePayment,
+        dailyLimit,
+        perTransaction,
+        { allowedHosts, allowedPayees },
       );
       setAgents((prev) => prev.map((row) => (row.id === updated.id ? updated : row)));
       setEditOpen(false);
@@ -206,15 +255,32 @@ export function AgentsListPage() {
     <div className="space-y-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <PageHeader icon={Bot} title="我的 Agents" />
-        <Button asChild variant="outline">
-          <Link to="/app/developers">
-            <Plus className="size-4" />
-            创建 Agent
-          </Link>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            disabled={loading || onChainBalances.isFetching || !owner}
+            onClick={() => void onRefreshAll()}
+          >
+            <RefreshCw
+              className={cn(
+                "size-4",
+                (loading || onChainBalances.isFetching) && "animate-spin",
+              )}
+              aria-hidden
+            />
+            刷新
+          </Button>
+          <Button asChild variant="outline">
+            <Link to="/app/developers">
+              <Plus className="size-4" />
+              创建 Agent
+            </Link>
+          </Button>
+        </div>
       </div>
       <p className="-mt-4 max-w-2xl text-sm text-muted-foreground">
-        当前钱包名下的受限 Agent。点击名称查看支付记录；点击钱包地址打开区块链浏览器。
+        当前钱包名下的受限 Agent。余额为链上余额；可用额度为策略额度。点击名称查看支付记录；点击钱包地址打开区块链浏览器。
       </p>
 
       {error ? (
@@ -244,10 +310,10 @@ export function AgentsListPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[7rem]">名称</TableHead>
-                  <TableHead className="min-w-[14rem]">钱包</TableHead>
-                  <TableHead>已用 / 上限</TableHead>
-                  <TableHead>单笔最大值</TableHead>
-                  <TableHead>可用额度</TableHead>
+                  <TableHead className="min-w-[14rem]">钱包地址</TableHead>
+                  <TableHead>余额</TableHead>
+                  <TableHead>已用 / dailyLimit</TableHead>
+                  <TableHead>perTx</TableHead>
                   <TableHead className="min-w-[12rem]">API Key</TableHead>
                   <TableHead className="w-[1%] whitespace-nowrap text-left">
                     操作
@@ -278,19 +344,20 @@ export function AgentsListPage() {
                         <ExternalLink className="size-3 shrink-0 opacity-60" />
                       </a>
                     </TableCell>
-                    <TableCell>
-                      {item.spentAmount}/{item.maxAmount} {item.asset}
+                    <TableCell className="font-mono text-sm">
+                      {onChainBalances.isLoading || onChainBalances.isFetching
+                        ? "…"
+                        : `${onChainBalances.data?.[item.id] ?? "0"} ${item.asset}`}
                     </TableCell>
                     <TableCell>
-                      {item.maxSinglePayment} {item.asset}
+                      {item.spentAmount}/{item.dailyLimit ?? item.maxAmount}{" "}
+                      {item.currency || item.asset}
                     </TableCell>
                     <TableCell>
-                      {item.allowanceEth} {item.asset}
+                      {item.perTransaction ?? item.maxSinglePayment}{" "}
+                      {item.currency || item.asset}
                     </TableCell>
-                    <TableCell
-                      className="min-w-[12rem] font-mono text-xs text-muted-foreground"
-                      title={item.apiKeyPrefix}
-                    >
+                    <TableCell>
                       {item.apiKeyPrefix}…
                     </TableCell>
                     <TableCell className="w-[1%] whitespace-nowrap text-left">
@@ -390,28 +457,47 @@ export function AgentsListPage() {
           <DialogHeader>
             <DialogTitle>修改限额 · {editAgent?.name ?? "—"}</DialogTitle>
             <DialogDescription>
-              可调整总额上限与单笔最大值。总额不能低于已花费或当前可用额度。
+              与 SDK AgentLimits 一致：dailyLimit、perTransaction，以及可选 allowlists。
+              dailyLimit 不能低于已花费或当前可用额度。
             </DialogDescription>
           </DialogHeader>
           <form className="space-y-4" onSubmit={(event) => void onSaveEdit(event)}>
             <label className="block space-y-1.5 text-sm">
               <span className="text-muted-foreground">
-                总额上限 ({editAgent?.asset ?? "USDC"})
+                dailyLimit ({editAgent?.currency || editAgent?.asset || "USDC"})
               </span>
               <Input
-                value={editMaxAmount}
-                onChange={(e) => setEditMaxAmount(e.target.value)}
+                value={editDailyLimit}
+                onChange={(e) => setEditDailyLimit(e.target.value)}
                 inputMode="decimal"
               />
             </label>
             <label className="block space-y-1.5 text-sm">
               <span className="text-muted-foreground">
-                单笔最大值 ({editAgent?.asset ?? "USDC"})
+                perTransaction ({editAgent?.currency || editAgent?.asset || "USDC"})
               </span>
               <Input
-                value={editMaxSingle}
-                onChange={(e) => setEditMaxSingle(e.target.value)}
+                value={editPerTransaction}
+                onChange={(e) => setEditPerTransaction(e.target.value)}
                 inputMode="decimal"
+              />
+            </label>
+            <label className="block space-y-1.5 text-sm">
+              <span className="text-muted-foreground">allowedHosts（可选）</span>
+              <textarea
+                value={editAllowedHosts}
+                onChange={(e) => setEditAllowedHosts(e.target.value)}
+                rows={3}
+                className="flex w-full rounded-md border border-border bg-white px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-[var(--color-ring)]"
+              />
+            </label>
+            <label className="block space-y-1.5 text-sm">
+              <span className="text-muted-foreground">allowedPayees（可选）</span>
+              <textarea
+                value={editAllowedPayees}
+                onChange={(e) => setEditAllowedPayees(e.target.value)}
+                rows={2}
+                className="flex w-full rounded-md border border-border bg-white px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-[var(--color-ring)]"
               />
             </label>
             <DialogFooter>

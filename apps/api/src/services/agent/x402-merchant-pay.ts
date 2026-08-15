@@ -50,6 +50,116 @@ function atomicUsdcToDecimal(atomic: string): number {
   return raw / 10 ** USDC_DECIMALS;
 }
 
+export type X402Quote = {
+  amount: number;
+  asset: "USDC";
+  payTo: string | null;
+  network: string | null;
+  merchantUrl: string;
+};
+
+/**
+ * Probes a merchant URL for the x402 402 quote without settling.
+ * @param merchantUrl - Absolute merchant resource URL
+ * @returns Quote amount in human USDC, or null when free / unreachable
+ */
+export async function quoteX402Merchant(
+  merchantUrl: string,
+): Promise<X402Quote | null> {
+  let url: URL;
+  try {
+    url = assertAllowedMerchantUrl(merchantUrl);
+  } catch {
+    return null;
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(url.toString(), {
+      method: "GET",
+      signal: AbortSignal.timeout(12_000),
+    });
+  } catch {
+    return null;
+  }
+
+  // Free resource — no payment needed.
+  if (response.ok) {
+    return {
+      amount: 0,
+      asset: "USDC",
+      payTo: null,
+      network: null,
+      merchantUrl: url.toString(),
+    };
+  }
+
+  if (response.status !== 402) return null;
+
+  type Accept = {
+    amount?: string;
+    maxAmountRequired?: string;
+    payTo?: string;
+    network?: string;
+    extra?: { decimals?: number };
+  };
+  type Required = { accepts?: Accept[] };
+
+  let required: Required | null = null;
+  const header =
+    response.headers.get("PAYMENT-REQUIRED") ||
+    response.headers.get("payment-required") ||
+    response.headers.get("X-PAYMENT-REQUIRED");
+  if (header) {
+    try {
+      required = JSON.parse(atob(header)) as Required;
+    } catch {
+      required = null;
+    }
+  }
+  if (!required?.accepts?.length) {
+    required = (await response.json().catch(() => null)) as Required | null;
+  }
+  const accept = required?.accepts?.[0];
+  if (!accept) return null;
+
+  const raw = accept.amount ?? accept.maxAmountRequired ?? "0";
+  const decimals = accept.extra?.decimals ?? USDC_DECIMALS;
+  const atomic = Number(raw);
+  if (!Number.isFinite(atomic) || atomic < 0) return null;
+  const amount = atomic / 10 ** decimals;
+  if (!Number.isFinite(amount)) return null;
+
+  return {
+    amount,
+    asset: "USDC",
+    payTo: accept.payTo?.toLowerCase() ?? null,
+    network: accept.network ?? null,
+    merchantUrl: url.toString(),
+  };
+}
+
+/**
+ * Whether a quoted amount requires explicit user confirmation for this agent.
+ * Within perTransaction + remaining dailyLimit → auto-pay; otherwise confirm.
+ * @param amount - Quoted human USDC
+ * @param agent - Agent policy snapshot
+ */
+export function paymentRequiresConfirmation(
+  amount: number,
+  agent: Pick<
+    DeveloperAgent,
+    "maxSinglePayment" | "maxAmount" | "spentAmount" | "perTransaction" | "dailyLimit"
+  >,
+): boolean {
+  if (!Number.isFinite(amount) || amount < 0) return true;
+  if (amount === 0) return false;
+  const perTx = agent.perTransaction ?? agent.maxSinglePayment;
+  const daily = agent.dailyLimit ?? agent.maxAmount;
+  const remaining = Math.max(0, daily - agent.spentAmount);
+  return amount > perTx || amount > remaining;
+}
+
 /**
  * Flattens undici/fetch errors into an actionable merchant connectivity message.
  * @param err - Thrown value from fetch / x402 wrap
@@ -68,12 +178,18 @@ function formatMerchantFetchError(err: unknown, merchantUrl: string): string {
     break;
   }
   const detail = parts.filter(Boolean).join(" ← ") || "unknown error";
+
+  // Policy / settle failures bubble through wrapFetchWithPayment — do not label as "unreachable".
+  if (/blocked by agent policy|allowance|insufficient|Payment blocked/i.test(detail)) {
+    return `支付被策略拦截（${detail}）。请先给 Agent 钱包充值 USDC，并确认 allowance / 单笔与总额上限足够。`;
+  }
+
   const isLocal =
     merchantUrl.includes("localhost") || merchantUrl.includes("127.0.0.1");
   const hint = isLocal
     ? "确认本地 seller 已启动：pnpm --filter @wallet/x402-seller dev"
-    : "当前网络可能无法访问 workers.dev，可改用 http://localhost:4021/weather";
-  return `无法连接商家 ${merchantUrl}（${detail}）。${hint}`;
+    : "浏览器能打开 402 页只说明商家在线；若本机 API 仍超时，可改用 http://localhost:4021/weather 或检查本机到 workers.dev 的出站网络";
+  return `无法完成对商家的请求 ${merchantUrl}（${detail}）。${hint}`;
 }
 
 /**
@@ -202,6 +318,15 @@ export async function payX402Merchant(
     return { ok: false, status: 400, error: "Agent key / address mismatch" };
   }
 
+  if (agent.allowanceEth <= 0) {
+    return {
+      ok: false,
+      status: 402,
+      error:
+        "Agent allowance 为 0：请先给该 Agent 充值 USDC（创建/充值流程），再发起 x402 支付。浏览器能打开商家 402 页不代表钱包已有额度。",
+    };
+  }
+
   const selectedRef: { current: PaymentRequirements | null } = { current: null };
   const client = new x402Client()
     .register("eip155:*", new ExactEvmScheme(signer))
@@ -209,7 +334,7 @@ export async function payX402Merchant(
       const allowed = requirements.filter((req) => {
         const human = atomicUsdcToDecimal(req.amount);
         if (!Number.isFinite(human) || human <= 0) return false;
-        if (human > agent.maxSinglePayment) return false;
+        // dailyLimit / allowance are hard caps; perTransaction only gates chat confirmation.
         if (agent.spentAmount + human > agent.maxAmount) return false;
         if (human > agent.allowanceEth) return false;
         // Accept Base Sepolia CAIP-2 only.
@@ -217,7 +342,7 @@ export async function payX402Merchant(
       });
       if (allowed.length === 0) {
         throw new Error(
-          "Payment blocked by agent policy (single/total/allowance or network)",
+          "Payment blocked by agent policy (dailyLimit/allowance or network)",
         );
       }
       selectedRef.current = allowed[0] ?? null;
