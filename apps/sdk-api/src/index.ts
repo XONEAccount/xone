@@ -41,10 +41,12 @@ app.use("*", async (c, next) => {
       ) {
         return origin;
       }
-      // Cloudflare Pages preview: https://<hash>.xone-console.pages.dev
+      // Cloudflare Pages preview: console + SDK docs/playground
       if (
         origin &&
-        /^https:\/\/([a-z0-9-]+\.)?xone-console\.pages\.dev$/i.test(origin)
+        /^https:\/\/([a-z0-9-]+\.)?(xone-console|xone-sdk-docs)\.pages\.dev$/i.test(
+          origin,
+        )
       ) {
         return origin;
       }

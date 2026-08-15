@@ -155,7 +155,7 @@ export async function createAgentForKey(
     dailyLimit: number;
     perTransaction: number;
     currency?: string;
-    chain?: Chain;
+    chain?: string;
     allowedHosts?: unknown;
     allowedPayees?: unknown;
   },
@@ -171,16 +171,12 @@ export async function createAgentForKey(
   const supabase = createServiceClient(c.env);
   const { data: existing } = await supabase
     .from("xone_agents")
-    .select("id")
+    .select("*")
     .eq("api_key_id", apiKeyId)
     .maybeSingle();
 
   if (existing) {
-    throw new HttpError(
-      400,
-      "This API key is already bound to an agent (1 key = 1 agent)",
-      "validation_error",
-    );
+    return { agent: existing as DbAgent };
   }
 
   const chain = normalizeChain(params.chain);
@@ -214,11 +210,17 @@ export async function createAgentForKey(
     updated_at: now,
   };
 
-  const { data, error } = await supabase
-    .from("xone_agents")
-    .insert(row)
-    .select("*")
-    .single();
+  const inserted = await supabase.from("xone_agents").insert(row).select("*").single();
+  let data = inserted.data;
+  let error = inserted.error;
+
+  // Remote DB may lag migrations — retry without allowlist columns.
+  if (error && /allowed_hosts|allowed_payees|schema cache/i.test(error.message)) {
+    const { allowed_hosts: _h, allowed_payees: _p, ...rest } = row;
+    const second = await supabase.from("xone_agents").insert(rest).select("*").single();
+    data = second.data;
+    error = second.error;
+  }
 
   if (error) throw new HttpError(500, error.message, "db_error");
   // Private key stays sealed server-side; SDK never receives it.

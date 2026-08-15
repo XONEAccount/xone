@@ -1,6 +1,6 @@
 import { Agent } from "./agent.js";
 import { OperatorRequiredError } from "./errors.js";
-import { getRemoteAgentForKey, RemoteAgent } from "./remoteAgent.js";
+import { getRemoteAgentForKey, createRemoteAgent, RemoteAgent } from "./remoteAgent.js";
 import {
   createAgentRecord,
   deleteAgentRecord,
@@ -36,14 +36,17 @@ function resolveApiBaseUrl(): string | undefined {
  * When `XONE_API_URL` is set in the environment, requests go to the Hono API.
  * Otherwise uses the in-memory mock store.
  *
- * Remote (production) tokens are spend-only: `get` / `pay` / history.
- * Create, limits, pause, and delete belong on the console JWT.
+ * Remote tokens: `create` (1 key ↔ 1 wallet), `get`, `pay`, history.
+ * Limits, pause, and delete belong on the console JWT.
  *
  * @example
  * ```ts
  * const xone = new XOne({ agentToken: process.env.XONE_AGENT_TOKEN! });
- * const agent = await xone.agent.get();
- * if (!agent) throw new Error("Create the agent in the console first");
+ * const agent = await xone.agent.create({
+ *   name: "agent",
+ *   dailyLimit: 10,
+ *   perTransaction: 1,
+ * });
  * await agent.pay({ url: "https://seller.example/weather" });
  * ```
  */
@@ -79,15 +82,12 @@ export class XOne {
     if (this.baseUrl) {
       const baseUrl = this.baseUrl;
       this.agent = {
-        create: async (_params: AgentCreateParams) => {
-          throw new OperatorRequiredError(
-            "Create agents in the console. Agent tokens may only get, pay, and read history.",
-          );
-        },
+        create: (params: AgentCreateParams) =>
+          createRemoteAgent(baseUrl, this.agentToken, params),
         get: () => getRemoteAgentForKey(baseUrl, this.agentToken),
         delete: async () => {
           throw new OperatorRequiredError(
-            "Delete agents in the console. Agent tokens may only get, pay, and read history.",
+            "Delete agents in the console. Agent tokens may create, get, pay, and read history.",
           );
         },
       };

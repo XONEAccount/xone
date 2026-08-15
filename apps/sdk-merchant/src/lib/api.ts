@@ -6,7 +6,7 @@ import type { AgentDto, ApiKeyDto, HistoryDto, ProfileDto } from "./types";
  */
 export function getApiBaseUrl(): string {
   const raw = (import.meta.env.VITE_API_URL as string | undefined)?.trim();
-  return (raw || "http://127.0.0.1:8787").replace(/\/$/, "");
+  return (raw || "https://xone-sdk-api.tskwangyi.workers.dev").replace(/\/$/, "");
 }
 
 /**
@@ -93,7 +93,7 @@ export async function publicApiFetch<T>(
     });
   } catch {
     throw new Error(
-      `Cannot reach API at ${getApiBaseUrl()}. Start local sdk-api (pnpm --filter @xone/api dev) or check VITE_API_URL.`,
+      `Cannot reach API at ${getApiBaseUrl()}. Check VITE_API_URL.`,
     );
   }
 

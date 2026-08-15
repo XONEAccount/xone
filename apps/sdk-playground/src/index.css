@@ -1,8 +1,10 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --font-sans:
+    "Noto Sans SC", "PingFang SC", "Microsoft YaHei", ui-sans-serif, system-ui,
+    sans-serif;
+  --: "IBM Plex Mono", ui-monospace, monospace;
 
   --color-background: #ffffff;
   --color-foreground: #0a0a0a;
@@ -180,7 +182,7 @@ html::-webkit-scrollbar-corner {
 }
 
 .prose-sdk code {
-  font-family: var(--font-mono);
+  font-family: var(--);
   font-size: 0.8em;
 }
 

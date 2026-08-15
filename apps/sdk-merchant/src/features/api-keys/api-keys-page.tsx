@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Eye, EyeOff, KeyRound, LoaderCircle, Plus, RefreshCw, Search } from "lucide-react";
+import { Check, Eye, EyeOff, FlaskConical, KeyRound, LoaderCircle, Plus, RefreshCw, Search } from "lucide-react";
 import type { ApiKeyRecord } from "@xone/sdk";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,9 @@ import { useAccount } from "@/hooks/use-account";
 import { errorMessage, formatDateTime } from "@/utils/format";
 
 const MASK = "xone_••••••••••••••••";
+const PLAYGROUND_URL =
+  (import.meta.env.VITE_PLAYGROUND_URL as string | undefined)?.trim() ||
+  "https://xone-sdk-docs.pages.dev/?view=playground";
 
 /**
  * API keys list and create flow.
@@ -45,9 +48,11 @@ export function ApiKeysPage() {
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
   const [revealed, setRevealed] = useState<Record<string, boolean>>({});
   const [pausingId, setPausingId] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [deleteKey, setDeleteKey] = useState<ApiKeyRecord | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -72,9 +77,6 @@ export function ApiKeysPage() {
       setName("");
       if (key.token) {
         await navigator.clipboard.writeText(key.token);
-        setMessage("API key created — token copied. Click the eye to reveal.");
-      } else {
-        setMessage("API key created.");
       }
     } catch (err) {
       setError(errorMessage(err));
@@ -84,21 +86,37 @@ export function ApiKeysPage() {
   }
 
   /**
-   * Soft-deletes a key after confirm.
+   * Copies the spend token and shows a short success hint on the button.
+   * @param key - Row whose token is still available in this session
    */
-  async function onDelete(key: ApiKeyRecord): Promise<void> {
-    if (
-      !window.confirm(
-        "Deleted keys can no longer pay. Existing agents stay listed. Continue?",
-      )
-    ) {
-      return;
-    }
+  async function onCopy(key: ApiKeyRecord): Promise<void> {
+    if (!key.token) return;
+    setError(null);
     try {
-      await deleteApiKey(key.id);
-      setMessage("API key deleted");
+      await navigator.clipboard.writeText(key.token);
+      setCopiedId(key.id);
+      window.setTimeout(() => {
+        setCopiedId((id) => (id === key.id ? null : id));
+      }, 1600);
+    } catch (err) {
+      setError(errorMessage(err) || "Could not copy the token.");
+    }
+  }
+
+  /**
+   * Soft-deletes the key selected in the confirm dialog.
+   */
+  async function onConfirmDelete(): Promise<void> {
+    if (!deleteKey) return;
+    setDeleting(true);
+    setError(null);
+    try {
+      await deleteApiKey(deleteKey.id);
+      setDeleteKey(null);
     } catch (err) {
       setError(errorMessage(err));
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -113,11 +131,6 @@ export function ApiKeysPage() {
     try {
       if (agent.getStatus() === "paused") await agent.resume();
       else await agent.pause();
-      setMessage(
-        agent.getStatus() === "paused"
-          ? `Paused ${agent.name}`
-          : `Resumed ${agent.name}`,
-      );
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -152,6 +165,12 @@ export function ApiKeysPage() {
             >
               <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
             </Button>
+            <Button type="button" variant="outline" asChild>
+              <a href={PLAYGROUND_URL} target="_blank" rel="noreferrer">
+                <FlaskConical className="h-4 w-4" />
+                Try online
+              </a>
+            </Button>
             <Button type="button" onClick={() => setShowCreate(true)}>
               <Plus className="h-4 w-4" />
               Create
@@ -160,11 +179,17 @@ export function ApiKeysPage() {
         }
       />
 
-      {message ? (
-        <p className="text-sm text-muted-foreground">{message}</p>
-      ) : null}
       {error ? (
         <p className="text-sm text-destructive">{error}</p>
+      ) : null}
+
+      {copiedId ? (
+        <div
+          className="pointer-events-none fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-md border border-border bg-foreground px-3 py-1.5 text-xs text-background shadow-sm"
+          role="status"
+        >
+          Copied
+        </div>
       ) : null}
 
       {apiKeys.length === 0 ? (
@@ -172,10 +197,17 @@ export function ApiKeysPage() {
           <CardContent className="space-y-3 p-6">
             <p className="font-medium">Create your first API key</p>
             <p className="text-sm text-muted-foreground">
-              1. Create a key and copy the token → 2. Create an agent → 3. In your
-              app, call <code className="font-mono text-xs">new XOne({"{ agentToken }"})</code> then{" "}
-              <code className="font-mono text-xs">agent.get()</code> /{" "}
-              <code className="font-mono text-xs">pay()</code>.
+              1. Create a key and copy the token → 2. Create an agent → 3.{" "}
+              <a
+                href={PLAYGROUND_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="underline underline-offset-2"
+              >
+                Try it online
+              </a>{" "}
+              or call <code className="font-mono text-xs">new XOne({"{ agentToken }"})</code>{" "}
+              in your app.
             </p>
             <Button type="button" onClick={() => setShowCreate(true)}>
               Create API key
@@ -253,11 +285,16 @@ export function ApiKeysPage() {
                             variant="ghost"
                             size="sm"
                             disabled={!key.token}
-                            onClick={() =>
-                              void navigator.clipboard.writeText(key.token)
-                            }
+                            onClick={() => void onCopy(key)}
                           >
-                            Copy
+                            {copiedId === key.id ? (
+                              <>
+                                <Check className="h-3.5 w-3.5" />
+                                Copied
+                              </>
+                            ) : (
+                              "Copy"
+                            )}
                           </Button>
                           <Button
                             type="button"
@@ -285,7 +322,10 @@ export function ApiKeysPage() {
                             size="sm"
                             className="text-destructive"
                             disabled={key.status === "deleted"}
-                            onClick={() => void onDelete(key)}
+                            onClick={() => {
+                              setError(null);
+                              setDeleteKey(key);
+                            }}
                           >
                             Delete
                           </Button>
@@ -306,6 +346,46 @@ export function ApiKeysPage() {
           </CardContent>
         </Card>
       )}
+
+      <Dialog
+        open={Boolean(deleteKey)}
+        onOpenChange={(open) => {
+          if (!open && !deleting) setDeleteKey(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete API key</DialogTitle>
+            <DialogDescription>
+              {deleteKey
+                ? `${deleteKey.name} will no longer be able to pay. Bound agents stay listed.`
+                : "This key will no longer be able to pay."}
+            </DialogDescription>
+          </DialogHeader>
+          {error && deleteKey ? (
+            <p className="text-sm text-destructive">{error}</p>
+          ) : null}
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="ghost"
+              disabled={deleting}
+              onClick={() => setDeleteKey(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={deleting}
+              onClick={() => void onConfirmDelete()}
+            >
+              {deleting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={showCreate} onOpenChange={setShowCreate}>
         <DialogContent>

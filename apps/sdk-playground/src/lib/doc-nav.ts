@@ -21,6 +21,7 @@ export const DOC_NAV: DocNavGroup[] = [
       { id: "overview", label: "Overview" },
       { id: "architecture", label: "Architecture" },
       { id: "console-setup", label: "Console setup" },
+      { id: "try-it-online", label: "Try it online" },
       { id: "funding", label: "Funding" },
       { id: "environment", label: "Environment" },
       { id: "installation", label: "Installation" },

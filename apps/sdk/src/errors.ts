@@ -147,14 +147,14 @@ export class ValidationError extends XOneError {
 
 /**
  * Thrown when an agent token is used for an operator-only action
- * (create, limits, pause, delete, transfer).
+ * (limits, pause, delete, transfer).
  */
 export class OperatorRequiredError extends XOneError {
   /**
    * @param message - Detail
    */
   constructor(
-    message = "This action requires the console. Agent tokens may only get, pay, and read history.",
+    message = "This action requires the console. Agent tokens may create, get, pay, and read history.",
   ) {
     super(message, "OPERATOR_REQUIRED");
     this.name = "OperatorRequiredError";

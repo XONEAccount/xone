@@ -9,6 +9,7 @@ import type {
   PayParams,
   PayResult,
   XOneChain,
+  AgentCreateParams,
 } from "./types.js";
 import { resolvePayIdempotencyKey } from "./store/payIntents.js";
 
@@ -204,6 +205,34 @@ export class RemoteAgent {
       token: this.agentToken,
     });
   }
+}
+
+/**
+ * Creates the wallet bound to this API key (idempotent: 1 key ↔ 1 agent).
+ * @param baseUrl - API origin
+ * @param agentToken - API key
+ * @param params - Name, limits, optional chain
+ * @returns Remote agent
+ */
+export async function createRemoteAgent(
+  baseUrl: string,
+  agentToken: string,
+  params: AgentCreateParams,
+): Promise<RemoteAgent> {
+  const dto = await httpJson<AgentDto>(baseUrl, "/v1/sdk/agents", {
+    method: "POST",
+    token: agentToken,
+    body: JSON.stringify({
+      name: params.name,
+      chain: params.chain,
+      dailyLimit: params.dailyLimit,
+      perTransaction: params.perTransaction,
+      currency: params.currency,
+      allowedHosts: params.allowedHosts,
+      allowedPayees: params.allowedPayees,
+    }),
+  });
+  return new RemoteAgent(dto, baseUrl, agentToken);
 }
 
 /**

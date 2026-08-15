@@ -1,3 +1,6 @@
 name = "xone-sdk-docs"
 compatibility_date = "2025-05-01"
 pages_build_output_dir = "dist"
+
+[vars]
+API_UPSTREAM = "https://xone-sdk-api.tskwangyi.workers.dev"

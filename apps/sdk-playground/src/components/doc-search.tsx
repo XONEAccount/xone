@@ -77,7 +77,7 @@ export function DocSearch({ markdown, onSelect }: DocSearchProps) {
       >
         <Search className="h-3.5 w-3.5 shrink-0" aria-hidden />
         <span className="flex-1 truncate">Search docs…</span>
-        <kbd className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+        <kbd className="rounded border border-border bg-muted px-1.5 py-0.5  text-[10px] text-muted-foreground">
           ⌘K
         </kbd>
       </button>
@@ -155,7 +155,7 @@ export function DocSearch({ markdown, onSelect }: DocSearchProps) {
                       )}
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <span className="font-mono text-sm font-medium">{hit.title}</span>
+                        <span className="text-sm font-medium">{hit.title}</span>
                         <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
                           {hit.group}
                         </span>

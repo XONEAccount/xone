@@ -11,9 +11,9 @@ TypeScript SDK for **agent-scoped wallets** that settle **HTTP 402 / x402** paym
 | Surface | Role |
 | ------- | ---- |
 | **[Console](https://xone-console.pages.dev/login)** | Operator identity, API keys, agent provisioning, spend limits, host/payee allowlists, pause/delete, audit |
-| **`@xone/sdk`** | Load the bound agent with a spend token and execute policy-constrained x402 payments |
+| **`@xone/sdk`** | Create/load the bound agent with a spend token and execute policy-constrained x402 payments |
 
-Agent tokens are **spend-only**. Policy changes (create agent, limits, allowlists, pause, delete) are performed in the console, never from the agent runtime.
+Agent tokens may **create** the wallet (idempotent, 1 key ↔ 1 wallet), **get**, **pay**, and read history. Policy changes (limits, allowlists, pause, delete) stay in the console.
 
 Spend is gated by:
 
@@ -30,11 +30,12 @@ Spend is gated by:
 
 ```
 Console (JWT)
-  create API key + agent, set limits / allowlists
+  create API key, set limits / allowlists
         │
         ▼
 Runtime: new XOne({ agentToken })
         │
+        ├─ agent.create(params)  → RemoteAgent (idempotent)
         ├─ agent.get()           → RemoteAgent
         ├─ agent.pay({ url })    → server-side x402 settle + resource body
         └─ agent.getTools()      → LangChain tools (same policy)
@@ -67,7 +68,21 @@ Do this before writing runtime code:
 4. Optionally set **`allowedHosts`** / **`allowedPayees`**.
 5. Note the agent wallet address (also available later via `agent.getAddress()`).
 
-Operator actions (limits, pause, delete) stay in the console. The SDK only spends.
+Operator actions (limits, pause, delete) stay in the console. The SDK creates the bound wallet (idempotent) and spends.
+
+---
+
+## Try it online
+
+Paste the API key into the [Playground](https://xone-sdk-docs.pages.dev/?view=playground) to call the live spender API from the browser:
+
+1. **Connect** — `POST /v1/sdk/agents` (create wallet) then `GET /v1/sdk/agents` (load it).
+2. **Load agent / History** — inspect policy and recent spend.
+3. **Pay** — settle the sample seller (`/weather`) or any x402 URL.
+
+The playground uses the same spend token as `new XOne({ agentToken })`. Connect creates the wallet if it does not exist (1 key ↔ 1 wallet). Limits, pause, and delete stay in the console. Fund the agent address with USDC before paying.
+
+Local: `pnpm --filter @xone/sdk-playground dev` → [http://localhost:5182/?view=playground](http://localhost:5182/?view=playground)
 
 ---
 
@@ -198,7 +213,22 @@ const xone = new XOne({
 
 ## API reference: `xone.agent`
 
-Namespace for the agent bound to this key. Operator actions (create, limits, pause, delete) are not available on the spend token; use the console.
+Namespace for the agent bound to this key. `create` is idempotent (1 key ↔ 1 wallet). Limits, pause, and delete stay in the console.
+
+### `agent.create(params)`
+
+Creates the wallet for this token, or returns the existing one.
+
+**Returns:** `Promise<RemoteAgent>`
+
+```ts
+const agent = await xone.agent.create({
+  name: "agent",
+  chain: "base-sepolia",
+  dailyLimit: 10,
+  perTransaction: 1,
+});
+```
 
 ### `agent.get()`
 
@@ -207,10 +237,13 @@ Loads the agent for this token, or `undefined` if none is bound.
 **Returns:** `Promise<RemoteAgent | undefined>`
 
 ```ts
-const agent = await xone.agent.get();
-if (!agent) {
-  // Provision in the console, then retry.
-}
+const agent = await xone.agent.create({
+  name: "agent",
+  chain: "base-sepolia",
+  dailyLimit: 10,
+  perTransaction: 1,
+});
+const loaded = await xone.agent.get();
 ```
 
 ---

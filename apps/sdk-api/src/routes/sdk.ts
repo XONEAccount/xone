@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { ApiBindings, ApiVariables } from "../env";
 import {
+  createAgentForKey,
   ensureDailyPeriod,
   payX402Agent,
   requireOwnedAgent,
@@ -14,11 +15,43 @@ type Env = { Bindings: ApiBindings; Variables: ApiVariables };
 
 /**
  * Spender API for `XOne({ agentToken })`.
- * Allowed: get agent, pay, history. Create / limits / pause / delete are console JWT only.
+ * Allowed: create (idempotent 1 key ↔ 1 wallet), get, pay, history.
+ * Limits / pause / delete stay on the console JWT.
  */
 export const sdkRoutes = new Hono<Env>();
 
 sdkRoutes.use("*", requireApiKey);
+
+/**
+ * Creates the wallet bound to this API key, or returns it if it already exists.
+ */
+sdkRoutes.post("/agents", async (c) => {
+  const body = ((await c.req.json().catch(() => ({}))) ?? {}) as {
+    name?: string;
+    dailyLimit?: number;
+    perTransaction?: number;
+    currency?: string;
+    chain?: string;
+    allowedHosts?: unknown;
+    allowedPayees?: unknown;
+  };
+
+  const { agent } = await createAgentForKey(
+    c,
+    {
+      name: body.name?.trim() || "agent",
+      dailyLimit: Number(body.dailyLimit ?? 10),
+      perTransaction: Number(body.perTransaction ?? 1),
+      currency: body.currency,
+      chain: body.chain,
+      allowedHosts: body.allowedHosts,
+      allowedPayees: body.allowedPayees,
+    },
+    c.get("apiKeyId")!,
+    c.get("userId"),
+  );
+  return c.json(serializeAgent(await ensureDailyPeriod(c, agent)), 201);
+});
 
 sdkRoutes.get("/agents", async (c) => {
   const supabase = createServiceClient(c.env);
@@ -108,12 +141,11 @@ sdkRoutes.get("/agents/:id/history", async (c) => {
 function operatorRequired(): never {
   throw new HttpError(
     403,
-    "This action requires the console (signed-in user). Agent tokens may only get, pay, and read history.",
+    "This action requires the console (signed-in user). Agent tokens may create, get, pay, and read history.",
     "operator_required",
   );
 }
 
-sdkRoutes.post("/agents", () => operatorRequired());
 sdkRoutes.delete("/agents", () => operatorRequired());
 sdkRoutes.delete("/agents/:id", () => operatorRequired());
 sdkRoutes.post("/agents/:id/pause", () => operatorRequired());

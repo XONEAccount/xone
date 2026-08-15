@@ -1,18 +1,10 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Bot, LoaderCircle, Plus, RefreshCw, Search } from "lucide-react";
-import type { Agent, AgentStatus, XOneChain } from "@xone/sdk";
+import { Bot, LoaderCircle, RefreshCw, Search } from "lucide-react";
+import type { Agent, AgentStatus } from "@xone/sdk";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
   Table,
@@ -22,65 +14,18 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Textarea } from "@/components/ui/textarea";
 import { useAccount } from "@/hooks/use-account";
 import { errorMessage, shortAddress } from "@/utils/format";
 
-const CHAINS: { label: string; value: XOneChain }[] = [
-  { label: "Base Sepolia", value: "base-sepolia" },
-  { label: "Base", value: "base" },
-  { label: "Polygon", value: "polygon" },
-  { label: "Arbitrum", value: "arbitrum" },
-];
-
 /**
- * @param text - Newline or comma separated
- * @returns Trimmed unique entries
- */
-function parseList(text: string): string[] {
-  return [
-    ...new Set(
-      text
-        .split(/[\n,]/)
-        .map((s) => s.trim())
-        .filter(Boolean),
-    ),
-  ];
-}
-
-/**
- * Agents list + create dialog (console operator).
+ * Agents list (console operator). Creation is not offered on this page.
  */
 export function AgentsPage() {
-  const {
-    agents,
-    apiKeys,
-    getApiKey,
-    agentCount,
-    createAgent,
-    refresh,
-    loading,
-  } = useAccount();
+  const { agents, getApiKey, refresh, loading } = useAccount();
 
   const [search, setSearch] = useState("");
   const [pausingId, setPausingId] = useState<string | null>(null);
-  const [showCreate, setShowCreate] = useState(false);
-  const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({
-    apiKeyId: "",
-    name: "",
-    chain: "base-sepolia" as XOneChain,
-    dailyLimit: 10,
-    perTransaction: 1,
-    allowedHosts: "",
-    allowedPayees: "",
-  });
-
-  const unboundKeys = useMemo(
-    () => apiKeys.filter((k) => k.status === "active" && agentCount(k.id) === 0),
-    [apiKeys, agentCount],
-  );
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -96,45 +41,6 @@ export function AgentsPage() {
       );
     });
   }, [agents, search, getApiKey]);
-
-  /**
-   * Opens create dialog with first unbound key selected.
-   */
-  function openCreate(): void {
-    setForm((f) => ({
-      ...f,
-      apiKeyId: unboundKeys[0]?.id ?? "",
-      name: "",
-      allowedHosts: "",
-      allowedPayees: "",
-    }));
-    setError(null);
-    setShowCreate(true);
-  }
-
-  /**
-   * Creates an agent from the console.
-   */
-  async function onCreate(): Promise<void> {
-    setCreating(true);
-    setError(null);
-    try {
-      await createAgent({
-        apiKeyId: form.apiKeyId,
-        name: form.name.trim(),
-        chain: form.chain,
-        dailyLimit: form.dailyLimit,
-        perTransaction: form.perTransaction,
-        allowedHosts: parseList(form.allowedHosts),
-        allowedPayees: parseList(form.allowedPayees),
-      });
-      setShowCreate(false);
-    } catch (err) {
-      setError(errorMessage(err));
-    } finally {
-      setCreating(false);
-    }
-  }
 
   /**
    * Pause / resume an agent.
@@ -157,7 +63,7 @@ export function AgentsPage() {
       <PageHeader
         icon={Bot}
         title="Agents"
-        description="Create agents here and bind each to an API key. Runtime tokens can only pay and read — limits and allowlists stay in this console."
+        description="Bound wallets and spend policy. Runtime tokens can only pay and read — limits stay in this console."
         actions={
           <>
             <div className="relative">
@@ -179,14 +85,6 @@ export function AgentsPage() {
             >
               <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
             </Button>
-            <Button
-              type="button"
-              disabled={unboundKeys.length === 0}
-              onClick={openCreate}
-            >
-              <Plus className="h-4 w-4" />
-              Create
-            </Button>
           </>
         }
       />
@@ -200,16 +98,8 @@ export function AgentsPage() {
           <CardContent className="space-y-3 p-6">
             <p className="font-medium">No agents yet</p>
             <p className="text-sm text-muted-foreground">
-              Create an API key first, then create an agent here. The SDK token
-              can only pay — it cannot raise limits.
+              Agents bound to your API keys will appear here.
             </p>
-            <Button
-              type="button"
-              disabled={unboundKeys.length === 0}
-              onClick={openCreate}
-            >
-              Create agent
-            </Button>
           </CardContent>
         </Card>
       ) : (
@@ -280,142 +170,6 @@ export function AgentsPage() {
           </CardContent>
         </Card>
       )}
-
-      <Dialog open={showCreate} onOpenChange={setShowCreate}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Create agent</DialogTitle>
-            <DialogDescription>
-              Bind one unused API key. Fund on-chain USDC at the agent address
-              after creation.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium" htmlFor="agent-key">
-                API key
-              </label>
-              <select
-                id="agent-key"
-                className="flex h-10 w-full rounded-md border border-border bg-white px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ring)]"
-                value={form.apiKeyId}
-                onChange={(e) => setForm((f) => ({ ...f, apiKeyId: e.target.value }))}
-              >
-                <option value="">Select an unused key</option>
-                {unboundKeys.map((k) => (
-                  <option key={k.id} value={k.id}>
-                    {k.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium" htmlFor="agent-name">
-                Name
-              </label>
-              <Input
-                id="agent-name"
-                value={form.name}
-                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                placeholder="research-bot"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium" htmlFor="agent-chain">
-                Chain
-              </label>
-              <select
-                id="agent-chain"
-                className="flex h-10 w-full rounded-md border border-border bg-white px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ring)]"
-                value={form.chain}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, chain: e.target.value as XOneChain }))
-                }
-              >
-                {CHAINS.map((c) => (
-                  <option key={c.value} value={c.value}>
-                    {c.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Daily limit</label>
-                <Input
-                  type="number"
-                  min={0.01}
-                  step={0.1}
-                  value={form.dailyLimit}
-                  onChange={(e) =>
-                    setForm((f) => ({
-                      ...f,
-                      dailyLimit: Number(e.target.value),
-                    }))
-                  }
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Per transaction</label>
-                <Input
-                  type="number"
-                  min={0.01}
-                  step={0.1}
-                  value={form.perTransaction}
-                  onChange={(e) =>
-                    setForm((f) => ({
-                      ...f,
-                      perTransaction: Number(e.target.value),
-                    }))
-                  }
-                />
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Allowed hosts (optional)</label>
-              <Textarea
-                value={form.allowedHosts}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, allowedHosts: e.target.value }))
-                }
-                placeholder="One host per line, e.g. seller.example.com"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Allowed payees (optional)</label>
-              <Textarea
-                value={form.allowedPayees}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, allowedPayees: e.target.value }))
-                }
-                placeholder="One 0x address per line"
-              />
-            </div>
-          </div>
-          {error && showCreate ? (
-            <p className="text-sm text-[var(--color-destructive)]">{error}</p>
-          ) : null}
-          <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => setShowCreate(false)}>
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              disabled={
-                !form.apiKeyId ||
-                !form.name.trim() ||
-                form.dailyLimit <= 0 ||
-                form.perTransaction <= 0 ||
-                creating
-              }
-              onClick={() => void onCreate()}
-            >
-              {creating ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}
-              Create
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

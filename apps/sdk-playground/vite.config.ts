@@ -13,5 +13,16 @@ export default defineConfig({
   server: {
     port: 5182,
     open: true,
+    proxy: {
+      "/v1": { target: "http://127.0.0.1:8787", changeOrigin: true },
+      "/health": { target: "http://127.0.0.1:8787", changeOrigin: true },
+    },
+  },
+  preview: {
+    port: 5182,
+    proxy: {
+      "/v1": { target: "http://127.0.0.1:8787", changeOrigin: true },
+      "/health": { target: "http://127.0.0.1:8787", changeOrigin: true },
+    },
   },
 });
