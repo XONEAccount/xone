@@ -19,8 +19,13 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md"
   ],
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsup src/index.ts src/mock.ts --format cjs,esm --dts --clean",
     "dev": "tsup src/index.ts src/mock.ts --format cjs,esm --dts --watch",
@@ -29,11 +34,12 @@
   },
   "keywords": [
     "x402",
-    "langchain",
+    "xone",
     "wallet",
     "usdc",
     "ai-agent",
-    "payments"
+    "payments",
+    "mcp"
   ],
   "license": "MIT",
   "dependencies": {

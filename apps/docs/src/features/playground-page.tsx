@@ -450,7 +450,7 @@ export function PlaygroundPage({ view, onView }: PlaygroundPageProps) {
                     className={cn(
                       "relative w-full rounded-md px-2.5 py-1.5 text-left transition-colors",
                       on
-                        ? "bg-muted font-medium text-foreground before:absolute before:inset-y-1 before:left-0 before:w-[2px] before:rounded-full before:bg-foreground"
+                        ? "bg-muted font-medium text-foreground before:absolute before:inset-y-1 before:left-0 before:w-0.5 before:rounded-full before:bg-foreground"
                         : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
                     )}
                   >
@@ -568,7 +568,7 @@ export function PlaygroundPage({ view, onView }: PlaygroundPageProps) {
   );
 
   return (
-    <div className="min-h-screen text-[var(--color-foreground)]">
+    <div className="min-h-screen text-(--color-foreground)">
       <div className="flex min-h-screen">
         <aside className="docs-sidebar sticky top-0 hidden h-screen w-72 shrink-0 overflow-y-auto border-r border-border bg-white/80 px-3 py-6 backdrop-blur-sm md:block">
           <Brand />
@@ -696,7 +696,7 @@ export function PlaygroundPage({ view, onView }: PlaygroundPageProps) {
                   </CardHeader>
                   <CardContent>
                     {result !== null ? (
-                      <pre className="overflow-x-auto rounded-md border border-border bg-[#fafafa] p-3  text-[11px] leading-relaxed text-foreground">
+                      <pre className="overflow-x-auto rounded-md border border-border bg-primary-foreground p-3  text-[11px] leading-relaxed text-foreground">
                         {typeof result === "string"
                           ? result
                           : JSON.stringify(result, null, 2)}
@@ -730,7 +730,7 @@ export function PlaygroundPage({ view, onView }: PlaygroundPageProps) {
                     </Button>
                   </CardHeader>
                   <CardContent>
-                    <pre className="overflow-x-auto rounded-md border border-border bg-[#fafafa] p-3  text-[11px] leading-relaxed">
+                    <pre className="overflow-x-auto rounded-md border border-border bg-primary-foreground p-3  text-[11px] leading-relaxed">
                       {sdkSnippet}
                     </pre>
                   </CardContent>
@@ -994,14 +994,13 @@ function snippetFor(id: MethodId, payUrl: string): string {
   const url = payUrl.trim() || DEFAULT_PAY_URL;
   const prefix = `import { XOne } from "@xone/sdk";
 
-const xone = new XOne({
-  agentToken: process.env.XONE_AGENT_TOKEN!,
-});
+const xone = new XOne();
 `;
   switch (id) {
     case "create":
       return `${prefix}
 const agent = await xone.agent.create({
+  apiKey: process.env.XONE_AGENT_TOKEN!,
   name: "agent",
   chain: "base-sepolia",
   dailyLimit: 10,

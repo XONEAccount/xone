@@ -1,0 +1,28 @@
+{
+  "name": "@wallet/assets",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./plugin.js",
+  "types": "./plugin.d.ts",
+  "exports": {
+    ".": {
+      "types": "./plugin.d.ts",
+      "import": "./plugin.js"
+    },
+    "./favicon.ico": "./favicon.ico"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit",
+    "lint": "echo \"no lint yet\""
+  },
+  "peerDependencies": {
+    "vite": "^7.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.1",
+    "typescript": "^5.9.2",
+    "vite": "^7.1.5"
+  }
+}

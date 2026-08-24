@@ -1,5 +1,5 @@
 import { Agent } from "./agent.js";
-import { OperatorRequiredError } from "./errors.js";
+import { InvalidApiKeyError, OperatorRequiredError } from "./errors.js";
 import { getRemoteAgentForKey, createRemoteAgent, RemoteAgent } from "./remoteAgent.js";
 import {
   createAgentRecord,
@@ -41,8 +41,9 @@ function resolveApiBaseUrl(): string | undefined {
  *
  * @example
  * ```ts
- * const xone = new XOne({ agentToken: process.env.XONE_AGENT_TOKEN! });
+ * const xone = new XOne();
  * const agent = await xone.agent.create({
+ *   apiKey: process.env.XONE_AGENT_TOKEN!,
  *   name: "agent",
  *   dailyLimit: 10,
  *   perTransaction: 1,
@@ -51,9 +52,16 @@ function resolveApiBaseUrl(): string | undefined {
  * ```
  */
 export class XOne {
-  readonly agentToken: string;
+  private token: string | undefined;
   /** Resolved API origin (`XONE_API_URL`), if any. */
   private readonly baseUrl?: string;
+
+  /**
+   * Bound spend token after construct or `agent.create({ apiKey })`.
+   */
+  get agentToken(): string | undefined {
+    return this.token;
+  }
 
   /**
    * Agent namespace (1 API key ↔ 1 agent). No ids required.
@@ -69,22 +77,20 @@ export class XOne {
   };
 
   /**
-   * @param config - API key token from the personal console
+   * @param config - Optional constructor token. Prefer passing `apiKey` to `agent.create`.
    */
-  constructor(config: XOneConfig) {
-    if (!config.agentToken?.trim()) {
-      throw new Error("agentToken is required");
-    }
-
-    this.agentToken = config.agentToken;
+  constructor(config: XOneConfig = {}) {
+    this.token = config.agentToken?.trim() || undefined;
     this.baseUrl = resolveApiBaseUrl();
 
     if (this.baseUrl) {
       const baseUrl = this.baseUrl;
       this.agent = {
-        create: (params: AgentCreateParams) =>
-          createRemoteAgent(baseUrl, this.agentToken, params),
-        get: () => getRemoteAgentForKey(baseUrl, this.agentToken),
+        create: (params: AgentCreateParams) => {
+          const token = this.bindToken(params.apiKey);
+          return createRemoteAgent(baseUrl, token, { ...params, apiKey: token });
+        },
+        get: () => getRemoteAgentForKey(baseUrl, this.requireToken()),
         delete: async () => {
           throw new OperatorRequiredError(
             "Delete agents in the console. Agent tokens may create, get, pay, and read history.",
@@ -110,22 +116,57 @@ export class XOne {
   /**
    * Creates an agent with a local wallet and spend limits (mock).
    *
-   * @param params - Name, limits, chain, optional currency
+   * @param params - Name, limits, chain, optional currency, and user API key
    * @returns Agent instance
+   * @throws {InvalidApiKeyError} When no API key is available
    */
   private async createAgent(params: AgentCreateParams): Promise<Agent> {
-    requireActiveApiKeyByToken(this.agentToken);
-    const record = await createAgentRecord(params, this.agentToken);
+    const token = this.bindToken(params.apiKey);
+    requireActiveApiKeyByToken(token);
+    const record = await createAgentRecord(params, token);
     return new Agent(record);
   }
 
   /**
    * @returns The agent bound to this key, if any
+   * @throws {InvalidApiKeyError} When no API key is bound
    */
   private getMockAgent(): Agent | undefined {
-    const keyId = findApiKeyIdByToken(this.agentToken);
+    const keyId = findApiKeyIdByToken(this.requireToken());
     if (!keyId) return undefined;
     const [record] = listAgentRecords([keyId]);
     return record ? new Agent(record) : undefined;
+  }
+
+  /**
+   * Binds a user-supplied API key (create param wins over constructor).
+   *
+   * @param apiKey - Token from `agent.create({ apiKey })`
+   * @returns Bound spend token
+   * @throws {InvalidApiKeyError} When neither create nor constructor provided a key
+   */
+  private bindToken(apiKey?: string): string {
+    const token = apiKey?.trim() || this.token?.trim();
+    if (!token) {
+      throw new InvalidApiKeyError(
+        "API key is required. Pass apiKey to agent.create() or construct XOne with agentToken.",
+      );
+    }
+    this.token = token;
+    return token;
+  }
+
+  /**
+   * @returns Already-bound spend token
+   * @throws {InvalidApiKeyError} When the client has no API key yet
+   */
+  private requireToken(): string {
+    const token = this.token?.trim();
+    if (!token) {
+      throw new InvalidApiKeyError(
+        "API key is required. Pass apiKey to agent.create() first.",
+      );
+    }
+    return token;
   }
 }

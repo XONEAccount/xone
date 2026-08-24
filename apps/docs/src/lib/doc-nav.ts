@@ -65,7 +65,6 @@ export const DOC_NAV: DocNavGroup[] = [
       { id: "xone_wallet_balance", label: "xone_wallet_balance" },
       { id: "xone_payment_status", label: "xone_payment_status" },
       { id: "xone_x402_pay", label: "xone_x402_pay" },
-      { id: "langchain-agent-example", label: "LangChain example" },
     ],
   },
   {

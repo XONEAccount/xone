@@ -23,8 +23,11 @@ export type ApiKeyStatus = "active" | "deleted";
  * Configuration for the XOne client.
  */
 export interface XOneConfig {
-  /** API key used to create/manage agents (from the personal console). */
-  agentToken: string;
+  /**
+   * Console spend token (`xone_…`). Optional when `agent.create({ apiKey })`
+   * supplies the key instead.
+   */
+  agentToken?: string;
 }
 
 /**
@@ -51,6 +54,11 @@ export interface ApiKeyRecord {
  * Parameters for creating an agent (1:1 with a local wallet + spend limits).
  */
 export interface AgentCreateParams {
+  /**
+   * Console spend token (`xone_…`). User-supplied — never hard-code this.
+   * Required so create cannot proceed without an explicit key.
+   */
+  apiKey: string;
   /** Human-readable agent name. */
   name: string;
   /**

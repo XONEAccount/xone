@@ -154,7 +154,7 @@ export function DocsPage({ view, onView }: DocsPageProps) {
                     className={cn(
                       "relative w-full rounded-md px-2.5 py-1.5 text-left  text-[14px] transition-colors",
                       active
-                        ? "bg-muted font-medium text-foreground before:absolute before:inset-y-1 before:left-0 before:w-[2px] before:rounded-full before:bg-foreground"
+                        ? "bg-muted font-medium text-foreground before:absolute before:inset-y-1 before:left-0 before:w-0.5 before:rounded-full before:bg-foreground"
                         : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
                     )}
                   >
@@ -170,7 +170,7 @@ export function DocsPage({ view, onView }: DocsPageProps) {
   );
 
   return (
-    <div className="min-h-screen text-[var(--color-foreground)]">
+    <div className="min-h-screen text-(--color-foreground)">
       <div className="flex min-h-screen">
         <aside className="docs-sidebar sticky top-0 hidden h-screen w-64 shrink-0 overflow-y-auto border-r border-border bg-white/80 px-3 py-6 backdrop-blur-sm md:block">
           <div className="mb-4 flex items-center gap-2.5 px-2">

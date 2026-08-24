@@ -20,6 +20,7 @@
     "vue-router": "^4.5.1"
   },
   "devDependencies": {
+    "@wallet/assets": "workspace:*",
     "@vitejs/plugin-vue": "^6.0.1",
     "typescript": "^5.9.2",
     "vite": "^7.1.5",
