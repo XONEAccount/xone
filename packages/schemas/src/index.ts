@@ -238,6 +238,11 @@ export const deleteDeveloperAgentSchema = z.object({
   ownerAddress: evmAddress,
 });
 
+/** Pause or resume a developer agent wallet (owner only). */
+export const pauseResumeDeveloperAgentSchema = z.object({
+  ownerAddress: evmAddress,
+});
+
 /** Stream chat with a developer agent (Vercel AI SDK UI messages + tools). */
 export const developerAgentChatSchema = z.object({
   ownerAddress: evmAddress,
@@ -319,6 +324,9 @@ export type CreateDeveloperAgentInput = z.infer<typeof createDeveloperAgentSchem
 export type FundDeveloperAgentInput = z.infer<typeof fundDeveloperAgentSchema>;
 export type UpdateDeveloperAgentInput = z.infer<typeof updateDeveloperAgentSchema>;
 export type DeleteDeveloperAgentInput = z.infer<typeof deleteDeveloperAgentSchema>;
+export type PauseResumeDeveloperAgentInput = z.infer<
+  typeof pauseResumeDeveloperAgentSchema
+>;
 export type DeveloperAgentChatInput = z.infer<typeof developerAgentChatSchema>;
 export type AssistantChatInput = z.infer<typeof assistantChatSchema>;
 export type AssistantChatSessionSaveInput = z.infer<

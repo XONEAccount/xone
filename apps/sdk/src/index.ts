@@ -39,5 +39,6 @@ export type {
   AgentHistoryEntry,
   WalletInfo,
   AgentRecord,
+  SpendSnapshot,
   BalanceSnapshot,
 } from "./types.js";

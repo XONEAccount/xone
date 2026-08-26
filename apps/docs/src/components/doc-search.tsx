@@ -1,23 +1,25 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Search } from "lucide-react";
+import { type DocNavGroup } from "@/lib/doc-nav";
 import { buildDocSections, searchDocs, type DocSearchHit } from "@/lib/doc-search";
 import { cn } from "@/lib/utils";
 
 type DocSearchProps = {
   markdown: string;
+  nav: DocNavGroup[];
   onSelect: (id: string) => void;
 };
 
 /**
  * Docs search: sidebar trigger + command palette (⌘/Ctrl+K).
  */
-export function DocSearch({ markdown, onSelect }: DocSearchProps) {
+export function DocSearch({ markdown, nav, onSelect }: DocSearchProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const sections = useMemo(() => buildDocSections(markdown), [markdown]);
+  const sections = useMemo(() => buildDocSections(markdown, nav), [markdown, nav]);
   const hits = useMemo(() => searchDocs(sections, query), [sections, query]);
 
   useEffect(() => {

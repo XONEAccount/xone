@@ -9,11 +9,12 @@ import {
   Wallet,
   WalletCards,
 } from "lucide-react";
-import { APP_NAME } from "@wallet/config";
 import { AccountMenu } from "@/components/auth/account-menu";
 import { AppSidebarNav } from "@/components/layout/app-sidebar-nav";
 import { Button } from "@/components/ui/button";
+import { useI18n } from "@/hooks/use-i18n";
 import { useWalletBalances } from "@/hooks/use-wallet-balances";
+import type { MessageKey } from "@/lib/i18n/messages";
 import { useA2AStore } from "@/stores/a2a";
 import { useUiStore } from "@/stores/ui";
 import { cn } from "@/lib/utils";
@@ -22,21 +23,27 @@ import { appChainLabel } from "@/web3";
 /** Fixed content inset from sidebar edge on desktop (via main/header padding). */
 const CONTENT_INSET_X = "md:px-8";
 
-const mobileNavItems = [
-  { to: "/app", label: "首页", end: true, icon: Home },
-  { to: "/app/send", label: "转账", icon: ArrowLeftRight },
-  { to: "/app/receive", label: "收款", icon: QrCode },
-  { to: "/app/ledger/payments", label: "明细", icon: ArrowUpRight },
-];
+const mobileNavItems: {
+  to: string;
+  labelKey: MessageKey;
+  end?: boolean;
+  icon: typeof Home;
+}[] = [
+    { to: "/app", labelKey: "nav.home", end: true, icon: Home },
+    { to: "/app/send", labelKey: "nav.send", icon: ArrowLeftRight },
+    { to: "/app/receive", labelKey: "nav.receive", icon: QrCode },
+    { to: "/app/ledger/payments", labelKey: "nav.mobileLedger", icon: ArrowUpRight },
+  ];
 
 /**
- * 应用壳层：桌面侧边栏、顶栏余额、账户菜单、移动端底部导航。
+ * App shell: desktop sidebar, balance header, account menu, mobile bottom nav.
  */
 export function AppLayout() {
   const { usdc } = useWalletBalances();
   const a2aBalance = useA2AStore((s) => s.a2aBalance);
   const sidebarOpen = useUiStore((s) => s.sidebarOpen);
   const toggleSidebar = useUiStore((s) => s.toggleSidebar);
+  const { t } = useI18n();
 
   return (
     <div className="min-h-screen text-[var(--color-foreground)]">
@@ -54,13 +61,12 @@ export function AppLayout() {
               sidebarOpen ? "opacity-100" : "pointer-events-none opacity-0",
             )}
           >
-            <div className="mb-10 flex items-center gap-2.5">
-              <div className="flex h-9 w-9 items-center justify-center rounded-md border border-border bg-[var(--color-muted)]">
+            <div className="mb-6 flex items-center gap-2.5">
+              <div className="flex h-9 w-9 items-center justify-center rounded-md border border-border bg-muted">
                 <Wallet className="h-4 w-4" strokeWidth={1.75} aria-hidden />
               </div>
               <div>
-                <p className="text-lg font-semibold tracking-tight">{APP_NAME}</p>
-                <p className="text-xs text-muted-foreground">Web3 · A2A</p>
+                <p className="text-lg font-semibold tracking-tight">{t("brand.name")}</p>
               </div>
             </div>
             <AppSidebarNav enabled={sidebarOpen} />
@@ -81,7 +87,11 @@ export function AppLayout() {
                 size="icon"
                 className="hidden h-9 w-9 shrink-0 md:inline-flex"
                 onClick={toggleSidebar}
-                aria-label={sidebarOpen ? "折叠侧边栏" : "展开侧边栏"}
+                aria-label={
+                  sidebarOpen
+                    ? t("layout.collapseSidebar")
+                    : t("layout.expandSidebar")
+                }
                 aria-expanded={sidebarOpen}
               >
                 {sidebarOpen ? (
@@ -94,7 +104,7 @@ export function AppLayout() {
               <div className="min-w-0 md:hidden">
                 <div className="flex items-center gap-2">
                   <Wallet className="h-4 w-4" strokeWidth={1.75} aria-hidden />
-                  <p className="text-sm font-medium">{APP_NAME}</p>
+                  <p className="text-sm font-medium">{t("brand.name")}</p>
                 </div>
                 <p className="mt-0.5 text-xs text-muted-foreground">
                   {appChainLabel}
@@ -109,14 +119,14 @@ export function AppLayout() {
               <div className="balance-tick rounded-md border border-border px-2.5 py-1.5 text-right">
                 <p className="flex items-center justify-end gap-1 text-[10px] leading-none text-muted-foreground">
                   <Wallet className="h-3 w-3" aria-hidden />
-                  钱包
+                  {t("layout.wallet")}
                 </p>
                 <p className="mt-1 font-mono text-xs font-medium">{usdc.toFixed(2)} USDC</p>
               </div>
-              <div className="balance-tick rounded-md border border-border bg-[var(--color-muted)] px-2.5 py-1.5 text-right">
+              <div className="balance-tick rounded-md border border-border bg-muted px-2.5 py-1.5 text-right">
                 <p className="flex items-center justify-end gap-1 text-[10px] leading-none text-muted-foreground">
                   <WalletCards className="h-3 w-3" aria-hidden />
-                  A2A 可支付
+                  {t("layout.a2aSpendable")}
                 </p>
                 <p className="mt-1 font-mono text-xs font-medium">{a2aBalance.toFixed(2)} USDC</p>
               </div>
@@ -143,13 +153,13 @@ export function AppLayout() {
                   cn(
                     "flex flex-col items-center gap-1 rounded-md px-2 py-2 text-center text-[11px] transition-colors",
                     isActive
-                      ? "bg-[var(--color-muted)] font-medium"
+                      ? "bg-muted font-medium"
                       : "text-muted-foreground",
                   )
                 }
               >
                 <Icon className="h-4 w-4" strokeWidth={1.75} aria-hidden />
-                <span>{item.label}</span>
+                <span>{t(item.labelKey)}</span>
               </NavLink>
             );
           })}

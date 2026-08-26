@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Check, Copy, CreditCard, ExternalLink } from "lucide-react";
-import { DEFAULT_CHAIN } from "@wallet/config";
+import { DEFAULT_CHAIN } from "@xone/config";
 import { useWalletAccount } from "@/hooks/use-wallet-account";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
@@ -57,7 +57,7 @@ export function PayPage() {
             向他人转账请用「转账」。
           </p>
 
-          <div className="rounded-md border border-border bg-[var(--color-muted)] p-4">
+          <div className="rounded-md border border-border bg-muted p-4">
             <p className="text-xs text-muted-foreground">收款地址</p>
             <p className="mt-1 break-all font-mono text-sm">{address || "未连接钱包"}</p>
             <Button
@@ -103,7 +103,7 @@ export function PayPage() {
                 href={faucet.href}
                 target="_blank"
                 rel="noreferrer"
-                className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-3 text-sm transition-colors hover:bg-[var(--color-muted)]"
+                className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-3 text-sm transition-colors hover:bg-muted"
               >
                 <span>
                   <span className="font-medium">{faucet.name}</span>

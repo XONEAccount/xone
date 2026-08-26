@@ -1,0 +1,33 @@
+{
+  "name": "@xone/console-api",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/node.ts",
+    "dev:worker": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "cf-typegen": "wrangler types",
+    "db:schema": "node scripts/apply-schema.mjs"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.14.3",
+    "@solana/web3.js": "^1.98.4",
+    "@supabase/supabase-js": "^2.49.8",
+    "@x402/evm": "^2.22.0",
+    "@x402/fetch": "^2.22.0",
+    "dotenv": "^16.5.0",
+    "hono": "^4.7.10",
+    "jose": "^6.0.11",
+    "viem": "^2.33.3",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250525.0",
+    "@types/node": "^24.13.3",
+    "tsx": "^4.19.4",
+    "typescript": "^5.9.2",
+    "wrangler": "^4.19.1"
+  }
+}

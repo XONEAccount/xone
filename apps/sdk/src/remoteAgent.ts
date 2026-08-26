@@ -4,7 +4,7 @@ import type {
   AgentHistoryEntry,
   AgentLimits,
   AgentStatus,
-  BalanceSnapshot,
+  SpendSnapshot,
   GetHistoryParams,
   PayParams,
   PayResult,
@@ -46,7 +46,7 @@ type HistoryDto = {
 
 /**
  * HTTP-backed spender agent. Private keys stay sealed on the API.
- * Operator actions (create, limits, pause, delete) are console JWT only.
+ * Operator actions (limits, pause, delete) are console JWT only.
  */
 export class RemoteAgent {
   readonly id: string;
@@ -90,9 +90,11 @@ export class RemoteAgent {
   }
 
   /**
-   * @returns Address + spend limits (fund USDC on-chain at `address`)
+   * Address + spend-policy snapshot (not an on-chain USDC balance).
+   * Refreshes from the API first.
+   * @returns Spend snapshot
    */
-  async getBalance(): Promise<BalanceSnapshot> {
+  async getSpendSnapshot(): Promise<SpendSnapshot> {
     this.snapshot = await this.fetch(`/v1/sdk/agents/${this.id}`);
     return {
       currency: this.snapshot.currency,
@@ -104,6 +106,14 @@ export class RemoteAgent {
       status: this.snapshot.status,
       note: "Fund on-chain USDC at address; limits use remainingDaily / perTransaction",
     };
+  }
+
+  /**
+   * @deprecated Use {@link getSpendSnapshot}. Same return value.
+   * @returns Spend snapshot
+   */
+  async getBalance(): Promise<SpendSnapshot> {
+    return this.getSpendSnapshot();
   }
 
   /**

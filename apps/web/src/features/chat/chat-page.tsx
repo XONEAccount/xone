@@ -20,12 +20,13 @@ import {
   Wallet,
 } from "lucide-react";
 import { Streamdown } from "streamdown";
-import type { DeveloperAgent } from "@wallet/types";
+import type { DeveloperAgent } from "@xone/types";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useWalletAccount } from "@/hooks/use-wallet-account";
+import { useI18n } from "@/hooks/use-i18n";
 import {
   clearAssistantChatSession,
   clearLocalAssistantChat,
@@ -40,20 +41,19 @@ import { cn } from "@/lib/utils";
 import { useX402AgentsStore } from "@/stores/x402-agents";
 import { fetchTokenBalances, findDisplayBalance } from "@/web3";
 
-const WELCOME: UIMessage[] = [
-  {
-    id: "welcome",
-    role: "assistant",
-    parts: [
-      {
-        type: "text",
-        text: "你好。我会根据 **Agent List** 里已启用的 x402 服务判断该调用哪一个；若多个都能满足，会请你选择。支付时若有多个 Agent 钱包，也会请你选择。金额未超限额时自动付款，超过则需手动确认。例如：「查一下天气」。",
-      },
-    ],
-  },
-];
-
-const HINTS = ["查一下天气", "现在有哪些 x402 服务？", "我的 Agent 钱包有哪些？"] as const;
+/**
+ * Builds the locale-aware welcome message.
+ * @param text - Welcome body
+ */
+function buildWelcome(text: string): UIMessage[] {
+  return [
+    {
+      id: "welcome",
+      role: "assistant",
+      parts: [{ type: "text", text }],
+    },
+  ];
+}
 
 /**
  * Whether messages contain real user/assistant turns beyond the welcome.
@@ -66,9 +66,10 @@ function hasPersistedContent(messages: UIMessage[]): boolean {
 }
 
 /**
- * Main 对话：Vercel AI SDK + 思考折叠 + x402/钱包 HITL 选择。
+ * Main chat: Vercel AI SDK + reasoning fold + x402/wallet HITL.
  */
 export function ChatPage() {
+  const { t } = useI18n();
   const { address } = useWalletAccount();
   const ownerAddress = address?.toLowerCase() ?? "";
   const x402Agents = useX402AgentsStore((s) => s.agents);
@@ -76,6 +77,7 @@ export function ChatPage() {
     () => x402Agents.filter((a) => a.enabled),
     [x402Agents],
   );
+  const welcome = useMemo(() => buildWelcome(t("chat.welcome")), [t]);
 
   const [wallets, setWallets] = useState<DeveloperAgent[]>([]);
   const [walletsError, setWalletsError] = useState<string | null>(null);
@@ -100,7 +102,9 @@ export function ChatPage() {
       })
       .catch((err) => {
         if (!cancelled) {
-          setWalletsError(err instanceof Error ? err.message : "加载钱包失败");
+          setWalletsError(
+            err instanceof Error ? err.message : t("chat.loadWalletsFailed"),
+          );
         }
       });
 
@@ -117,21 +121,19 @@ export function ChatPage() {
       } catch (err) {
         if (!cancelled) {
           setHistoryError(
-            err instanceof Error
-              ? err.message
-              : "云端会话加载失败，已尝试本地备份",
+            err instanceof Error ? err.message : t("chat.historyFailed"),
           );
         }
       }
       if (cancelled) return;
       const local = readLocalAssistantChat(ownerAddress);
-      setInitialMessages(local && local.length > 0 ? local : WELCOME);
+      setInitialMessages(local && local.length > 0 ? local : welcome);
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [ownerAddress]);
+  }, [ownerAddress, welcome, t]);
 
   const walletKeys = wallets.map((w) => `${w.id}:${w.walletAddress}`).join("|");
   const balancesQuery = useQuery({
@@ -151,8 +153,8 @@ export function ChatPage() {
   if (!ownerAddress) {
     return (
       <div className="mx-auto max-w-2xl animate-in">
-        <PageHeader icon={MessageSquare} title="对话" />
-        <p className="mt-4 text-sm text-muted-foreground">请先连接钱包。</p>
+        <PageHeader icon={MessageSquare} title={t("chat.title")} />
+        <p className="mt-4 text-sm text-muted-foreground">{t("chat.connectFirst")}</p>
       </div>
     );
   }
@@ -160,10 +162,10 @@ export function ChatPage() {
   if (!initialMessages) {
     return (
       <div className="mx-auto max-w-2xl animate-in">
-        <PageHeader icon={MessageSquare} title="对话" />
+        <PageHeader icon={MessageSquare} title={t("chat.title")} />
         <p className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
           <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden />
-          正在加载历史会话…
+          {t("chat.loadingHistory")}
         </p>
       </div>
     );
@@ -180,7 +182,8 @@ export function ChatPage() {
       balancesById={balancesQuery.data ?? {}}
       balancesLoading={balancesQuery.isLoading || balancesQuery.isFetching}
       initialMessages={initialMessages}
-      onCleared={() => setInitialMessages(WELCOME)}
+      welcome={welcome}
+      onCleared={() => setInitialMessages(welcome)}
     />
   );
 }
@@ -200,6 +203,7 @@ type ChatPanelProps = {
   balancesById: Record<string, string>;
   balancesLoading: boolean;
   initialMessages: UIMessage[];
+  welcome: UIMessage[];
   onCleared: () => void;
 };
 
@@ -216,8 +220,10 @@ function ChatPanel({
   balancesById,
   balancesLoading,
   initialMessages,
+  welcome,
   onCleared,
 }: ChatPanelProps) {
+  const { t } = useI18n();
   const apiUrl = getWebEnv().apiUrl;
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [input, setInput] = useState("");
@@ -282,12 +288,12 @@ function ChatPanel({
 
     const timer = window.setTimeout(() => {
       void saveAssistantChatSession(ownerAddress, messages)
-        .then(() => setSaveHint("已保存"))
-        .catch(() => setSaveHint("已存本地（云端暂不可用）"));
+        .then(() => setSaveHint(t("chat.saved")))
+        .catch(() => setSaveHint(t("chat.savedLocal")));
     }, 400);
 
     return () => window.clearTimeout(timer);
-  }, [messages, status, ownerAddress]);
+  }, [messages, status, ownerAddress, t]);
 
   /**
    * Sends the composer text.
@@ -313,15 +319,21 @@ function ChatPanel({
       // Table may not exist yet — still clear local.
     }
     clearLocalAssistantChat(ownerAddress);
-    setMessages(WELCOME);
+    setMessages(welcome);
     onCleared();
     setSaveHint(null);
   }
 
+  const hints = [
+    t("chat.hint.weather"),
+    t("chat.hint.services"),
+    t("chat.hint.wallets"),
+  ] as const;
+
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-6 animate-in">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <PageHeader icon={MessageSquare} title="对话" />
+        <PageHeader icon={MessageSquare} title={t("chat.title")} />
         <Button
           type="button"
           size="sm"
@@ -329,16 +341,16 @@ function ChatPanel({
           disabled={busy}
           onClick={() => void onClearHistory()}
         >
-          清空会话
+          {t("chat.clear")}
         </Button>
       </div>
 
       <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
         <span className="rounded-md border border-border px-2 py-1">
-          x402 已启用 {x402Services.length}
+          {t("chat.x402Enabled", { count: x402Services.length })}
         </span>
         <span className="rounded-md border border-border px-2 py-1">
-          Agent 钱包 {wallets.length}
+          {t("chat.agentWallets", { count: wallets.length })}
         </span>
         {saveHint ? (
           <span className="rounded-md border border-border px-2 py-1">{saveHint}</span>
@@ -355,7 +367,7 @@ function ChatPanel({
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Bot className="h-4 w-4" strokeWidth={1.75} aria-hidden />
-            会话
+            {t("chat.session")}
           </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
@@ -393,7 +405,7 @@ function ChatPanel({
             {busy ? (
               <p className="mr-8 flex items-center gap-2 text-sm text-muted-foreground">
                 <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden />
-                思考与调用中…
+                {t("chat.thinking")}
               </p>
             ) : null}
             {error ? (
@@ -407,22 +419,22 @@ function ChatPanel({
             <Input
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="例如：查一下天气"
+              placeholder={t("chat.placeholder")}
               disabled={busy}
             />
             {busy ? (
               <Button type="button" variant="outline" onClick={() => stop()}>
-                停止
+                {t("chat.stop")}
               </Button>
             ) : null}
             <Button type="submit" disabled={busy || !input.trim()}>
               <SendHorizontal className="h-4 w-4" aria-hidden />
-              发送
+              {t("chat.send")}
             </Button>
           </form>
 
           <div className="flex flex-wrap gap-2">
-            {HINTS.map((hint) => (
+            {hints.map((hint) => (
               <Button
                 key={hint}
                 type="button"
@@ -466,6 +478,7 @@ function MessageBubble({
   onPickWallet,
   onApprovePay,
 }: MessageBubbleProps) {
+  const { t } = useI18n();
   const isUser = message.role === "user";
 
   return (
@@ -552,7 +565,7 @@ function MessageBubble({
               return (
                 <ChoiceCard
                   key={`${message.id}-tool-${index}`}
-                  title="选择 x402 服务"
+                  title={t("chat.pickX402")}
                   question={input?.question}
                   options={(input?.candidates ?? []).map((c) => ({
                     id: c.id,
@@ -585,7 +598,7 @@ function MessageBubble({
               return (
                 <ChoiceCard
                   key={`${message.id}-tool-${index}`}
-                  title="选择 Agent 钱包"
+                  title={t("chat.pickWallet")}
                   question={input?.question}
                   options={(input?.candidates ?? []).map((c) => {
                     const agent = wallets.find((w) => w.id === c.id);
@@ -599,7 +612,7 @@ function MessageBubble({
                     return {
                       id: c.id,
                       title: c.name,
-                      detail: `余额 ${balance} ${asset}`,
+                      detail: t("chat.balance", { balance, asset }),
                       meta: `dailyLimit ${daily} · perTx ${perTx} ${asset}`,
                       icon: true,
                     };
@@ -633,17 +646,21 @@ function MessageBubble({
                     key={`${message.id}-tool-${index}`}
                     className="space-y-2 rounded-md border border-border bg-white p-3"
                   >
-                    <p className="font-medium">支付超过限额，需手动确认</p>
+                    <p className="font-medium">{t("chat.payOverLimitTitle")}</p>
                     <p className="text-xs text-muted-foreground">
-                      报价超过该钱包的 perTransaction（单笔确认线）或剩余
-                      dailyLimit。确认后将尝试支付。
+                      {t("chat.payOverLimitBody")}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      钱包 {agent?.name ?? input?.agentId ?? "—"} · 余额{" "}
-                      {balance} {asset}
+                      {t("chat.payWalletLine", {
+                        name: agent?.name ?? input?.agentId ?? "—",
+                        balance: `${balance} ${asset}`,
+                      })}
                       {perTx != null ? ` · perTx ${perTx}` : ""}
                       {remaining != null
-                        ? ` · 剩余 daily ${remaining}/${daily}`
+                        ? t("chat.payDailyRemaining", {
+                            remaining,
+                            daily: daily ?? "—",
+                          })
                         : ""}
                     </p>
                     <div className="flex gap-2">
@@ -652,7 +669,7 @@ function MessageBubble({
                         size="sm"
                         onClick={() => onApprovePay(approval.id, true)}
                       >
-                        仍要支付
+                        {t("chat.payAnyway")}
                       </Button>
                       <Button
                         type="button"
@@ -660,7 +677,7 @@ function MessageBubble({
                         variant="outline"
                         onClick={() => onApprovePay(approval.id, false)}
                       >
-                        取消
+                        {t("chat.cancel")}
                       </Button>
                     </div>
                   </div>
@@ -674,8 +691,8 @@ function MessageBubble({
                 className="text-xs text-muted-foreground"
               >
                 {state === "output-available"
-                  ? `已完成 \`${toolName}\``
-                  : `正在调用 \`${toolName}\`…`}
+                  ? t("chat.toolDone", { tool: toolName })
+                  : t("chat.toolRunning", { tool: toolName })}
               </p>
             );
           }
@@ -697,6 +714,7 @@ type ThinkingBlockProps = {
  * @param props - Reasoning text + stream flag
  */
 function ThinkingBlock({ text, streaming }: ThinkingBlockProps) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(true);
 
   useEffect(() => {
@@ -721,7 +739,9 @@ function ThinkingBlock({ text, streaming }: ThinkingBlockProps) {
           )}
           aria-hidden
         />
-        <span>{streaming ? "思考中…" : "思考过程"}</span>
+        <span>
+          {streaming ? t("chat.reasoningStreaming") : t("chat.reasoning")}
+        </span>
       </button>
       {open ? (
         <p className="whitespace-pre-wrap border-t border-border px-2.5 py-2 text-xs leading-relaxed text-muted-foreground">

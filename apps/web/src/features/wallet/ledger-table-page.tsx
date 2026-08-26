@@ -1,6 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import { ExternalLink } from "lucide-react";
-import { getTxExplorerUrl } from "@wallet/config";
+import { getTxExplorerUrl } from "@xone/config";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -140,7 +140,7 @@ function StatusBadge({ status }: { status: LedgerRecord["status"] }) {
       className={cn(
         "inline-flex rounded-md px-2 py-0.5 text-xs",
         status === "success"
-          ? "bg-[var(--color-muted)] text-[var(--color-foreground)]"
+          ? "bg-muted text-[var(--color-foreground)]"
           : "bg-red-50 text-[var(--color-destructive)]",
       )}
     >

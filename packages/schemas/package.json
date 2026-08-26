@@ -1,5 +1,5 @@
 {
-  "name": "@wallet/schemas",
+  "name": "@xone/schemas",
   "version": "0.1.0",
   "private": true,
   "type": "module",

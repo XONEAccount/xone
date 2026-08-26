@@ -1,4 +1,4 @@
-import { DOC_NAV, slugifyHeading } from "@/lib/doc-nav";
+import { type DocNavGroup, slugifyHeading } from "@/lib/doc-nav";
 
 export interface DocSearchHit {
   id: string;
@@ -33,11 +33,12 @@ function plain(text: string): string {
 /**
  * Builds searchable sections from README markdown.
  * @param markdown - Raw README
+ * @param nav - Sidebar groups for section labels
  * @returns Indexed sections
  */
-export function buildDocSections(markdown: string): DocSection[] {
+export function buildDocSections(markdown: string, nav: DocNavGroup[]): DocSection[] {
   const idToGroup = new Map<string, string>();
-  for (const group of DOC_NAV) {
+  for (const group of nav) {
     for (const item of group.items) {
       idToGroup.set(item.id, group.title);
     }

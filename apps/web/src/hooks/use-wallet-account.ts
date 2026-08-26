@@ -113,7 +113,7 @@ function describeLoginMethod(user: User | null, wallet: ConnectedWallet | null):
   if (user?.discord?.username) return `Discord · ${user.discord.username}`;
   if (user?.twitter?.username) return `X · ${user.twitter.username}`;
   if (user?.phone?.number) return user.phone.number;
-  if (wallet?.walletClientType === "privy") return "Privy 嵌入式钱包";
+  if (wallet?.walletClientType === "privy") return "Privy embedded wallet";
   if (wallet?.walletClientType) return wallet.walletClientType;
   return "Privy";
 }

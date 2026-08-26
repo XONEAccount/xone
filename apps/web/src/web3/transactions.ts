@@ -6,7 +6,7 @@ import {
   parseUnits,
   type Hex,
 } from "viem";
-import { DEFAULT_CHAIN, SUPPORTED_ASSETS } from "@wallet/config";
+import { DEFAULT_CHAIN, SUPPORTED_ASSETS } from "@xone/config";
 import { chainFromSlug } from "@/web3/chains";
 import { getPublicClientBySlug } from "@/web3/client";
 

@@ -1,9 +1,8 @@
 import { Agent } from "./agent.js";
-import { InvalidApiKeyError, OperatorRequiredError } from "./errors.js";
+import { InvalidApiKeyError } from "./errors.js";
 import { getRemoteAgentForKey, createRemoteAgent, RemoteAgent } from "./remoteAgent.js";
 import {
   createAgentRecord,
-  deleteAgentRecord,
   listAgentRecords,
 } from "./store/mock.js";
 import {
@@ -36,8 +35,8 @@ function resolveApiBaseUrl(): string | undefined {
  * When `XONE_API_URL` is set in the environment, requests go to the Hono API.
  * Otherwise uses the in-memory mock store.
  *
- * Remote tokens: `create` (1 key ↔ 1 wallet), `get`, `pay`, history.
- * Limits, pause, and delete belong on the console JWT.
+ * Spend surface: `create`, `get`, `pay`, history. Soft-delete / pause / limits
+ * belong on the console (JWT), not this client.
  *
  * @example
  * ```ts
@@ -65,15 +64,16 @@ export class XOne {
 
   /**
    * Agent namespace (1 API key ↔ 1 agent). No ids required.
+   * Soft-delete is console-only — not exposed here.
    */
   readonly agent: {
     create: (params: AgentCreateParams) => Promise<Agent | RemoteAgent>;
-    /** Load the agent bound to this key (or `undefined`). */
+    /**
+     * Load the single agent bound to this key, or `undefined` if none yet.
+     */
     get: () =>
       | Promise<Agent | RemoteAgent | undefined>
       | (Agent | undefined);
-    /** Soft-delete the agent bound to this key. */
-    delete: () => Promise<Agent | RemoteAgent> | Agent;
   };
 
   /**
@@ -91,11 +91,6 @@ export class XOne {
           return createRemoteAgent(baseUrl, token, { ...params, apiKey: token });
         },
         get: () => getRemoteAgentForKey(baseUrl, this.requireToken()),
-        delete: async () => {
-          throw new OperatorRequiredError(
-            "Delete agents in the console. Agent tokens may create, get, pay, and read history.",
-          );
-        },
       };
       return;
     }
@@ -103,13 +98,6 @@ export class XOne {
     this.agent = {
       create: (params) => this.createAgent(params),
       get: () => this.getMockAgent(),
-      delete: () => {
-        const existing = this.getMockAgent();
-        if (!existing) {
-          throw new Error("Agent not found for this API key");
-        }
-        return new Agent(deleteAgentRecord(existing.id));
-      },
     };
   }
 
@@ -128,7 +116,7 @@ export class XOne {
   }
 
   /**
-   * @returns The agent bound to this key, if any
+   * @returns The single agent bound to this key, if any
    * @throws {InvalidApiKeyError} When no API key is bound
    */
   private getMockAgent(): Agent | undefined {

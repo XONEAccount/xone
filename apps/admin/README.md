@@ -6,8 +6,8 @@ Vue 3 + PrimeVue ops console with a **separate** Hono Admin API. Both deploy to 
 
 | Package | Path | Port (local) | Cloudflare |
 |---|---|---|---|
-| `@wallet/admin` | `apps/admin` | `5174` | Pages `xone-admin` |
-| `@wallet/admin-api` | `apps/admin-api` | `4397` | Worker `xone-admin-api` |
+| `@xone/admin` | `apps/admin` | `5174` | Pages `xone-admin` |
+| `@xone/admin-api` | `apps/admin-api` | `4397` | Worker `xone-admin-api` |
 
 ## Features (MVP)
 
@@ -42,10 +42,10 @@ Apply migration:
 
 ```bash
 # Worker secrets
-pnpm --filter @wallet/admin-api exec wrangler secret put SUPABASE_URL
-pnpm --filter @wallet/admin-api exec wrangler secret put SUPABASE_SERVICE_ROLE_KEY
-pnpm --filter @wallet/admin-api exec wrangler secret put ADMIN_JWT_SECRET
-pnpm --filter @wallet/admin-api exec wrangler secret put ADMIN_PASSWORD
+pnpm --filter @xone/admin-api exec wrangler secret put SUPABASE_URL
+pnpm --filter @xone/admin-api exec wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+pnpm --filter @xone/admin-api exec wrangler secret put ADMIN_JWT_SECRET
+pnpm --filter @xone/admin-api exec wrangler secret put ADMIN_PASSWORD
 
 pnpm deploy:ops
 ```

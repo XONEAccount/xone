@@ -33,9 +33,6 @@ export function X402AgentsPage() {
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-6 animate-in">
       <PageHeader icon={List} title="X402 List" />
-      <p className="-mt-4 max-w-2xl text-sm text-muted-foreground">
-        公用 x402 服务目录。对话会匹配已启用的服务。
-      </p>
 
       <Card className="fade-up">
         <CardHeader>

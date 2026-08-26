@@ -34,7 +34,7 @@ cp apps/XPayLabs-x402-seller/.env.example apps/XPayLabs-x402-seller/.env
 ### 2. 本地启动（Node + Hono）
 
 ```bash
-pnpm --filter @wallet/x402-seller dev
+pnpm --filter @xone/x402-seller dev
 ```
 
 服务启动在 `http://localhost:4021`。
@@ -43,9 +43,9 @@ pnpm --filter @wallet/x402-seller dev
 
 ```bash
 # 先写入收款地址（或改 wrangler.toml [vars]）
-pnpm --filter @wallet/x402-seller exec wrangler secret put EVM_ADDRESS
+pnpm --filter @xone/x402-seller exec wrangler secret put EVM_ADDRESS
 
-pnpm --filter @wallet/x402-seller deploy
+pnpm --filter @xone/x402-seller deploy
 # 或在仓库根目录：pnpm deploy:x402-seller
 ```
 

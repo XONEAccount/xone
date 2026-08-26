@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { PrivyProvider } from "@privy-io/react-auth";
-import { APP_NAME } from "@wallet/config";
+import { APP_NAME } from "@xone/config";
 import { getWebEnv } from "@/lib/env";
 import { appChain, sepoliaChain } from "@/web3/chains";
 

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Check, Copy, QrCode } from "lucide-react";
-import { DEFAULT_CHAIN } from "@wallet/config";
+import { DEFAULT_CHAIN } from "@xone/config";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

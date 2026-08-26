@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { DocsPage } from "@/features/docs-page";
 import { PlaygroundPage } from "@/features/playground-page";
-import { readDocsView, setDocsView, type DocsView } from "@/lib/view";
+import { readDocsView, readDocProduct, setDocsView, type DocsView } from "@/lib/view";
 
 /**
  * Docs site root: README reference or live API-key playground.
@@ -11,7 +11,11 @@ export function App() {
 
   useEffect(() => {
     document.title =
-      view === "playground" ? "XOne SDK Playground" : "XOne SDK Docs";
+      view === "playground"
+        ? "XOne Playground"
+        : readDocProduct() === "mcp"
+          ? "XOne MCP Docs"
+          : "XOne SDK Docs";
   }, [view]);
 
   useEffect(() => {

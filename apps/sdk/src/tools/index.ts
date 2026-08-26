@@ -61,7 +61,7 @@ export function createXOneTools(ctx: XOneToolContext) {
   const balanceTool = tool(
     async () => {
       if (ctx.mode === "remote") {
-        return JSON.stringify(await ctx.remote.getBalance());
+        return JSON.stringify(await ctx.remote.getSpendSnapshot());
       }
       const record = requireMock(ctx);
       return JSON.stringify({
@@ -78,7 +78,7 @@ export function createXOneTools(ctx: XOneToolContext) {
     {
       name: "xone_wallet_balance",
       description:
-        "Return agent address and spend limits. Fund on-chain USDC at the address; there is no SDK deposit ledger.",
+        "Return the agent's spend-policy snapshot (address, remainingDaily, limits, status). Not an on-chain USDC RPC balance — fund USDC at the wallet address separately.",
       schema: z.object({}),
     },
   );

@@ -225,9 +225,10 @@ export interface AgentRecord {
 }
 
 /**
- * Wallet + limits snapshot (spendable funds are on-chain USDC at `address`).
+ * Wallet address + spend-policy snapshot (not an on-chain token balance).
+ * Fund USDC on-chain at `address`; use `remainingDaily` / `perTransaction` for policy.
  */
-export interface BalanceSnapshot {
+export interface SpendSnapshot {
   currency: string;
   chain: XOneChain;
   address: string;
@@ -236,10 +237,15 @@ export interface BalanceSnapshot {
   perTransaction: number;
   status: AgentStatus;
   /**
-   * Reminder: fund this address on-chain; SDK no longer has a fake deposit ledger.
+   * Reminder: fund this address on-chain; this snapshot is policy, not RPC balance.
    */
   note: "Fund on-chain USDC at address; limits use remainingDaily / perTransaction";
 }
+
+/**
+ * @deprecated Use {@link SpendSnapshot}. Same shape — kept for older imports.
+ */
+export type BalanceSnapshot = SpendSnapshot;
 
 /**
  * Pay result shared by mock + remote.

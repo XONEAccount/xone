@@ -1,4 +1,4 @@
-import { DEFAULT_CHAIN } from "@wallet/config";
+import { DEFAULT_CHAIN } from "@xone/config";
 import { apiFetch } from "@/lib/api";
 
 export type RecordTransferBody = {

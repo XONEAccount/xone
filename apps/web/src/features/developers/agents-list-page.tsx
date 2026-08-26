@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState, type FormEvent, type MouseEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { getAddressExplorerUrl } from "@wallet/config";
+import { getAddressExplorerUrl } from "@xone/config";
 import { useWalletAccount } from "@/hooks/use-wallet-account";
 import { Bot, ExternalLink, Plus, RefreshCw } from "lucide-react";
-import type { AgentPayment, DeveloperAgent } from "@wallet/types";
+import type { AgentPayment, DeveloperAgent } from "@xone/types";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,10 +27,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { AgentChatDialog } from "@/features/developers/agent-chat-dialog";
+import { useI18n } from "@/hooks/use-i18n";
 import {
   deleteDeveloperAgent,
   getDeveloperAgentDetail,
   listDeveloperAgents,
+  pauseDeveloperAgent,
+  resumeDeveloperAgent,
   updateDeveloperAgent,
 } from "@/lib/developer-api";
 import { shortAddress } from "@/lib/address";
@@ -51,6 +54,7 @@ function displayWalletAddress(address: string): string {
  * Shows balance + max limit; click name for payment history.
  */
 export function AgentsListPage() {
+  const { t } = useI18n();
   const { address } = useWalletAccount();
   const owner = address?.toLowerCase() ?? "";
   const [agents, setAgents] = useState<DeveloperAgent[]>([]);
@@ -71,6 +75,9 @@ export function AgentsListPage() {
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteAgent, setDeleteAgent] = useState<DeveloperAgent | null>(null);
+
+  const [pauseOpen, setPauseOpen] = useState(false);
+  const [pauseAgent, setPauseAgent] = useState<DeveloperAgent | null>(null);
 
   const [chatOpen, setChatOpen] = useState(false);
   const [chatAgent, setChatAgent] = useState<DeveloperAgent | null>(null);
@@ -251,10 +258,62 @@ export function AgentsListPage() {
     }
   }
 
+  /**
+   * Pauses or resumes an agent wallet. Pause opens a confirm dialog; resume runs immediately.
+   * @param event - Click event
+   * @param agent - Target agent
+   */
+  function onTogglePause(event: MouseEvent, agent: DeveloperAgent) {
+    event.stopPropagation();
+    if (agent.status === "paused") {
+      void onConfirmResume(agent);
+      return;
+    }
+    setPauseAgent(agent);
+    setPauseOpen(true);
+  }
+
+  /**
+   * Resumes a paused agent immediately.
+   * @param agent - Target agent
+   */
+  async function onConfirmResume(agent: DeveloperAgent) {
+    if (!owner) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const updated = await resumeDeveloperAgent(agent.id, owner);
+      setAgents((prev) => prev.map((row) => (row.id === updated.id ? updated : row)));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "恢复失败");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /**
+   * Confirms pause after dialog acknowledgement.
+   */
+  async function onConfirmPause() {
+    if (!owner || !pauseAgent) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const updated = await pauseDeveloperAgent(pauseAgent.id, owner);
+      setAgents((prev) => prev.map((row) => (row.id === updated.id ? updated : row)));
+      setPauseOpen(false);
+      setPauseAgent(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "暂停失败");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <PageHeader icon={Bot} title="我的 Agents" />
+        <PageHeader icon={Bot} title={t("devWallet.listTitle")} />
         <div className="flex flex-wrap gap-2">
           <Button
             type="button"
@@ -269,19 +328,16 @@ export function AgentsListPage() {
               )}
               aria-hidden
             />
-            刷新
+            {t("devWallet.refresh")}
           </Button>
           <Button asChild variant="outline">
             <Link to="/app/developers">
               <Plus className="size-4" />
-              创建 Agent
+              {t("devWallet.create")}
             </Link>
           </Button>
         </div>
       </div>
-      <p className="-mt-4 max-w-2xl text-sm text-muted-foreground">
-        当前钱包名下的受限 Agent。余额为链上余额；可用额度为策略额度。点击名称查看支付记录；点击钱包地址打开区块链浏览器。
-      </p>
 
       {error ? (
         <DismissibleError
@@ -293,30 +349,30 @@ export function AgentsListPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Agent 列表</CardTitle>
           <CardDescription>
             {loading
-              ? "加载中…"
+              ? t("devWallet.loading")
               : agents.length === 0
-                ? "还没有 Agent，先去创建一个。"
-                : `${agents.length} 个 Agent`}
+                ? t("devWallet.emptyHint")
+                : t("devWallet.count", { count: agents.length })}
           </CardDescription>
         </CardHeader>
         <CardContent>
           {agents.length === 0 ? (
-            <p className="text-sm text-muted-foreground">暂无数据</p>
+            <p className="text-sm text-muted-foreground">{t("devWallet.noData")}</p>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[7rem]">名称</TableHead>
-                  <TableHead className="min-w-[14rem]">钱包地址</TableHead>
-                  <TableHead>余额</TableHead>
-                  <TableHead>已用 / dailyLimit</TableHead>
-                  <TableHead>perTx</TableHead>
-                  <TableHead className="min-w-[12rem]">API Key</TableHead>
+                  <TableHead className="w-28">{t("devWallet.colName")}</TableHead>
+                  <TableHead className="min-w-56">{t("devWallet.colAddress")}</TableHead>
+                  <TableHead>{t("devWallet.colBalance")}</TableHead>
+                  <TableHead>{t("devWallet.colUsedLimit")}</TableHead>
+                  <TableHead>{t("devWallet.colPerTx")}</TableHead>
+                  <TableHead className="w-24">{t("devWallet.colStatus")}</TableHead>
+                  <TableHead className="min-w-48">{t("devWallet.colApiKey")}</TableHead>
                   <TableHead className="w-[1%] whitespace-nowrap text-left">
-                    操作
+                    {t("devWallet.colActions")}
                   </TableHead>
                 </TableRow>
               </TableHeader>
@@ -358,6 +414,20 @@ export function AgentsListPage() {
                       {item.currency || item.asset}
                     </TableCell>
                     <TableCell>
+                      <span
+                        className={cn(
+                          "rounded-md border px-2 py-0.5 text-xs",
+                          item.status === "paused"
+                            ? "border-border text-muted-foreground"
+                            : "border-foreground bg-foreground text-background",
+                        )}
+                      >
+                        {item.status === "paused"
+                          ? t("devWallet.statusPaused")
+                          : t("devWallet.statusActive")}
+                      </span>
+                    </TableCell>
+                    <TableCell>
                       {item.apiKeyPrefix}…
                     </TableCell>
                     <TableCell className="w-[1%] whitespace-nowrap text-left">
@@ -366,10 +436,10 @@ export function AgentsListPage() {
                           type="button"
                           size="sm"
                           variant="outline"
-                          disabled={busy}
+                          disabled={busy || item.status === "paused"}
                           onClick={(event) => onOpenChat(event, item)}
                         >
-                          对话
+                          {t("devWallet.chat")}
                         </Button>
                         <Button
                           type="button"
@@ -378,7 +448,18 @@ export function AgentsListPage() {
                           disabled={busy}
                           onClick={(event) => onOpenEdit(event, item)}
                         >
-                          修改
+                          {t("devWallet.edit")}
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={busy}
+                          onClick={(event) => onTogglePause(event, item)}
+                        >
+                          {item.status === "paused"
+                            ? t("devWallet.resume")
+                            : t("devWallet.pause")}
                         </Button>
                         <Button
                           type="button"
@@ -388,7 +469,7 @@ export function AgentsListPage() {
                           className="text-red-700 hover:bg-red-50 hover:text-red-900"
                           onClick={(event) => onOpenDelete(event, item)}
                         >
-                          删除
+                          {t("devWallet.delete")}
                         </Button>
                       </div>
                     </TableCell>
@@ -403,22 +484,28 @@ export function AgentsListPage() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle>支付记录 · {selected?.name ?? "—"}</DialogTitle>
+            <DialogTitle>
+              {t("devWallet.paymentsTitle", { name: selected?.name ?? "—" })}
+            </DialogTitle>
           </DialogHeader>
 
           {detailLoading ? (
-            <p className="text-sm text-muted-foreground">加载中…</p>
+            <p className="text-sm text-muted-foreground">
+              {t("devWallet.paymentsLoading")}
+            </p>
           ) : payments.length === 0 ? (
-            <p className="text-sm text-muted-foreground">暂无机器支付记录。</p>
+            <p className="text-sm text-muted-foreground">
+              {t("devWallet.paymentsEmpty")}
+            </p>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>金额</TableHead>
-                  <TableHead>收款人</TableHead>
-                  <TableHead>商户</TableHead>
-                  <TableHead>状态</TableHead>
-                  <TableHead>通道</TableHead>
+                  <TableHead>{t("devWallet.colAmount")}</TableHead>
+                  <TableHead>{t("devWallet.colPayee")}</TableHead>
+                  <TableHead>{t("devWallet.colMerchant")}</TableHead>
+                  <TableHead>{t("devWallet.colPayStatus")}</TableHead>
+                  <TableHead>{t("devWallet.colProvider")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -488,7 +575,7 @@ export function AgentsListPage() {
                 value={editAllowedHosts}
                 onChange={(e) => setEditAllowedHosts(e.target.value)}
                 rows={3}
-                className="flex w-full rounded-md border border-border bg-white px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-[var(--color-ring)]"
+                className="flex w-full rounded-md border border-border bg-white px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-(--color-ring)"
               />
             </label>
             <label className="block space-y-1.5 text-sm">
@@ -497,7 +584,7 @@ export function AgentsListPage() {
                 value={editAllowedPayees}
                 onChange={(e) => setEditAllowedPayees(e.target.value)}
                 rows={2}
-                className="flex w-full rounded-md border border-border bg-white px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-[var(--color-ring)]"
+                className="flex w-full rounded-md border border-border bg-white px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-(--color-ring)"
               />
             </label>
             <DialogFooter>
@@ -526,10 +613,9 @@ export function AgentsListPage() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>确认删除</DialogTitle>
+            <DialogTitle>{t("devWallet.deleteTitle")}</DialogTitle>
             <DialogDescription>
-              确定删除 Agent「{deleteAgent?.name ?? "—"}」吗？删除后将无法再用于 MCP /
-              x402 支付（历史记录仍保留）。
+              {t("devWallet.deleteBody", { name: deleteAgent?.name ?? "—" })}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -539,7 +625,7 @@ export function AgentsListPage() {
               disabled={busy}
               onClick={() => setDeleteOpen(false)}
             >
-              取消
+              {t("devWallet.cancel")}
             </Button>
             <Button
               type="button"
@@ -547,7 +633,41 @@ export function AgentsListPage() {
               className="bg-red-700 text-white hover:bg-red-800"
               onClick={() => void onConfirmDelete()}
             >
-              {busy ? "删除中…" : "确认删除"}
+              {busy ? t("devWallet.deletePending") : t("devWallet.deleteConfirm")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={pauseOpen}
+        onOpenChange={(open) => {
+          setPauseOpen(open);
+          if (!open) setPauseAgent(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("devWallet.pauseTitle")}</DialogTitle>
+            <DialogDescription>
+              {t("devWallet.pauseBody", { name: pauseAgent?.name ?? "—" })}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={busy}
+              onClick={() => setPauseOpen(false)}
+            >
+              {t("devWallet.cancel")}
+            </Button>
+            <Button
+              type="button"
+              disabled={busy || !owner}
+              onClick={() => void onConfirmPause()}
+            >
+              {busy ? t("devWallet.pausePending") : t("devWallet.pauseConfirm")}
             </Button>
           </DialogFooter>
         </DialogContent>

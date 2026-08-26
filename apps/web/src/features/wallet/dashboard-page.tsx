@@ -9,25 +9,39 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SpendingChart } from "@/features/wallet/spending-chart";
+import { useI18n } from "@/hooks/use-i18n";
 import { useWalletAccount } from "@/hooks/use-wallet-account";
 import { useWalletBalances } from "@/hooks/use-wallet-balances";
+import type { MessageKey } from "@/lib/i18n/messages";
 import { listDeveloperAgents } from "@/lib/developer-api";
 import { useA2AStore } from "@/stores/a2a";
 import { appChainLabel } from "@/web3";
 
 /** Wallet-first shortcuts; AI chat sits just before ledger. */
-const actions = [
-  { to: "/app/send", label: "转账", icon: ArrowLeftRight, primary: true },
-  { to: "/app/receive", label: "收款", icon: QrCode, primary: false },
-  { to: "/app/pay", label: "充值", icon: CreditCard, primary: false },
-  { to: "/app/chat", label: "对话", icon: MessageSquare, primary: false },
-  { to: "/app/ledger/payments", label: "明细", icon: ArrowUpRight, primary: false },
-] as const;
+const actions: {
+  to: string;
+  labelKey: MessageKey;
+  icon: typeof ArrowLeftRight;
+  primary: boolean;
+}[] = [
+    { to: "/app/send", labelKey: "dashboard.actionSend", icon: ArrowLeftRight, primary: true },
+    { to: "/app/receive", labelKey: "dashboard.actionReceive", icon: QrCode, primary: false },
+    { to: "/app/pay", labelKey: "dashboard.actionPay", icon: CreditCard, primary: false },
+    { to: "/app/chat", labelKey: "dashboard.actionChat", icon: MessageSquare, primary: false },
+    {
+      to: "/app/ledger/payments",
+      labelKey: "dashboard.actionLedger",
+      icon: ArrowUpRight,
+      primary: false,
+    },
+  ];
 
 /**
- * 钱包首页：链上余额总览与快捷入口。
+ * Wallet home: balance overview, shortcuts, and spending chart.
  */
 export function DashboardPage() {
+  const { t } = useI18n();
   const { address, usdc, balances, isLoading } = useWalletBalances();
   const { address: ownerAddress } = useWalletAccount();
   const a2aBalance = useA2AStore((s) => s.a2aBalance);
@@ -43,12 +57,15 @@ export function DashboardPage() {
   const activeCount =
     myAgents.data?.filter((agent) => agent.status === "active").length ?? 0;
 
+  const agentsLabel = !owner || myAgents.isLoading
+    ? t("dashboard.agentsLoading")
+    : agentCount === 0
+      ? t("dashboard.agentsNone")
+      : t("dashboard.agentsActive", { active: activeCount, total: agentCount });
+
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-8 animate-in">
+    <div className="mx-auto flex max-w-4xl flex-col gap-8 animate-in">
       <section className="space-y-2 fade-up">
-        <p className="text-sm text-muted-foreground">
-          钱包可用 · {appChainLabel}
-        </p>
         {isLoading ? (
           <Skeleton className="h-12 w-56" />
         ) : (
@@ -57,12 +74,10 @@ export function DashboardPage() {
           </h1>
         )}
         <p className="text-md text-muted-foreground">
-          A2A 可支付 {a2aBalance.toFixed(2)} USDC · 我的 Agents{" "}
-          {!owner || myAgents.isLoading
-            ? "…"
-            : agentCount === 0
-              ? "0 个"
-              : `活跃 ${activeCount}/${agentCount}`}
+          {t("dashboard.a2aAndAgents", {
+            a2a: a2aBalance.toFixed(2),
+            agents: agentsLabel,
+          })}
         </p>
       </section>
 
@@ -78,30 +93,41 @@ export function DashboardPage() {
             >
               <Link to={action.to} className="hover-lift">
                 <Icon className="h-4 w-4" strokeWidth={1.75} aria-hidden />
-                {action.label}
+                {t(action.labelKey)}
               </Link>
             </Button>
           );
         })}
       </section>
 
-      <section className="space-y-3 fade-up delay-2">
-        <h2 className="text-sm font-medium">资产</h2>
+      <SpendingChart />
+
+      <section className="space-y-3 fade-up delay-3">
+        <h2 className="text-sm font-medium">{t("dashboard.assets")}</h2>
         <div className="divide-y divide-border rounded-md border border-border bg-white">
           {(balances.length
-            ? [...balances].sort((a, b) => (a.symbol === "USDC" ? -1 : b.symbol === "USDC" ? 1 : 0))
+            ? [...balances].sort((a, b) =>
+              a.symbol === "USDC" ? -1 : b.symbol === "USDC" ? 1 : 0,
+            )
             : [
-                { symbol: "USDC", name: "USD Coin", displayValue: "0" },
-                { symbol: "ETH", name: "Ether", displayValue: "0" },
-              ]
+              { symbol: "USDC", name: "USD Coin", displayValue: "0" },
+              { symbol: "ETH", name: "Ether", displayValue: "0" },
+            ]
           ).map((asset) => (
-            <div key={asset.symbol} className="flex items-center justify-between px-4 py-3 text-sm">
+            <div
+              key={asset.symbol}
+              className="flex items-center justify-between px-4 py-3 text-sm"
+            >
               <div>
                 <p className="font-medium">{asset.symbol}</p>
                 <p className="text-xs text-muted-foreground">{asset.name}</p>
               </div>
               <p className="font-mono">
-                {isLoading ? "…" : Number(asset.displayValue).toLocaleString(undefined, { maximumFractionDigits: 6 })}
+                {isLoading
+                  ? "…"
+                  : Number(asset.displayValue).toLocaleString(undefined, {
+                    maximumFractionDigits: 6,
+                  })}
               </p>
             </div>
           ))}

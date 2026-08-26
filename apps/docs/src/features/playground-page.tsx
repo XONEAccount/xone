@@ -43,11 +43,10 @@ type MethodId =
   | "get"
   | "getStatus"
   | "getAddress"
-  | "getBalance"
+  | "getSpendSnapshot"
   | "getLimits"
   | "getHistory"
-  | "pay"
-  | "getTools";
+  | "pay";
 
 type MethodDef = {
   id: MethodId;
@@ -87,10 +86,10 @@ const METHODS: MethodDef[] = [
     needsAgent: true,
   },
   {
-    id: "getBalance",
+    id: "getSpendSnapshot",
     group: "RemoteAgent",
-    label: "getBalance()",
-    hint: "Address + spend-policy snapshot",
+    label: "getSpendSnapshot()",
+    hint: "Address + spend-policy snapshot (not RPC USDC)",
     needsAgent: true,
   },
   {
@@ -114,13 +113,6 @@ const METHODS: MethodDef[] = [
     hint: "Settle an x402 resource (real USDC)",
     needsAgent: true,
   },
-  {
-    id: "getTools",
-    group: "RemoteAgent",
-    label: "getTools()",
-    hint: "LangChain tools (same policy)",
-    needsAgent: true,
-  },
 ];
 
 const CONSOLE_ONLY = [
@@ -128,13 +120,6 @@ const CONSOLE_ONLY = [
   "agent.pause()",
   "agent.resume()",
   "agent.updateLimits()",
-];
-
-const LANGCHAIN_TOOLS = [
-  "xone_wallet_address",
-  "xone_wallet_balance",
-  "xone_payment_status",
-  "xone_x402_pay",
 ];
 
 /**
@@ -316,18 +301,7 @@ export function PlaygroundPage({ view, onView }: PlaygroundPageProps) {
       return;
     }
 
-    if (id === "getTools") {
-      setResult({
-        tools: LANGCHAIN_TOOLS,
-        note: "Same spend policy as agent.pay() / getBalance() / getLimits()",
-      });
-      setCall(null);
-      setError(null);
-      setConfirmPay(false);
-      return;
-    }
-
-    if (id === "getBalance" || id === "getLimits") {
+    if (id === "getSpendSnapshot" || id === "getLimits") {
       void run(id, async (secret) => {
         const { data, call: next } = await playgroundFetch<PlaygroundAgent>({
           token: secret,
@@ -336,7 +310,7 @@ export function PlaygroundPage({ view, onView }: PlaygroundPageProps) {
         return {
           call: next,
           agent: data,
-          result: id === "getBalance" ? toBalance(data) : toLimits(data),
+          result: id === "getSpendSnapshot" ? toSpendSnapshot(data) : toLimits(data),
         };
       });
       return;
@@ -957,9 +931,9 @@ function formatAmt(n: number): string {
 }
 
 /**
- * SDK-shaped getBalance() return.
+ * SDK-shaped getSpendSnapshot() return.
  */
-function toBalance(agent: PlaygroundAgent) {
+function toSpendSnapshot(agent: PlaygroundAgent) {
   return {
     currency: agent.currency,
     chain: agent.chain,
@@ -1017,10 +991,10 @@ const status = agent?.getStatus();`;
       return `${prefix}
 const agent = await xone.agent.get();
 const address = agent?.getAddress();`;
-    case "getBalance":
+    case "getSpendSnapshot":
       return `${prefix}
 const agent = await xone.agent.get();
-const snap = await agent?.getBalance();`;
+const snap = await agent?.getSpendSnapshot();`;
     case "getLimits":
       return `${prefix}
 const agent = await xone.agent.get();
@@ -1036,11 +1010,5 @@ const result = await agent?.pay({
   url: "${url}",
   idempotencyKey: crypto.randomUUID(),
 });`;
-    case "getTools":
-      return `${prefix}
-const agent = await xone.agent.get();
-const tools = agent?.getTools();
-// xone_wallet_address | xone_wallet_balance
-// xone_payment_status | xone_x402_pay`;
   }
 }

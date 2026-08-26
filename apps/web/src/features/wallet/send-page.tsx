@@ -1,6 +1,6 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { getTxExplorerUrl } from "@wallet/config";
+import { getTxExplorerUrl } from "@xone/config";
 import { ArrowLeftRight, ExternalLink, Eye, LoaderCircle } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";

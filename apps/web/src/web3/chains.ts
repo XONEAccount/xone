@@ -1,5 +1,5 @@
 import { baseSepolia, sepolia } from "viem/chains";
-import { DEFAULT_CHAIN } from "@wallet/config";
+import { DEFAULT_CHAIN } from "@xone/config";
 
 /**
  * Active chain for the MVP (Base Sepolia).

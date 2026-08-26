@@ -177,7 +177,7 @@ export interface DeveloperAgent {
   /** Settlement currency (SDK `currency`). */
   currency: string;
   chain: string;
-  status: "active" | "disabled";
+  status: "active" | "paused" | "disabled";
   allowedHosts: string[];
   allowedPayees: string[];
   createdAt: string;

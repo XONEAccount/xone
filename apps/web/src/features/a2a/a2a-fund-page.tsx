@@ -81,7 +81,7 @@ export function A2AFundPage() {
           className={cn(
             "message-in rounded-md border px-4 py-3 text-sm",
             toast.tone === "ok"
-              ? "border-border bg-[var(--color-muted)]"
+              ? "border-border bg-muted"
               : "border-[var(--color-destructive)]/30 bg-red-50 text-[var(--color-destructive)]",
           )}
           role="status"

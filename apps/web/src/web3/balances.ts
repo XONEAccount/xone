@@ -1,5 +1,5 @@
 import { erc20Abi, formatUnits } from "viem";
-import { SUPPORTED_ASSETS } from "@wallet/config";
+import { SUPPORTED_ASSETS } from "@xone/config";
 import { appChain } from "@/web3/chains";
 import { getPublicClient } from "@/web3/client";
 

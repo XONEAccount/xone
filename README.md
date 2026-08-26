@@ -66,7 +66,7 @@ Worker 侧的 `SUPABASE_*` 等仍用 `wrangler secret put` 配在 Cloudflare，�
 ### 本地手动部署
 
 ```bash
-pnpm --filter @wallet/api exec wrangler login
+pnpm --filter @xone/wallet-api exec wrangler login
 pnpm deploy:api
 # 构建时指向线上 API
 VITE_API_URL=https://xone-wallet-api.tskwangyi.workers.dev pnpm deploy:web

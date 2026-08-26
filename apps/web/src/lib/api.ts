@@ -76,7 +76,7 @@ export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promi
     return data;
   } catch (error) {
     if (error instanceof Error && error.message === "Failed to fetch") {
-      throw new Error("无法连接钱包服务。请先启动 API：pnpm --filter @wallet/api dev");
+      throw new Error("无法连接钱包服务。请先启动 API：pnpm --filter @xone/wallet-api dev");
     }
     throw error;
   }

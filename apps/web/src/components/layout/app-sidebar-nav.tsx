@@ -12,75 +12,92 @@ import {
   Zap,
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
+import { useI18n } from "@/hooks/use-i18n";
+import type { MessageKey } from "@/lib/i18n/messages";
 import { cn } from "@/lib/utils";
 
 type NavLinkItem = {
   to: string;
-  label: string;
+  labelKey: MessageKey;
   end?: boolean;
 };
 
 type NavGroupEntry = {
   kind: "group";
   id: string;
-  label: string;
+  labelKey: MessageKey;
   icon: LucideIcon;
   children: NavLinkItem[];
 };
 
 type NavEntry =
-  | { kind: "link"; to: string; label: string; end?: boolean; icon: LucideIcon }
+  | {
+    kind: "link";
+    to: string;
+    labelKey: MessageKey;
+    end?: boolean;
+    icon: LucideIcon;
+  }
   | NavGroupEntry;
 
 const navEntries: NavEntry[] = [
-  { kind: "link", to: "/app", label: "首页", end: true, icon: Home },
+  { kind: "link", to: "/app", labelKey: "nav.home", end: true, icon: Home },
   {
     kind: "group",
     id: "wallet",
-    label: "钱包",
+    labelKey: "nav.wallet",
     icon: Wallet,
     children: [
-      { to: "/app/assets", label: "资产" },
-      { to: "/app/pay", label: "充值" },
-      { to: "/app/send", label: "转账" },
-      { to: "/app/receive", label: "收款" },
+      { to: "/app/assets", labelKey: "nav.assets" },
+      { to: "/app/pay", labelKey: "nav.pay" },
+      { to: "/app/send", labelKey: "nav.send" },
+      { to: "/app/receive", labelKey: "nav.receive" },
     ],
   },
-  { kind: "link", to: "/app/agents", label: "X402 List", icon: List },
   {
     kind: "group",
-    id: "agents",
-    label: "Agents",
+    id: "lists",
+    labelKey: "nav.serviceList",
+    icon: List,
+    children: [
+      { to: "/app/agents/x402", labelKey: "nav.x402List" },
+      { to: "/app/agents/list", labelKey: "nav.agentList" },
+    ],
+  },
+  {
+    kind: "group",
+    id: "developer-wallet",
+    labelKey: "nav.developerWallet",
     icon: Bot,
     children: [
-      { to: "/app/developers/agents", label: "我的 Agents" },
-      { to: "/app/developers", label: "创建 Agent", end: true },
+      { to: "/app/developers/wallet", labelKey: "nav.myWallet" },
+      { to: "/app/developers", labelKey: "nav.createWallet", end: true },
     ],
   },
   {
     kind: "group",
     id: "a2a",
-    label: "A2A",
+    labelKey: "nav.a2a",
     icon: Zap,
     children: [
-      { to: "/app/a2a/fund", label: "A2A 转入" },
-      { to: "/app/merchants", label: "A2A 支付" },
-      { to: "/app/ledger/a2a", label: "A2A 明细" },
+      { to: "/app/a2a/fund", labelKey: "nav.a2aFund" },
+      { to: "/app/merchants", labelKey: "nav.a2aPay" },
+      { to: "/app/ledger/a2a", labelKey: "nav.a2aLedger" },
     ],
   },
-  { kind: "link", to: "/app/chat", label: "对话", icon: MessageSquare },
+  { kind: "link", to: "/app/chat", labelKey: "nav.chat", icon: MessageSquare },
   {
     kind: "group",
     id: "ledger",
-    label: "交易",
+    labelKey: "nav.ledger",
     icon: ClipboardList,
     children: [
-      { to: "/app/ledger/payments", label: "转账" },
-      { to: "/app/ledger/receive", label: "收款" },
-      { to: "/app/ledger/pay", label: "支付" },
+      { to: "/app/ledger/payments", labelKey: "nav.ledgerTransfer" },
+      { to: "/app/ledger/receive", labelKey: "nav.ledgerReceive" },
+      { to: "/app/ledger/pay", labelKey: "nav.ledgerPay" },
     ],
   },
-  { kind: "link", to: "/app/settings", label: "设置", icon: Settings },
+  { kind: "link", to: "/app/settings", labelKey: "nav.settings", icon: Settings },
 ];
 
 /**
@@ -95,14 +112,14 @@ function isPathActive(pathname: string, to: string, end?: boolean): boolean {
 }
 
 /**
- * Group label that contains the current route, if any.
+ * Group id that contains the current route, if any.
  * @param pathname - Current location
  */
-function findActiveGroup(pathname: string): string | null {
+function findActiveGroupId(pathname: string): string | null {
   for (const entry of navEntries) {
     if (entry.kind !== "group") continue;
     if (entry.children.some((child) => isPathActive(pathname, child.to, child.end))) {
-      return entry.label;
+      return entry.id;
     }
   }
   return null;
@@ -113,7 +130,7 @@ const itemClass = (isActive: boolean) =>
     "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-all duration-200",
     isActive
       ? "bg-[var(--color-foreground)] text-[var(--color-background)]"
-      : "text-muted-foreground hover:bg-[var(--color-muted)] hover:text-[var(--color-foreground)]",
+      : "text-muted-foreground hover:bg-muted hover:text-[var(--color-foreground)]",
   );
 
 type AppSidebarNavProps = {
@@ -127,14 +144,15 @@ type AppSidebarNavProps = {
  */
 export function AppSidebarNav({ enabled }: AppSidebarNavProps) {
   const { pathname } = useLocation();
+  const { t } = useI18n();
   const tabIndex = enabled ? 0 : -1;
   const [openGroups, setOpenGroups] = useState<Set<string>>(() => {
-    const active = findActiveGroup(pathname);
+    const active = findActiveGroupId(pathname);
     return new Set(active ? [active] : []);
   });
 
   useEffect(() => {
-    const active = findActiveGroup(pathname);
+    const active = findActiveGroupId(pathname);
     if (!active) return;
     setOpenGroups((prev) => {
       if (prev.has(active)) return prev;
@@ -146,19 +164,19 @@ export function AppSidebarNav({ enabled }: AppSidebarNavProps) {
 
   /**
    * Toggles a nav group open or closed.
-   * @param label - Group label
+   * @param id - Group id
    */
-  function toggleGroup(label: string) {
+  function toggleGroup(id: string) {
     setOpenGroups((prev) => {
       const next = new Set(prev);
-      if (next.has(label)) next.delete(label);
-      else next.add(label);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   }
 
   return (
-    <nav className="flex flex-col gap-1" aria-label="主导航">
+    <nav className="flex flex-col gap-1" aria-label={t("nav.main")}>
       {navEntries.map((entry) => {
         if (entry.kind === "link") {
           const Icon = entry.icon;
@@ -171,19 +189,21 @@ export function AppSidebarNav({ enabled }: AppSidebarNavProps) {
               className={({ isActive }) => itemClass(isActive)}
             >
               <Icon className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden />
-              <span>{entry.label}</span>
+              <span>{t(entry.labelKey)}</span>
             </NavLink>
           );
         }
 
         return (
           <NavGroup
-            key={entry.label}
+            key={entry.id}
             entry={entry}
-            open={openGroups.has(entry.label)}
+            label={t(entry.labelKey)}
+            open={openGroups.has(entry.id)}
             pathname={pathname}
             tabIndex={tabIndex}
-            onToggle={() => toggleGroup(entry.label)}
+            onToggle={() => toggleGroup(entry.id)}
+            t={t}
           />
         );
       })}
@@ -193,21 +213,26 @@ export function AppSidebarNav({ enabled }: AppSidebarNavProps) {
 
 type NavGroupProps = {
   entry: NavGroupEntry;
+  label: string;
   open: boolean;
   pathname: string;
   tabIndex: number;
   onToggle: () => void;
+  t: (key: MessageKey) => string;
 };
 
 /**
  * Expandable sidebar section with a toggle button and nested links.
- * @param entry - Group definition
- * @param open - Whether children are visible
- * @param pathname - Current location (for active styling)
- * @param tabIndex - Tab index inherited from sidebar open state
- * @param onToggle - Click handler for the group header
  */
-function NavGroup({ entry, open, pathname, tabIndex, onToggle }: NavGroupProps) {
+function NavGroup({
+  entry,
+  label,
+  open,
+  pathname,
+  tabIndex,
+  onToggle,
+  t,
+}: NavGroupProps) {
   const Icon = entry.icon;
   const groupActive = entry.children.some((child) =>
     isPathActive(pathname, child.to, child.end),
@@ -225,11 +250,11 @@ function NavGroup({ entry, open, pathname, tabIndex, onToggle }: NavGroupProps) 
           "flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-all duration-200",
           groupActive
             ? "font-medium text-foreground"
-            : "text-muted-foreground hover:bg-[var(--color-muted)] hover:text-[var(--color-foreground)]",
+            : "text-muted-foreground hover:bg-muted hover:text-(--color-foreground)",
         )}
       >
         <Icon className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden />
-        <span className="flex-1 text-left">{entry.label}</span>
+        <span className="flex-1 text-left">{label}</span>
         <ChevronRight
           className={cn(
             "h-3.5 w-3.5 shrink-0 transition-transform duration-200",
@@ -258,11 +283,11 @@ function NavGroup({ entry, open, pathname, tabIndex, onToggle }: NavGroupProps) 
                     "mt-0.5 flex items-center rounded-md py-2 pl-9 pr-3 text-sm transition-all duration-200",
                     isActive
                       ? "bg-[var(--color-foreground)] text-[var(--color-background)]"
-                      : "text-muted-foreground hover:bg-[var(--color-muted)] hover:text-[var(--color-foreground)]",
+                      : "text-muted-foreground hover:bg-muted hover:text-[var(--color-foreground)]",
                   )
                 }
               >
-                {child.label}
+                {t(child.labelKey)}
               </NavLink>
             </li>
           ))}

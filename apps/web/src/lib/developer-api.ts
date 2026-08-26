@@ -1,4 +1,4 @@
-import type { AgentPayment, DeveloperAgent } from "@wallet/types";
+import type { AgentPayment, DeveloperAgent } from "@xone/types";
 import { apiFetch } from "@/lib/api";
 import { getWebEnv } from "@/lib/env";
 
@@ -313,5 +313,45 @@ export async function deleteDeveloperAgent(
     body: { ownerAddress },
     token: "demo",
   });
+}
+
+/**
+ * Pauses an agent wallet (blocks API-key payments until resumed).
+ * @param agentId - Agent id
+ * @param ownerAddress - Owner wallet
+ */
+export async function pauseDeveloperAgent(
+  agentId: string,
+  ownerAddress: string,
+): Promise<DeveloperAgent> {
+  const data = await apiFetch<{ ok: true; agent: DeveloperAgent }>(
+    `/api/developer/agents/${agentId}/pause`,
+    {
+      method: "POST",
+      body: { ownerAddress },
+      token: "demo",
+    },
+  );
+  return data.agent;
+}
+
+/**
+ * Resumes a paused agent wallet.
+ * @param agentId - Agent id
+ * @param ownerAddress - Owner wallet
+ */
+export async function resumeDeveloperAgent(
+  agentId: string,
+  ownerAddress: string,
+): Promise<DeveloperAgent> {
+  const data = await apiFetch<{ ok: true; agent: DeveloperAgent }>(
+    `/api/developer/agents/${agentId}/resume`,
+    {
+      method: "POST",
+      body: { ownerAddress },
+      token: "demo",
+    },
+  );
+  return data.agent;
 }
 

@@ -2,13 +2,13 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLoginWithEmail, useLoginWithOAuth, usePrivy } from "@privy-io/react-auth";
 import { LoaderCircle, Mail, Wallet } from "lucide-react";
-import { APP_NAME } from "@wallet/config";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { OtpInput } from "@/components/ui/otp-input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useWalletAccount } from "@/hooks/use-wallet-account";
+import { useI18n } from "@/hooks/use-i18n";
 import { cn } from "@/lib/utils";
 import { assertChainAlignment } from "@/web3";
 
@@ -21,6 +21,7 @@ const CREATE_WAIT_MS = 12_000;
  * 登录页：邮箱验证码、Google / GitHub、外部钱包。
  */
 export function SignInPage() {
+  const { t } = useI18n();
   const { ready, authenticated, login, logout } = usePrivy();
   const { address } = useWalletAccount();
   const navigate = useNavigate();
@@ -49,7 +50,7 @@ export function SignInPage() {
             <Wallet className="h-5 w-5" strokeWidth={1.75} aria-hidden />
           </div>
           <div className="space-y-1">
-            <h1 className="text-3xl font-semibold tracking-tight">{APP_NAME}</h1>
+            <h1 className="text-3xl font-semibold tracking-tight">{t("brand.name")}</h1>
             <p className="text-sm text-muted-foreground">登录以使用钱包</p>
           </div>
         </div>

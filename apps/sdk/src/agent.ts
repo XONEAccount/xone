@@ -17,7 +17,7 @@ import type {
   AgentLimits,
   AgentRecord,
   AgentStatus,
-  BalanceSnapshot,
+  SpendSnapshot,
   GetHistoryParams,
   PayParams,
   PayResult,
@@ -62,9 +62,10 @@ export class Agent {
   }
 
   /**
-   * @returns Address + spend limits (fund USDC on-chain at `address`)
+   * Address + spend-policy snapshot (not an on-chain USDC balance).
+   * @returns Spend snapshot
    */
-  async getBalance(): Promise<BalanceSnapshot> {
+  async getSpendSnapshot(): Promise<SpendSnapshot> {
     await tick();
     const record = this.requireRecord();
     return {
@@ -77,6 +78,14 @@ export class Agent {
       status: record.status,
       note: "Fund on-chain USDC at address; limits use remainingDaily / perTransaction",
     };
+  }
+
+  /**
+   * @deprecated Use {@link getSpendSnapshot}. Same return value.
+   * @returns Spend snapshot
+   */
+  async getBalance(): Promise<SpendSnapshot> {
+    return this.getSpendSnapshot();
   }
 
   /**
@@ -153,7 +162,8 @@ export class Agent {
   }
 
   /**
-   * Soft-deletes this agent.
+   * Soft-deletes this agent in **mock / local** mode only.
+   * Production soft-delete is console JWT (`DELETE /v1/agents/:id`), not the spend SDK.
    * @returns Updated status (`deleted`)
    */
   async delete(): Promise<AgentStatus> {

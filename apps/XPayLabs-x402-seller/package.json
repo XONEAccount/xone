@@ -1,5 +1,5 @@
 {
-  "name": "@wallet/x402-seller",
+  "name": "@xone/x402-seller",
   "version": "0.1.0",
   "private": true,
   "description": "XPay Labs — x402 seller test server (Hono) for HTTP 402 micropayment flows.",

@@ -7,7 +7,7 @@ import {
 } from "ai";
 import { Bot, LoaderCircle, SendHorizontal, UserRound } from "lucide-react";
 import { Streamdown } from "streamdown";
-import type { DeveloperAgent } from "@wallet/types";
+import type { DeveloperAgent } from "@xone/types";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,

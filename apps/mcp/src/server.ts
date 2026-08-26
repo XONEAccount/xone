@@ -177,7 +177,7 @@ export function createXOneMcpServer(): McpServer {
       const loaded = await loadAgent(session, server, apiKey);
       if ("stop" in loaded) return loaded.stop;
       try {
-        return textResult(await loaded.agent.getBalance());
+        return textResult(await loaded.agent.getSpendSnapshot());
       } catch (error) {
         return errorResult(toErrorMessage(error));
       }
