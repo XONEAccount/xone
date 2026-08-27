@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
-import { Check, LoaderCircle, Shield, Wallet } from "lucide-react";
+import { LoaderCircle, Shield, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/hooks/use-auth";
@@ -9,7 +9,7 @@ import { errorMessage, shorten } from "@/lib/utils";
 type Step = "idle" | "connect" | "sign" | "done";
 
 /**
- * SIWE-lite admin login (challenge → sign → JWT), Gemini-style flow.
+ * SIWE-lite admin login (challenge → sign → JWT).
  */
 export function LoginPage() {
   const { loginWithWallet, isLoggedIn, ready } = useAuth();
@@ -64,30 +64,6 @@ export function LoginPage() {
 
         <Card className="fade-up overflow-hidden">
           <CardContent className="space-y-5 p-6">
-            <ol className="space-y-3 text-sm">
-              <StepRow
-                n={1}
-                title="Connect wallet"
-                detail="MetaMask / OKX / other injected wallet"
-                active={step === "connect"}
-                done={step === "sign" || step === "done"}
-              />
-              <StepRow
-                n={2}
-                title="Sign challenge"
-                detail="Prove ownership — no gas, no on-chain tx"
-                active={step === "sign"}
-                done={step === "done"}
-              />
-              <StepRow
-                n={3}
-                title="Allowlist check + session"
-                detail="Only wallets in admin_wallets / ADMIN_WALLETS"
-                active={false}
-                done={step === "done"}
-              />
-            </ol>
-
             {address ? (
               <p className="rounded-md border border-border bg-muted px-3 py-2 font-mono text-xs">
                 {shorten(address, 10, 8)}
@@ -117,39 +93,5 @@ export function LoginPage() {
         </Card>
       </div>
     </div>
-  );
-}
-
-function StepRow({
-  n,
-  title,
-  detail,
-  active,
-  done,
-}: {
-  n: number;
-  title: string;
-  detail: string;
-  active: boolean;
-  done: boolean;
-}) {
-  return (
-    <li className="flex gap-3">
-      <span
-        className={
-          done
-            ? "flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--color-foreground)] text-[var(--color-background)]"
-            : active
-              ? "flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 border-[var(--color-foreground)] text-xs font-medium"
-              : "flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-border text-xs text-muted-foreground"
-        }
-      >
-        {done ? <Check className="h-3.5 w-3.5" strokeWidth={2.5} /> : n}
-      </span>
-      <div className="min-w-0">
-        <p className="font-medium leading-6">{title}</p>
-        <p className="text-xs text-muted-foreground">{detail}</p>
-      </div>
-    </li>
   );
 }

@@ -11,7 +11,7 @@ type SearchBarProps = {
  */
 export function SearchBar({ onSearch, searching, children }: SearchBarProps) {
   return (
-    <div className="flex flex-wrap items-end gap-2">
+    <div className="flex flex-wrap items-center gap-2">
       {children}
       <Button type="button" onClick={onSearch} disabled={searching}>
         {searching ? "Searching…" : "Search"}

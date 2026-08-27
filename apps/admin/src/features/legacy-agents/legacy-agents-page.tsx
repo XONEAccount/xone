@@ -115,7 +115,7 @@ export function LegacyAgentsPage() {
           value={draftStatus || "__all__"}
           onValueChange={(v) => setDraftStatus(v === "__all__" ? "" : v)}
         >
-          <SelectTrigger className="min-w-36">
+          <SelectTrigger className="w-auto min-w-36">
             <SelectValue placeholder="All statuses" />
           </SelectTrigger>
           <SelectContent>
