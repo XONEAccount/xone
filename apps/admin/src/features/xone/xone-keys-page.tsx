@@ -3,7 +3,17 @@ import { KeyRound } from "lucide-react";
 import { ListPager } from "@/components/layout/list-pager";
 import { PageHeader } from "@/components/layout/page-header";
 import { SearchBar } from "@/components/layout/search-bar";
-import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
@@ -13,7 +23,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
 import {
   Table,
   TableBody,
@@ -26,7 +35,7 @@ import {
 import { useAuth } from "@/hooks/use-auth";
 import { useServerPagination } from "@/hooks/use-server-pagination";
 import type { ListResponse } from "@/lib/api";
-import { errorMessage, shorten } from "@/lib/utils";
+import { cn, errorMessage, shorten } from "@/lib/utils";
 
 type ApiKey = {
   id: string;
@@ -55,6 +64,7 @@ export function XoneKeysPage() {
   const [error, setError] = useState<string | null>(null);
   const [searching, setSearching] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [revokeTarget, setRevokeTarget] = useState<ApiKey | null>(null);
 
   /**
    * Commits draft filters and resets to page 1.
@@ -98,10 +108,12 @@ export function XoneKeysPage() {
   }, [authFetch, pager.limit, pager.offset, applied]);
 
   /**
-   * Soft-deletes a key, then reloads with applied filters.
+   * Soft-deletes the selected key, then reloads with applied filters.
    */
-  async function revoke(id: string): Promise<void> {
-    if (!confirm("Revoke this API key? Spend tokens stop working immediately.")) return;
+  async function confirmRevoke(): Promise<void> {
+    if (!revokeTarget) return;
+    const id = revokeTarget.id;
+    setRevokeTarget(null);
     setBusyId(id);
     try {
       await authFetch(`/api/xone/api-keys/${id}/revoke`, { method: "POST" });
@@ -170,35 +182,57 @@ export function XoneKeysPage() {
                       variant="destructive"
                       size="sm"
                       disabled={row.status === "deleted" || busyId === row.id}
-                      onClick={() => void revoke(row.id)}
+                      onClick={() => setRevokeTarget(row)}
                     >
                       Revoke
                     </Button>
                   </TableCell>
                 </TableRow>
               ))}
-              {items.length === 0 ? (
-                <TableEmpty
-                  colSpan={5}
-                  message="No keys"
-                />
-              ) : null}
+              {items.length === 0 ? <TableEmpty colSpan={5} message="No keys" /> : null}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
       <ListPager
-          page={pager.page}
-          pageCount={pager.pageCount}
-          total={pager.total}
-          limit={pager.limit}
-          pageSizes={pager.pageSizes}
-          canPrev={pager.canPrev}
-          canNext={pager.canNext}
-          onPrev={pager.prev}
-          onNext={pager.next}
-          onLimitChange={pager.setLimit}
-        />
+        page={pager.page}
+        pageCount={pager.pageCount}
+        total={pager.total}
+        limit={pager.limit}
+        pageSizes={pager.pageSizes}
+        canPrev={pager.canPrev}
+        canNext={pager.canNext}
+        onPrev={pager.prev}
+        onNext={pager.next}
+        onLimitChange={pager.setLimit}
+      />
+
+      <AlertDialog
+        open={Boolean(revokeTarget)}
+        onOpenChange={(open) => {
+          if (!open) setRevokeTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Revoke API key?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {revokeTarget
+                ? `${revokeTarget.name} (${revokeTarget.token_prefix}…) spend tokens will stop working immediately.`
+                : "Spend tokens will stop working immediately."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className={cn(buttonVariants({ variant: "destructive" }))}
+              onClick={() => void confirmRevoke()}
+            >
+              Revoke
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

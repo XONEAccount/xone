@@ -2,11 +2,21 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Shield } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
-import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
-import { errorMessage, shorten } from "@/lib/utils";
+import { cn, errorMessage, shorten } from "@/lib/utils";
 import type { LegacyAgent } from "./legacy-agents-page";
 
 /**
@@ -20,6 +30,7 @@ export function LegacyAgentDetailPage() {
   const [busy, setBusy] = useState(false);
   const [maxAmount, setMaxAmount] = useState("");
   const [maxSingle, setMaxSingle] = useState("");
+  const [revokeOpen, setRevokeOpen] = useState(false);
 
   /**
    * Reloads agent.
@@ -68,8 +79,8 @@ export function LegacyAgentDetailPage() {
   /**
    * Revokes API key and disables agent.
    */
-  async function revoke(): Promise<void> {
-    if (!confirm("Revoke API key and disable this agent?")) return;
+  async function confirmRevoke(): Promise<void> {
+    setRevokeOpen(false);
     setBusy(true);
     try {
       const res = await authFetch<{ ok: true; item: LegacyAgent }>(
@@ -147,7 +158,7 @@ export function LegacyAgentDetailPage() {
                 variant="destructive"
                 size="sm"
                 disabled={busy}
-                onClick={() => void revoke()}
+                onClick={() => setRevokeOpen(true)}
               >
                 Revoke key
               </Button>
@@ -191,6 +202,26 @@ export function LegacyAgentDetailPage() {
           </Card>
         </>
       ) : null}
+
+      <AlertDialog open={revokeOpen} onOpenChange={setRevokeOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Revoke API key?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will revoke the API key and disable the agent. Spend will stop immediately.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className={cn(buttonVariants({ variant: "destructive" }))}
+              onClick={() => void confirmRevoke()}
+            >
+              Revoke key
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

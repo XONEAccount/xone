@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { getSupabaseAdmin } from "../lib/supabase.js";
+import { getSupabaseWallet } from "../lib/supabase.js";
 import type { AdminAuthVariables } from "../middleware/admin-auth.js";
 import { requireAdmin } from "../middleware/admin-auth.js";
 import { writeAdminAudit } from "../services/audit.js";
@@ -54,7 +54,7 @@ agents.use("*", requireAdmin);
  * Lists developer agents without secrets.
  */
 agents.get("/", async (c) => {
-  const admin = getSupabaseAdmin();
+  const admin = getSupabaseWallet();
   if (!admin) {
     return c.json({ error: "Supabase is not configured" }, 503);
   }
@@ -98,7 +98,7 @@ agents.get("/", async (c) => {
  * Agent detail without sealed key material.
  */
 agents.get("/:id", async (c) => {
-  const admin = getSupabaseAdmin();
+  const admin = getSupabaseWallet();
   if (!admin) {
     return c.json({ error: "Supabase is not configured" }, 503);
   }
@@ -124,7 +124,7 @@ agents.get("/:id", async (c) => {
  * Updates agent policy fields / status. Never returns private keys.
  */
 agents.patch("/:id", async (c) => {
-  const admin = getSupabaseAdmin();
+  const admin = getSupabaseWallet();
   if (!admin) {
     return c.json({ error: "Supabase is not configured" }, 503);
   }
@@ -186,7 +186,7 @@ agents.patch("/:id", async (c) => {
  * Invalidates the current API key without issuing a replacement to the admin UI.
  */
 agents.post("/:id/revoke-key", async (c) => {
-  const admin = getSupabaseAdmin();
+  const admin = getSupabaseWallet();
   if (!admin) {
     return c.json({ error: "Supabase is not configured" }, 503);
   }

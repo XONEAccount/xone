@@ -2,11 +2,21 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Wallet } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
-import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
-import { errorMessage, shorten } from "@/lib/utils";
+import { cn, errorMessage, shorten } from "@/lib/utils";
 import type { XoneAgent } from "./xone-wallets-page";
 
 /**
@@ -20,6 +30,7 @@ export function XoneWalletDetailPage() {
   const [busy, setBusy] = useState(false);
   const [dailyLimit, setDailyLimit] = useState("");
   const [perTx, setPerTx] = useState("");
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   /**
    * Reloads agent.
@@ -91,12 +102,16 @@ export function XoneWalletDetailPage() {
               <p>id: {item.id}</p>
               <p>status: {item.status}</p>
               <p>address: {item.wallet_address}</p>
-              <p>chain: {item.chain} · {item.currency}</p>
+              <p>
+                chain: {item.chain} · {item.currency}
+              </p>
               <p>
                 daily {item.daily_limit} · per-tx {item.per_transaction} · remaining{" "}
                 {item.remaining_daily}
               </p>
-              <p>user: {shorten(item.user_id)} · key: {shorten(item.api_key_id)}</p>
+              <p>
+                user: {shorten(item.user_id)} · key: {shorten(item.api_key_id)}
+              </p>
             </CardContent>
           </Card>
           <Card>
@@ -127,10 +142,7 @@ export function XoneWalletDetailPage() {
                 variant="destructive"
                 size="sm"
                 disabled={busy || item.status === "deleted"}
-                onClick={() => {
-                  if (!confirm("Soft-delete this agent wallet?")) return;
-                  void run(`/api/xone/agents/${id}`, { method: "DELETE" });
-                }}
+                onClick={() => setDeleteOpen(true)}
               >
                 Soft-delete
               </Button>
@@ -173,6 +185,27 @@ export function XoneWalletDetailPage() {
           </Card>
         </>
       ) : null}
+
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Soft-delete agent wallet?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This agent will be marked deleted and stop spending. This cannot be undone from the
+              spend key.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className={cn(buttonVariants({ variant: "destructive" }))}
+              onClick={() => void run(`/api/xone/agents/${id}`, { method: "DELETE" })}
+            >
+              Soft-delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

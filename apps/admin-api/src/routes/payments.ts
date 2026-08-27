@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { getSupabaseAdmin } from "../lib/supabase.js";
+import { getSupabaseWallet } from "../lib/supabase.js";
 import type { AdminAuthVariables } from "../middleware/admin-auth.js";
 import { requireAdmin } from "../middleware/admin-auth.js";
 
@@ -11,7 +11,7 @@ payments.use("*", requireAdmin);
  * Lists agent payment records across all owners.
  */
 payments.get("/", async (c) => {
-  const admin = getSupabaseAdmin();
+  const admin = getSupabaseWallet();
   if (!admin) {
     return c.json({ error: "Supabase is not configured" }, 503);
   }

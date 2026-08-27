@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { getSupabaseAdmin } from "../lib/supabase.js";
+import { getSupabaseConsole, getSupabaseWallet } from "../lib/supabase.js";
 import type { AdminAuthVariables } from "../middleware/admin-auth.js";
 import { requireAdmin } from "../middleware/admin-auth.js";
 
@@ -8,11 +8,12 @@ export const dashboard = new Hono<{ Variables: AdminAuthVariables }>();
 dashboard.use("*", requireAdmin);
 
 /**
- * Aggregate counts for the ops home screen.
+ * Aggregate counts for the ops home screen (wallet + console projects).
  */
 dashboard.get("/stats", async (c) => {
-  const admin = getSupabaseAdmin();
-  if (!admin) {
+  const wallet = getSupabaseWallet();
+  const consoleDb = getSupabaseConsole();
+  if (!wallet && !consoleDb) {
     return c.json({ error: "Supabase is not configured" }, 503);
   }
 
@@ -29,32 +30,53 @@ dashboard.get("/stats", async (c) => {
     xoneKeys,
     xoneHistory,
   ] = await Promise.all([
-    admin.from("profiles").select("*", { count: "exact", head: true }),
-    admin.from("developer_agents").select("*", { count: "exact", head: true }),
-    admin
-      .from("developer_agents")
-      .select("*", { count: "exact", head: true })
-      .eq("status", "active"),
-    admin.from("agent_payments").select("*", { count: "exact", head: true }),
-    admin.from("agent_fundings").select("*", { count: "exact", head: true }),
-    admin
-      .from("agent_payments")
-      .select("*", { count: "exact", head: true })
-      .eq("status", "failed"),
-    admin.from("xone_profiles").select("*", { count: "exact", head: true }),
-    admin.from("xone_agents").select("*", { count: "exact", head: true }),
-    admin
-      .from("xone_agents")
-      .select("*", { count: "exact", head: true })
-      .eq("status", "active"),
-    admin
-      .from("xone_api_keys")
-      .select("*", { count: "exact", head: true })
-      .eq("status", "active"),
-    admin.from("xone_agent_history").select("*", { count: "exact", head: true }),
+    wallet
+      ? wallet.from("profiles").select("*", { count: "exact", head: true })
+      : Promise.resolve({ count: 0, error: null }),
+    wallet
+      ? wallet.from("developer_agents").select("*", { count: "exact", head: true })
+      : Promise.resolve({ count: 0, error: null }),
+    wallet
+      ? wallet
+          .from("developer_agents")
+          .select("*", { count: "exact", head: true })
+          .eq("status", "active")
+      : Promise.resolve({ count: 0, error: null }),
+    wallet
+      ? wallet.from("agent_payments").select("*", { count: "exact", head: true })
+      : Promise.resolve({ count: 0, error: null }),
+    wallet
+      ? wallet.from("agent_fundings").select("*", { count: "exact", head: true })
+      : Promise.resolve({ count: 0, error: null }),
+    wallet
+      ? wallet
+          .from("agent_payments")
+          .select("*", { count: "exact", head: true })
+          .eq("status", "failed")
+      : Promise.resolve({ count: 0, error: null }),
+    consoleDb
+      ? consoleDb.from("xone_profiles").select("*", { count: "exact", head: true })
+      : Promise.resolve({ count: 0, error: null }),
+    consoleDb
+      ? consoleDb.from("xone_agents").select("*", { count: "exact", head: true })
+      : Promise.resolve({ count: 0, error: null }),
+    consoleDb
+      ? consoleDb
+          .from("xone_agents")
+          .select("*", { count: "exact", head: true })
+          .eq("status", "active")
+      : Promise.resolve({ count: 0, error: null }),
+    consoleDb
+      ? consoleDb
+          .from("xone_api_keys")
+          .select("*", { count: "exact", head: true })
+          .eq("status", "active")
+      : Promise.resolve({ count: 0, error: null }),
+    consoleDb
+      ? consoleDb.from("xone_agent_history").select("*", { count: "exact", head: true })
+      : Promise.resolve({ count: 0, error: null }),
   ]);
 
-  // Legacy tables must succeed; xone_* may be absent on older DBs.
   const firstError =
     profiles.error ??
     agents.error ??
