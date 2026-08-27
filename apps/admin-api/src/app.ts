@@ -9,6 +9,8 @@ import { dashboard } from "./routes/dashboard.js";
 import { fundings } from "./routes/fundings.js";
 import { payments } from "./routes/payments.js";
 import { profiles } from "./routes/profiles.js";
+import { search } from "./routes/search.js";
+import { xone } from "./routes/xone.js";
 
 type AppEnv = {
   Bindings: WorkerBindings;
@@ -45,11 +47,13 @@ export function createApp() {
 
   app.route("/api/auth", auth);
   app.route("/api/dashboard", dashboard);
+  app.route("/api/search", search);
   app.route("/api/profiles", profiles);
   app.route("/api/agents", agents);
   app.route("/api/payments", payments);
   app.route("/api/fundings", fundings);
   app.route("/api/audit", audit);
+  app.route("/api/xone", xone);
 
   return app;
 }

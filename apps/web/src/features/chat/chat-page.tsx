@@ -24,6 +24,11 @@ import type { DeveloperAgent } from "@xone/types";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { useWalletAccount } from "@/hooks/use-wallet-account";
 import { useI18n } from "@/hooks/use-i18n";
@@ -726,12 +731,12 @@ function ThinkingBlock({ text, streaming }: ThinkingBlockProps) {
   if (!text.trim()) return null;
 
   return (
-    <div className="rounded-md border border-dashed border-border bg-white/80">
-      <button
-        type="button"
-        className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-xs text-muted-foreground"
-        onClick={() => setOpen((v) => !open)}
-      >
+    <Collapsible
+      open={open}
+      onOpenChange={setOpen}
+      className="rounded-md border border-dashed border-border bg-white/80"
+    >
+      <CollapsibleTrigger className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-xs text-muted-foreground">
         <ChevronDown
           className={cn(
             "h-3.5 w-3.5 shrink-0 transition-transform",
@@ -742,13 +747,13 @@ function ThinkingBlock({ text, streaming }: ThinkingBlockProps) {
         <span>
           {streaming ? t("chat.reasoningStreaming") : t("chat.reasoning")}
         </span>
-      </button>
-      {open ? (
+      </CollapsibleTrigger>
+      <CollapsibleContent>
         <p className="whitespace-pre-wrap border-t border-border px-2.5 py-2 text-xs leading-relaxed text-muted-foreground">
           {text}
         </p>
-      ) : null}
-    </div>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 
@@ -790,15 +795,13 @@ function ChoiceCard({
           const selected = selectedId === opt.id;
           return (
             <li key={opt.id}>
-              <button
+              <Button
                 type="button"
+                variant={selected ? "default" : "outline"}
                 disabled={disabled}
                 onClick={() => onSelect(opt.id)}
                 className={cn(
-                  "flex w-full items-start gap-2 rounded-md border px-3 py-2 text-left text-sm transition-colors",
-                  selected
-                    ? "border-foreground bg-foreground text-background"
-                    : "border-border hover:bg-muted",
+                  "h-auto w-full items-start justify-start gap-2 px-3 py-2 text-left whitespace-normal",
                   disabled && !selected && "opacity-60",
                 )}
               >
@@ -810,7 +813,7 @@ function ChoiceCard({
                   <span
                     className={cn(
                       "mt-0.5 block text-xs",
-                      selected ? "text-background/80" : "text-muted-foreground",
+                      selected ? "text-primary-foreground/80" : "text-muted-foreground",
                     )}
                   >
                     {opt.detail}
@@ -819,14 +822,14 @@ function ChoiceCard({
                     <span
                       className={cn(
                         "mt-0.5 block break-all font-mono text-[10px]",
-                        selected ? "text-background/70" : "text-muted-foreground",
+                        selected ? "text-primary-foreground/70" : "text-muted-foreground",
                       )}
                     >
                       {opt.meta}
                     </span>
                   ) : null}
                 </span>
-              </button>
+              </Button>
             </li>
           );
         })}

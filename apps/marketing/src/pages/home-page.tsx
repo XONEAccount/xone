@@ -8,7 +8,7 @@ import { FaqList } from "@/components/faq-list";
 import { HeroBackdrop } from "@/components/hero-backdrop";
 import { Marquee } from "@/components/marquee";
 import { Reveal } from "@/components/reveal";
-import { Button } from "@/components/ui/button";
+import { MarketingButton as Button } from "@/components/ui/marketing-button";
 import { WaitlistForm } from "@/components/waitlist-form";
 import { links } from "@/lib/links";
 

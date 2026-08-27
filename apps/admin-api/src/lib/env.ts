@@ -12,8 +12,11 @@ export function getEnv() {
     supabaseAnonKey: process.env.SUPABASE_ANON_KEY ?? "",
     supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
     adminJwtSecret: process.env.ADMIN_JWT_SECRET ?? "",
-    adminUsername: process.env.ADMIN_USERNAME ?? "admin",
-    adminPassword: process.env.ADMIN_PASSWORD ?? "",
+    /**
+     * Comma-separated EVM addresses allowed to sign in to the ops console.
+     * Example: `0xabc…,0xdef…`
+     */
+    adminWallets: process.env.ADMIN_WALLETS ?? "",
   };
 }
 

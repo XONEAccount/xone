@@ -2,7 +2,7 @@ import { ArrowRight } from "lucide-react";
 import { motion } from "motion/react";
 import { DocumentMeta } from "@/components/document-meta";
 import { Reveal } from "@/components/reveal";
-import { Button } from "@/components/ui/button";
+import { MarketingButton as Button } from "@/components/ui/marketing-button";
 import { links } from "@/lib/links";
 
 const surfaces = [

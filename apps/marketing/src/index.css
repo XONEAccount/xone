@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Shared shadcn primitives */
+@source "../../../packages/ui/src";
+
 @theme {
   --font-sans: "Source Sans 3", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
@@ -9,10 +12,19 @@
   --color-muted: #f0f0f0;
   --color-muted-foreground: #5c5c5c;
   --color-border: #e5e5e5;
+  --color-input: #e5e5e5;
   --color-card: #ffffff;
+  --color-card-foreground: #111111;
+  --color-popover: #ffffff;
+  --color-popover-foreground: #111111;
   --color-primary: #111111;
   --color-primary-foreground: #fafafa;
+  --color-secondary: #f0f0f0;
+  --color-secondary-foreground: #111111;
+  --color-accent: #f0f0f0;
+  --color-accent-foreground: #111111;
   --color-destructive: #dc2626;
+  --color-destructive-foreground: #fafafa;
   --color-ring: #111111;
   --radius-sm: 0.375rem;
   --radius-md: 0.5rem;

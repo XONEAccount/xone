@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useI18n } from "@/hooks/use-i18n";
 import { useSpendingActivity } from "@/hooks/use-spending-activity";
 import type { MessageKey } from "@/lib/i18n/messages";
@@ -12,7 +13,6 @@ import {
   type ServiceBucket,
   type TimeGrain,
 } from "@/lib/spending-activity";
-import { cn } from "@/lib/utils";
 
 const GRAINS: { value: TimeGrain; labelKey: MessageKey }[] = [
   { value: "day", labelKey: "spending.day" },
@@ -63,23 +63,26 @@ export function SpendingChart() {
           <h2 className="text-sm font-medium">{t("spending.title")}</h2>
           <p className="mt-1 text-xs text-muted-foreground">{t("spending.subtitle")}</p>
         </div>
-        <div className="flex rounded-md border border-border p-0.5">
+        <ToggleGroup
+          type="single"
+          value={grain}
+          onValueChange={(value) => {
+            if (value) setGrain(value as TimeGrain);
+          }}
+          variant="outline"
+          size="sm"
+          className="rounded-md border border-border p-0.5"
+        >
           {GRAINS.map((item) => (
-            <button
+            <ToggleGroupItem
               key={item.value}
-              type="button"
-              onClick={() => setGrain(item.value)}
-              className={cn(
-                "rounded px-2.5 py-1 text-xs transition-colors",
-                grain === item.value
-                  ? "bg-foreground text-background"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
+              value={item.value}
+              className="rounded px-2.5 text-xs data-[state=on]:bg-foreground data-[state=on]:text-background"
             >
               {t(item.labelKey)}
-            </button>
+            </ToggleGroupItem>
           ))}
-        </div>
+        </ToggleGroup>
       </div>
 
       <Card>

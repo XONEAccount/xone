@@ -5,7 +5,11 @@ import { LoaderCircle, Mail, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { OtpInput } from "@/components/ui/otp-input";
+import {
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSlot,
+} from "@/components/ui/input-otp";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useWalletAccount } from "@/hooks/use-wallet-account";
 import { useI18n } from "@/hooks/use-i18n";
@@ -200,18 +204,31 @@ function LoginMethods({ onWallet }: { onWallet: () => void }) {
         <p className="text-sm text-muted-foreground">
           验证码已发送至 <span className="font-medium text-foreground">{email.trim()}</span>
         </p>
-        <OtpInput
+        <InputOTP
+          maxLength={6}
           value={code}
           disabled={busy}
+          containerClassName="w-full"
           onChange={setCode}
           onComplete={(otp) => void onVerifyCode(undefined, otp)}
-        />
+        >
+          <InputOTPGroup className="w-full justify-between gap-2">
+            {Array.from({ length: 6 }, (_, index) => (
+              <InputOTPSlot
+                key={index}
+                index={index}
+                className="h-12 min-w-0 flex-1 rounded-md border border-input text-lg first:rounded-md last:rounded-md"
+              />
+            ))}
+          </InputOTPGroup>
+        </InputOTP>
         <Button type="submit" className="w-full" disabled={busy || code.length < 6}>
           {pending === "otp" ? <Spinner /> : "登录"}
         </Button>
-        <button
+        <Button
           type="button"
-          className="w-full text-center text-xs text-muted-foreground underline-offset-2 hover:underline"
+          variant="link"
+          className="h-auto w-full p-0 text-xs text-muted-foreground"
           disabled={busy}
           onClick={() => {
             setStep("email");
@@ -220,7 +237,7 @@ function LoginMethods({ onWallet }: { onWallet: () => void }) {
           }}
         >
           使用其他邮箱
-        </button>
+        </Button>
         {error ? <AuthError message={error} /> : null}
       </form>
     );

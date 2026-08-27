@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Check, Eye, EyeOff, FlaskConical, KeyRound, LoaderCircle, Plus, RefreshCw, Search } from "lucide-react";
 import type { ApiKeyRecord } from "@xone/sdk";
 import { PageHeader } from "@/components/layout/page-header";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -17,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
+  TableEmpty,
   TableCell,
   TableHead,
   TableHeader,
@@ -218,7 +220,7 @@ export function ApiKeysPage() {
         </Card>
       ) : (
         <Card>
-          <CardContent className="p-0">
+          <CardContent className="p-6">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -235,7 +237,7 @@ export function ApiKeysPage() {
                   const agent = getAgentByApiKey(key.id);
                   return (
                     <TableRow key={key.id}>
-                      <TableCell className="font-medium">{key.name}</TableCell>
+                      <TableCell className="font-medium whitespace-nowrap">{key.name}</TableCell>
                       <TableCell>
                         <StatusPill
                           value={key.status}
@@ -268,21 +270,20 @@ export function ApiKeysPage() {
                           </Button>
                         </div>
                       </TableCell>
-                      <TableCell className="text-muted-foreground">
+                      <TableCell className="whitespace-nowrap text-muted-foreground">
                         {agent
                           ? `${agent.name} (${agent.getStatus()})`
                           : "—"}
                       </TableCell>
-                      <TableCell className="text-muted-foreground">
+                      <TableCell className="whitespace-nowrap text-muted-foreground">
                         {formatDateTime(key.createdAt)}
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex flex-wrap justify-end gap-1">
+                        <div className="flex flex-nowrap items-center justify-end gap-1">
                           <Button
                             type="button"
                             variant="ghost"
                             size="sm"
-                            className="min-w-14"
                             disabled={!key.token}
                             title={
                               key.token
@@ -336,11 +337,7 @@ export function ApiKeysPage() {
                   );
                 })}
                 {filtered.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground">
-                      No matches. Try clearing the search.
-                    </TableCell>
-                  </TableRow>
+                  <TableEmpty colSpan={6} title="No matches. Try clearing the search." />
                 ) : null}
               </TableBody>
             </Table>
@@ -439,17 +436,6 @@ function StatusPill({
   value: string;
   tone: "ok" | "warn" | "bad";
 }) {
-  return (
-    <span
-      className={
-        tone === "ok"
-          ? "rounded-md border border-border bg-muted px-2 py-0.5 text-xs"
-          : tone === "warn"
-            ? "rounded-md border border-border px-2 py-0.5 text-xs text-muted-foreground"
-            : "rounded-md border border-destructive/30 px-2 py-0.5 text-xs text-destructive"
-      }
-    >
-      {value}
-    </span>
-  );
+  const variant = tone === "ok" ? "secondary" : tone === "bad" ? "destructive" : "outline";
+  return <Badge variant={variant}>{value}</Badge>;
 }

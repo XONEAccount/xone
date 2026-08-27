@@ -7,12 +7,12 @@ export interface AdminSession {
 }
 
 /**
- * Creates a short-lived admin session JWT after password login.
- * @param subject - Actor label stored in the token
+ * Creates a short-lived admin session JWT after wallet signature login.
+ * @param subject - Wallet address stored as token subject
  * @returns Signed JWT string
  * @throws When ADMIN_JWT_SECRET is missing
  */
-export async function signAdminToken(subject = "admin"): Promise<string> {
+export async function signAdminToken(subject: string): Promise<string> {
   const env = getEnv();
   if (!env.adminJwtSecret) {
     throw new Error("ADMIN_JWT_SECRET is not configured");
@@ -46,41 +46,4 @@ export async function verifyAdminToken(token: string): Promise<AdminSession | nu
   } catch {
     return null;
   }
-}
-
-/**
- * Constant-time-ish string equality for credential checks.
- * @param expected - Expected secret
- * @param actual - Submitted value
- * @returns Whether both strings match
- */
-function secureEqual(expected: string, actual: string): boolean {
-  if (!expected || !actual) return false;
-  if (expected.length !== actual.length) {
-    let mismatch = 0;
-    for (let i = 0; i < expected.length; i += 1) {
-      mismatch |= expected.charCodeAt(i) ^ 0;
-    }
-    return false;
-  }
-
-  let result = 0;
-  for (let i = 0; i < expected.length; i += 1) {
-    result |= expected.charCodeAt(i) ^ actual.charCodeAt(i);
-  }
-  return result === 0;
-}
-
-/**
- * Validates admin username + password against env credentials.
- * @param username - Submitted username
- * @param password - Submitted password
- * @returns Whether credentials match
- */
-export function verifyAdminCredentials(username: string, password: string): boolean {
-  const env = getEnv();
-  if (!env.adminUsername || !env.adminPassword) return false;
-  const userOk = secureEqual(env.adminUsername, username);
-  const passOk = secureEqual(env.adminPassword, password);
-  return userOk && passOk;
 }

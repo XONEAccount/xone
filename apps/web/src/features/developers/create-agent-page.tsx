@@ -24,8 +24,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { DismissibleError } from "@/components/ui/dismissible-error";
+import { DismissibleError } from "@/components/ui/web-dismissible-error";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { useEnsureEmbeddedWallet } from "@/hooks/use-ensure-embedded-wallet";
 import { useI18n } from "@/hooks/use-i18n";
 import { useSendAsset } from "@/hooks/use-send-asset";
@@ -331,20 +339,24 @@ export function CreateAgentPage() {
 
               <label className="block space-y-1.5 text-sm">
                 <div className="text-muted-foreground">{t("devWallet.chain")}</div>
-                <select
-                  className="flex h-10 w-full rounded-md border border-border bg-white px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-(--color-ring)"
+                <Select
                   value={chain}
-                  onChange={(e) =>
-                    setChain(e.target.value as (typeof CHAINS)[number]["value"])
+                  onValueChange={(v) =>
+                    setChain(v as (typeof CHAINS)[number]["value"])
                   }
                 >
-                  {CHAINS.map((c) => (
-                    <option key={c.value} value={c.value}>
-                      {c.label}
-                      {c.value !== "base-sepolia" ? t("devWallet.chainUnsupported") : ""}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CHAINS.map((c) => (
+                      <SelectItem key={c.value} value={c.value}>
+                        {c.label}
+                        {c.value !== "base-sepolia" ? t("devWallet.chainUnsupported") : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <span className="text-xs text-muted-foreground">
                   {t("devWallet.currencyFixed")}
                 </span>
@@ -371,23 +383,21 @@ export function CreateAgentPage() {
 
               <label className="block space-y-1.5 text-sm">
                 <div className="text-muted-foreground">allowedHosts（可选，每行一个）</div>
-                <textarea
+                <Textarea
                   value={allowedHostsText}
                   onChange={(e) => setAllowedHostsText(e.target.value)}
                   placeholder={"seller.example.com\n*.example.com"}
                   rows={3}
-                  className="flex w-full rounded-md border border-border bg-white px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-(--color-ring)"
                 />
               </label>
 
               <label className="block space-y-1.5 text-sm">
                 <div className="text-muted-foreground">allowedPayees（可选，每行一个 0x）</div>
-                <textarea
+                <Textarea
                   value={allowedPayeesText}
                   onChange={(e) => setAllowedPayeesText(e.target.value)}
                   placeholder="0x…"
                   rows={2}
-                  className="flex w-full rounded-md border border-border bg-white px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-(--color-ring)"
                 />
               </label>
 

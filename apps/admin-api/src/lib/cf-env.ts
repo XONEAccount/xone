@@ -7,8 +7,8 @@ export type WorkerBindings = {
   SUPABASE_ANON_KEY?: string;
   SUPABASE_SERVICE_ROLE_KEY?: string;
   ADMIN_JWT_SECRET?: string;
-  ADMIN_USERNAME?: string;
-  ADMIN_PASSWORD?: string;
+  /** Comma-separated allowlisted admin wallets. */
+  ADMIN_WALLETS?: string;
 };
 
 const BINDING_KEYS: (keyof WorkerBindings)[] = [
@@ -17,8 +17,7 @@ const BINDING_KEYS: (keyof WorkerBindings)[] = [
   "SUPABASE_ANON_KEY",
   "SUPABASE_SERVICE_ROLE_KEY",
   "ADMIN_JWT_SECRET",
-  "ADMIN_USERNAME",
-  "ADMIN_PASSWORD",
+  "ADMIN_WALLETS",
 ];
 
 /**

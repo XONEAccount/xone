@@ -14,6 +14,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useSendAsset } from "@/hooks/use-send-asset";
 import { useWalletAccount } from "@/hooks/use-wallet-account";
 import { useWalletBalances } from "@/hooks/use-wallet-balances";
@@ -173,18 +180,21 @@ export function SendPage() {
               <label className="text-sm font-medium" htmlFor="asset">
                 资产
               </label>
-              <select
-                id="asset"
-                className="flex h-10 w-full rounded-md border border-border bg-white px-3 text-sm"
+              <Select
                 value={asset}
-                onChange={(e) => {
-                  setAsset(e.target.value);
+                onValueChange={(v) => {
+                  setAsset(v);
                   setPreview(null);
                 }}
               >
-                <option value="ETH">ETH（可用 {eth}）</option>
-                <option value="USDC">USDC（可用 {usdc}）</option>
-              </select>
+                <SelectTrigger id="asset" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ETH">ETH（可用 {eth}）</SelectItem>
+                  <SelectItem value="USDC">USDC（可用 {usdc}）</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium" htmlFor="to">

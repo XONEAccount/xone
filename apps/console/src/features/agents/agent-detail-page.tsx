@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Bot, LoaderCircle } from "lucide-react";
 import type { Agent, AgentHistoryEntry, AgentLimits, AgentStatus } from "@xone/sdk";
 import { PageHeader } from "@/components/layout/page-header";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,6 +11,7 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableEmpty,
   TableHead,
   TableHeader,
   TableRow,
@@ -272,7 +274,7 @@ export function AgentDetailPage() {
         <CardHeader>
           <CardTitle>History</CardTitle>
         </CardHeader>
-        <CardContent className="p-0">
+        <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
@@ -300,11 +302,7 @@ export function AgentDetailPage() {
                 </TableRow>
               ))}
               {history.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={4} className="text-center text-muted-foreground">
-                    No history yet
-                  </TableCell>
-                </TableRow>
+                <TableEmpty colSpan={4} title="No history yet" />
               ) : null}
             </TableBody>
           </Table>
@@ -336,19 +334,7 @@ function StatCard({
 }
 
 function StatusPill({ status }: { status: AgentStatus }) {
-  const tone =
-    status === "active" ? "ok" : status === "deleted" ? "bad" : "warn";
-  return (
-    <span
-      className={
-        tone === "ok"
-          ? "rounded-md border border-border bg-muted px-2 py-0.5 text-xs"
-          : tone === "warn"
-            ? "rounded-md border border-border px-2 py-0.5 text-xs text-muted-foreground"
-            : "rounded-md border border-[var(--color-destructive)]/30 px-2 py-0.5 text-xs text-[var(--color-destructive)]"
-      }
-    >
-      {status}
-    </span>
-  );
+  const variant =
+    status === "active" ? "secondary" : status === "deleted" ? "destructive" : "outline";
+  return <Badge variant={variant}>{status}</Badge>;
 }

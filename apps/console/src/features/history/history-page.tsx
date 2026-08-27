@@ -4,11 +4,20 @@ import { ArrowDownLeft, ArrowUpRight, Receipt, Search } from "lucide-react";
 import type { AgentHistoryEntry, AgentHistoryType } from "@xone/sdk";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent } from "@/components/ui/card";
+import { Empty, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
   TableCell,
+  TableEmpty,
   TableHead,
   TableHeader,
   TableRow,
@@ -161,29 +170,32 @@ export function HistoryPage() {
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
-            <select
-              className="flex h-10 rounded-md border border-border bg-white py-2 pl-3 pr-10 text-sm outline-none focus-visible:ring-2 focus-visible:ring-(--color-ring)"
-              value={walletFilter}
-              onChange={(e) => setWalletFilter(e.target.value)}
-            >
-              <option value="all">All wallets</option>
-              {agents.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name}
-                </option>
-              ))}
-            </select>
-            <select
-              className="flex h-10 rounded-md border border-border bg-white py-2 pl-3 pr-10 text-sm outline-none focus-visible:ring-2 focus-visible:ring-(--color-ring)"
+            <Select value={walletFilter} onValueChange={setWalletFilter}>
+              <SelectTrigger className="w-44">
+                <SelectValue placeholder="All wallets" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All wallets</SelectItem>
+                {agents.map((a) => (
+                  <SelectItem key={a.id} value={a.id}>
+                    {a.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select
               value={flowFilter}
-              onChange={(e) =>
-                setFlowFilter(e.target.value as FlowDirection | "all")
-              }
+              onValueChange={(v) => setFlowFilter(v as FlowDirection | "all")}
             >
-              <option value="all">All flows</option>
-              <option value="income">Income</option>
-              <option value="spend">Spend</option>
-            </select>
+              <SelectTrigger className="w-36">
+                <SelectValue placeholder="All flows" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All flows</SelectItem>
+                <SelectItem value="income">Income</SelectItem>
+                <SelectItem value="spend">Spend</SelectItem>
+              </SelectContent>
+            </Select>
           </>
         }
       />
@@ -191,12 +203,16 @@ export function HistoryPage() {
       {agents.length === 0 ? (
         <Card>
           <CardContent className="p-6">
-            <p className="font-medium">No wallets yet</p>
+            <Empty className="border-0 py-6 md:py-8">
+              <EmptyHeader>
+                <EmptyTitle>No wallets yet</EmptyTitle>
+              </EmptyHeader>
+            </Empty>
           </CardContent>
         </Card>
       ) : (
         <Card>
-          <CardContent className="p-0">
+          <CardContent className="p-6">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -267,16 +283,12 @@ export function HistoryPage() {
                   );
                 })}
                 {filtered.length === 0 ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={6}
-                      className="text-center text-muted-foreground"
-                    >
-                      {loading
-                        ? "Loading ledger…"
-                        : "No spend or income records yet."}
-                    </TableCell>
-                  </TableRow>
+                  <TableEmpty
+                    colSpan={6}
+                    title={
+                      loading ? "Loading ledger…" : "No spend or income records yet."
+                    }
+                  />
                 ) : null}
               </TableBody>
             </Table>

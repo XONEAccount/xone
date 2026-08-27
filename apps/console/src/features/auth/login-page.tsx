@@ -185,24 +185,26 @@ export function LoginPage() {
                 {mode === "register" ? (
                   <>
                     Already have an account?{" "}
-                    <button
+                    <Button
                       type="button"
-                      className="font-medium text-foreground underline-offset-4 hover:underline"
+                      variant="link"
+                      className="h-auto p-0 font-medium text-foreground"
                       onClick={() => switchMode("login")}
                     >
                       Sign in
-                    </button>
+                    </Button>
                   </>
                 ) : (
                   <>
                     New here?{" "}
-                    <button
+                    <Button
                       type="button"
-                      className="font-medium text-foreground underline-offset-4 hover:underline"
+                      variant="link"
+                      className="h-auto p-0 font-medium text-foreground"
                       onClick={() => switchMode("register")}
                     >
                       Create an account
-                    </button>
+                    </Button>
                   </>
                 )}
               </p>

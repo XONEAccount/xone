@@ -1,38 +1,42 @@
-# X-ONE钱包 — Web3 AI Wallet
+# XOne — Web3 AI Wallet & Agent Payments
 
-Web-first Web3 钱包，支持 A2A 快捷支付。
+Web-first Web3 wallet plus policy-gated **x402 agent payments** (Console / SDK / MCP / HTTP).
 
-技术栈：React + Vite + Tailwind + Hono + Cloudflare（Pages + Workers）+ Supabase + Privy（嵌入式钱包 / MetaMask 等）+ viem。
+Stack: React + Vite + Tailwind + Hono + Cloudflare (Pages + Workers) + Supabase + Privy + viem + x402.
 
-## 结构
+## Monorepo
 
 ```
-apps/web          React 钱包 UI（Cloudflare Pages）
-apps/api          Hono API（Cloudflare Workers）
-packages/types    领域类型
-packages/schemas  Zod 校验
-packages/config   链 / 资产 / 默认策略
-supabase/         SQL migrations
+apps/web            Consumer wallet UI (Pages)
+apps/web-api        Wallet / A2A / chat API (@xone/wallet-api, Workers)
+apps/console        Operator console — keys, wallets, limits, ledger
+apps/console-api    Spend + operator HTTP API (/v1/sdk, /v1/agents, …)
+apps/sdk            @xone/sdk — runtime create / get / pay / history
+apps/mcp            @xone/mcp — MCP tools over the same spend surface
+apps/docs           SDK docs + playground (@xone/sdk-playground)
+apps/marketing      Public marketing site
+apps/admin          Ops admin UI (React, console-style)
+apps/admin-api      Ops admin API (wallet + XOne surfaces)
+apps/XPayLabs-x402-seller   Sample x402 seller
+packages/ui         Shared shadcn UI (@xone/ui)
+packages/types      Shared domain types
+packages/schemas    Zod schemas
+packages/config     Chains / assets / defaults
+supabase/           SQL migrations
 ```
 
-## 本地启动
+## Local development
 
 ```bash
 pnpm install
 cp .env.example .env
 ```
 
-在 [Privy Dashboard](https://dashboard.privy.io) 创建应用，打开 Email / Social / Wallet 登录，并把 `http://localhost:5173` 加到 Allowed Origins。把 App ID 填进 `apps/web/.env`：
+### Wallet (`pnpm dev`)
 
-```bash
-VITE_PRIVY_APP_ID=your-privy-app-id
-```
-
-`apps/api/.env` 中保持：
-
-```bash
-ALLOW_DEMO_AUTH=true
-```
+1. Privy Dashboard → App ID → `apps/web/.env` as `VITE_PRIVY_APP_ID`
+2. Allowed Origins include `http://localhost:5173`
+3. `apps/web-api/.env`: `ALLOW_DEMO_AUTH=true` (and Supabase / LLM secrets as needed)
 
 ```bash
 pnpm dev
@@ -41,53 +45,58 @@ pnpm dev
 - Web: http://localhost:5173
 - API: http://localhost:4396/health
 
-## Cloudflare 部署
-
-仓库：https://github.com/XONEAccount/web.git
-
-### GitHub Actions（推荐）
-
-推送到 `main` / `master` 会自动执行 `pnpm run deploy`（见 `.github/workflows/deploy.yml`）。
-
-在 GitHub → Settings → Secrets and variables → Actions 配置：
-
-| Secret | 说明 |
-|--------|------|
-| `CLOUDFLARE_API_TOKEN` | Cloudflare API Token（需 Workers / Pages 编辑权限） |
-| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare Account ID |
-| `VITE_API_URL` | 例如 `https://xone-wallet-api.tskwangyi.workers.dev` |
-| `VITE_SUPABASE_URL` | Supabase 项目 URL |
-| `VITE_SUPABASE_ANON_KEY` | Supabase anon key |
-| `VITE_PRIVY_APP_ID` | Privy App ID（dashboard.privy.io） |
-| `VITE_ETHERSCAN_API_KEY` | 可选 |
-
-Worker 侧的 `SUPABASE_*` 等仍用 `wrangler secret put` 配在 Cloudflare，不必放进 GitHub。
-
-### 本地手动部署
+### Console + agent API
 
 ```bash
-pnpm --filter @xone/wallet-api exec wrangler login
-pnpm deploy:api
-# 构建时指向线上 API
-VITE_API_URL=https://xone-wallet-api.tskwangyi.workers.dev pnpm deploy:web
-# 或一次性
-pnpm deploy
+pnpm dev:console
 ```
 
-## 产品说明
+### Docs / marketing
 
-- **登录**：邮箱 / GitHub / Google / Apple / Discord / 手机号 / Passkey / MetaMask / WalletConnect 等（Privy）
-- **钱包**：Ethereum Sepolia 余额、收款二维码、链上转账
-- **首页**：链上余额 + A2A 快捷入口
-- **设置**：退出登录、从钱包转入 A2A、配置限额
-- **顶栏**：钱包余额 + A2A 可支付余额 + 账户地址
+```bash
+pnpm dev:docs    # SDK playground
+pnpm dev:site    # marketing
+```
 
-## 安全模型
+## Surfaces
+
+| Surface | Auth | Role |
+|---------|------|------|
+| Wallet web + web-api | Privy / Supabase | End-user wallet, A2A, assistant |
+| Console + console-api JWT | Supabase user JWT | Keys, pause/resume, limits, soft-delete, ledger |
+| `/v1/sdk/*` + `@xone/sdk` / `@xone/mcp` | Agent API key (`xone_…`) | Create/get agent, `pay`, history |
+| Docs `?doc=api` | — | Same HTTP contract for any language |
+
+**Spend vs operator:** soft-delete, pause, resume, and limit changes are console JWT only — not on the spend token. SDK `getSpendSnapshot()` is address + policy headroom (`remainingDaily` / limits), **not** an on-chain USDC RPC balance. Fund USDC at the agent `address` separately.
+
+## Deploy (Cloudflare)
+
+Repo: https://github.com/XONEAccount/web.git
+
+```bash
+pnpm deploy              # wallet-api + web
+pnpm deploy:console      # console-api + console
+pnpm deploy:docs
+pnpm deploy:site
+pnpm deploy:ops          # admin-api + admin
+```
+
+Worker secrets (`SUPABASE_*`, etc.) via `wrangler secret put`. Frontend `VITE_*` at build / CI time.
+
+## Product notes
+
+**Wallet:** Privy login, Base Sepolia balances, receive / send, A2A fund & settle, AI assistant under policy.
+
+**Agent payments:** one API key → one agent → one wallet; daily / per-tx caps; optional host/payee allowlists; idempotent `pay`.
+
+## Security model
 
 ```
 Intent → Validation → Policy → Authorization → Execution → Confirmation → Audit
 ```
 
-## 项目规则
+Never put private keys or service-role secrets in the browser. LLM proposes; policy decides; spend keys cannot operate the wallet.
+
+## Project rules
 
 `.cursor/rules/web3-wallet.mdc`

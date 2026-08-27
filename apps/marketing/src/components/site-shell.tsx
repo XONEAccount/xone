@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { Link, NavLink } from "react-router-dom";
 import { links } from "@/lib/links";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
+import { MarketingButton as Button } from "@/components/ui/marketing-button";
 
 /**
  * Shared marketing chrome: top nav + footer.

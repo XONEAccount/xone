@@ -17,6 +17,7 @@
     "@supabase/supabase-js": "^2.57.4",
     "hono": "^4.9.7",
     "jose": "^6.2.8",
+    "viem": "^2.33.3",
     "zod": "^4.4.3"
   },
   "devDependencies": {

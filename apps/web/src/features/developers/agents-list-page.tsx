@@ -6,6 +6,7 @@ import { useWalletAccount } from "@/hooks/use-wallet-account";
 import { Bot, ExternalLink, Plus, RefreshCw } from "lucide-react";
 import type { AgentPayment, DeveloperAgent } from "@xone/types";
 import { PageHeader } from "@/components/layout/page-header";
+import { TablePagination } from "@/components/layout/table-pagination";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -16,17 +17,22 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { DismissibleError } from "@/components/ui/dismissible-error";
+import { Empty, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
+import { DismissibleError } from "@/components/ui/web-dismissible-error";
 import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
   TableCell,
+  TableEmpty,
   TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import { AgentChatDialog } from "@/features/developers/agent-chat-dialog";
+import { useClientPagination } from "@/hooks/use-client-pagination";
 import { useI18n } from "@/hooks/use-i18n";
 import {
   deleteDeveloperAgent,
@@ -81,6 +87,9 @@ export function AgentsListPage() {
 
   const [chatOpen, setChatOpen] = useState(false);
   const [chatAgent, setChatAgent] = useState<DeveloperAgent | null>(null);
+
+  const agentsPager = useClientPagination(agents);
+  const paymentsPager = useClientPagination(payments);
 
   const refresh = useCallback(async () => {
     if (!owner) return;
@@ -359,34 +368,40 @@ export function AgentsListPage() {
         </CardHeader>
         <CardContent>
           {agents.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t("devWallet.noData")}</p>
+            <Empty className="border-0 py-10 md:py-12">
+              <EmptyHeader>
+                <EmptyTitle>{t("devWallet.noData")}</EmptyTitle>
+              </EmptyHeader>
+            </Empty>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-28">{t("devWallet.colName")}</TableHead>
-                  <TableHead className="min-w-56">{t("devWallet.colAddress")}</TableHead>
-                  <TableHead>{t("devWallet.colBalance")}</TableHead>
-                  <TableHead>{t("devWallet.colUsedLimit")}</TableHead>
-                  <TableHead>{t("devWallet.colPerTx")}</TableHead>
-                  <TableHead className="w-24">{t("devWallet.colStatus")}</TableHead>
-                  <TableHead className="min-w-48">{t("devWallet.colApiKey")}</TableHead>
-                  <TableHead className="w-[1%] whitespace-nowrap text-left">
-                    {t("devWallet.colActions")}
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {agents.map((item) => (
+            <>
+              <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-28">{t("devWallet.colName")}</TableHead>
+                      <TableHead className="min-w-56">{t("devWallet.colAddress")}</TableHead>
+                      <TableHead>{t("devWallet.colBalance")}</TableHead>
+                      <TableHead>{t("devWallet.colUsedLimit")}</TableHead>
+                      <TableHead>{t("devWallet.colPerTx")}</TableHead>
+                      <TableHead className="w-24">{t("devWallet.colStatus")}</TableHead>
+                      <TableHead className="min-w-48">{t("devWallet.colApiKey")}</TableHead>
+                      <TableHead className="w-[1%] whitespace-nowrap text-left">
+                        {t("devWallet.colActions")}
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {agentsPager.pageItems.map((item) => (
                   <TableRow key={item.id}>
                     <TableCell className="font-medium">
-                      <button
+                      <Button
                         type="button"
-                        className="text-left font-medium text-foreground underline decoration-foreground/40 underline-offset-4 transition-colors hover:decoration-foreground"
+                        variant="link"
+                        className="h-auto p-0 font-medium"
                         onClick={() => void onOpenPayments(item)}
                       >
                         {item.name}
-                      </button>
+                      </Button>
                     </TableCell>
                     <TableCell className="min-w-[16rem]" title={item.walletAddress}>
                       <a
@@ -413,19 +428,14 @@ export function AgentsListPage() {
                       {item.perTransaction ?? item.maxSinglePayment}{" "}
                       {item.currency || item.asset}
                     </TableCell>
-                    <TableCell>
-                      <span
-                        className={cn(
-                          "rounded-md border px-2 py-0.5 text-xs",
-                          item.status === "paused"
-                            ? "border-border text-muted-foreground"
-                            : "border-foreground bg-foreground text-background",
-                        )}
+                    <TableCell className="whitespace-nowrap">
+                      <Badge
+                        variant={item.status === "paused" ? "outline" : "default"}
                       >
                         {item.status === "paused"
                           ? t("devWallet.statusPaused")
                           : t("devWallet.statusActive")}
-                      </span>
+                      </Badge>
                     </TableCell>
                     <TableCell>
                       {item.apiKeyPrefix}…
@@ -475,8 +485,21 @@ export function AgentsListPage() {
                     </TableCell>
                   </TableRow>
                 ))}
-              </TableBody>
-            </Table>
+                  </TableBody>
+                </Table>
+              <TablePagination
+                page={agentsPager.page}
+                pageCount={agentsPager.pageCount}
+                total={agentsPager.total}
+                pageSize={agentsPager.pageSize}
+                canPrev={agentsPager.canPrev}
+                canNext={agentsPager.canNext}
+                onPrev={agentsPager.onPrev}
+                onNext={agentsPager.onNext}
+                onPageChange={agentsPager.setPage}
+                onPageSizeChange={agentsPager.setPageSize}
+              />
+            </>
           )}
         </CardContent>
       </Card>
@@ -493,10 +516,6 @@ export function AgentsListPage() {
             <p className="text-sm text-muted-foreground">
               {t("devWallet.paymentsLoading")}
             </p>
-          ) : payments.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              {t("devWallet.paymentsEmpty")}
-            </p>
           ) : (
             <Table>
               <TableHeader>
@@ -509,27 +528,45 @@ export function AgentsListPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {payments.map((pay) => (
-                  <TableRow key={pay.id}>
-                    <TableCell className="font-medium">
-                      {pay.amount} {pay.asset}
-                    </TableCell>
-                    <TableCell>
-                      <div className="space-y-0.5">
-                        <p className="font-mono text-xs">{shortAddress(pay.recipient)}</p>
-                        <p className="break-all font-mono text-[11px] text-muted-foreground">
-                          {pay.recipient}
-                        </p>
-                      </div>
-                    </TableCell>
-                    <TableCell>{pay.merchant ?? "—"}</TableCell>
-                    <TableCell>{pay.status}</TableCell>
-                    <TableCell>{pay.provider}</TableCell>
-                  </TableRow>
-                ))}
+                {payments.length === 0 ? (
+                  <TableEmpty colSpan={5} title={t("devWallet.paymentsEmpty")} />
+                ) : (
+                  paymentsPager.pageItems.map((pay) => (
+                    <TableRow key={pay.id}>
+                      <TableCell className="font-medium">
+                        {pay.amount} {pay.asset}
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-0.5">
+                          <p className="font-mono text-xs">{shortAddress(pay.recipient)}</p>
+                          <p className="break-all font-mono text-[11px] text-muted-foreground">
+                            {pay.recipient}
+                          </p>
+                        </div>
+                      </TableCell>
+                      <TableCell>{pay.merchant ?? "—"}</TableCell>
+                      <TableCell>{pay.status}</TableCell>
+                      <TableCell>{pay.provider}</TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           )}
+          {payments.length > 0 ? (
+              <TablePagination
+                page={paymentsPager.page}
+                pageCount={paymentsPager.pageCount}
+                total={paymentsPager.total}
+                pageSize={paymentsPager.pageSize}
+                canPrev={paymentsPager.canPrev}
+                canNext={paymentsPager.canNext}
+                onPrev={paymentsPager.onPrev}
+                onNext={paymentsPager.onNext}
+                onPageChange={paymentsPager.setPage}
+                onPageSizeChange={paymentsPager.setPageSize}
+              />
+          ) : null}
         </DialogContent>
       </Dialog>
 
@@ -571,20 +608,18 @@ export function AgentsListPage() {
             </label>
             <label className="block space-y-1.5 text-sm">
               <span className="text-muted-foreground">allowedHosts（可选）</span>
-              <textarea
+              <Textarea
                 value={editAllowedHosts}
                 onChange={(e) => setEditAllowedHosts(e.target.value)}
                 rows={3}
-                className="flex w-full rounded-md border border-border bg-white px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-(--color-ring)"
               />
             </label>
             <label className="block space-y-1.5 text-sm">
               <span className="text-muted-foreground">allowedPayees（可选）</span>
-              <textarea
+              <Textarea
                 value={editAllowedPayees}
                 onChange={(e) => setEditAllowedPayees(e.target.value)}
                 rows={2}
-                className="flex w-full rounded-md border border-border bg-white px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-(--color-ring)"
               />
             </label>
             <DialogFooter>

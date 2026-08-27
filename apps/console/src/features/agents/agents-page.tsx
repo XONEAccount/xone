@@ -3,13 +3,16 @@ import { Link } from "react-router-dom";
 import { LoaderCircle, RefreshCw, Search, Wallet } from "lucide-react";
 import type { Agent, AgentStatus } from "@xone/sdk";
 import { PageHeader } from "@/components/layout/page-header";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
   TableCell,
+  TableEmpty,
   TableHead,
   TableHeader,
   TableRow,
@@ -95,16 +98,20 @@ export function AgentsPage() {
 
       {agents.length === 0 ? (
         <Card>
-          <CardContent className="space-y-3 p-6">
-            <p className="font-medium">No wallets yet</p>
-            <p className="text-sm text-muted-foreground">
-              Wallets bound to your API keys will appear here.
-            </p>
+          <CardContent className="p-6">
+            <Empty className="border-0 py-6 md:py-8">
+              <EmptyHeader>
+                <EmptyTitle>No wallets yet</EmptyTitle>
+                <EmptyDescription>
+                  Wallets bound to your API keys will appear here.
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
           </CardContent>
         </Card>
       ) : (
         <Card>
-          <CardContent className="p-0">
+          <CardContent className="p-6">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -159,11 +166,7 @@ export function AgentsPage() {
                   );
                 })}
                 {filtered.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground">
-                      No matching agents.
-                    </TableCell>
-                  </TableRow>
+                  <TableEmpty colSpan={6} title="No matching agents." />
                 ) : null}
               </TableBody>
             </Table>
@@ -178,19 +181,7 @@ export function AgentsPage() {
  * @param status - Agent status
  */
 function StatusPill({ status }: { status: AgentStatus }) {
-  const tone =
-    status === "active" ? "ok" : status === "deleted" ? "bad" : "warn";
-  return (
-    <span
-      className={
-        tone === "ok"
-          ? "rounded-md border border-border bg-muted px-2 py-0.5 text-xs"
-          : tone === "warn"
-            ? "rounded-md border border-border px-2 py-0.5 text-xs text-muted-foreground"
-            : "rounded-md border border-[var(--color-destructive)]/30 px-2 py-0.5 text-xs text-[var(--color-destructive)]"
-      }
-    >
-      {status}
-    </span>
-  );
+  const variant =
+    status === "active" ? "secondary" : status === "deleted" ? "destructive" : "outline";
+  return <Badge variant={variant}>{status}</Badge>;
 }

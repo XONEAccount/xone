@@ -2,7 +2,10 @@ import type { LucideIcon } from "lucide-react";
 import { ExternalLink } from "lucide-react";
 import { getTxExplorerUrl } from "@xone/config";
 import { PageHeader } from "@/components/layout/page-header";
+import { TablePagination } from "@/components/layout/table-pagination";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { Empty, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import {
   Table,
   TableBody,
@@ -11,8 +14,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useClientPagination } from "@/hooks/use-client-pagination";
 import type { LedgerRecord } from "@/stores/a2a";
-import { cn } from "@/lib/utils";
 
 type LedgerTablePageProps = {
   icon: LucideIcon;
@@ -36,52 +39,70 @@ export function LedgerTablePage({
   signedAmount = true,
   showTitleColumn = true,
 }: LedgerTablePageProps) {
+  const pager = useClientPagination(rows);
+
   return (
     <div className="w-full max-w-5xl space-y-6 animate-in md:mx-0">
       <PageHeader icon={icon} title={title} />
 
       <Card className="fade-up overflow-hidden">
-        <CardContent className="p-0">
+        <CardContent className="p-6">
           {rows.length === 0 ? (
-            <p className="px-4 py-10 text-center text-sm text-muted-foreground">
-              {emptyText}
-            </p>
+            <Empty className="border-0 py-10 md:py-12">
+              <EmptyHeader>
+                <EmptyTitle>{emptyText}</EmptyTitle>
+              </EmptyHeader>
+            </Empty>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>时间</TableHead>
-                  {showTitleColumn ? <TableHead>标题</TableHead> : null}
-                  <TableHead>对方</TableHead>
-                  <TableHead>金额</TableHead>
-                  <TableHead>状态</TableHead>
-                  <TableHead>交易哈希</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map((item) => (
-                  <TableRow key={item.id} className="message-in">
-                    <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
-                      {new Date(item.createdAt).toLocaleString("zh-CN")}
-                    </TableCell>
-                    {showTitleColumn ? (
-                      <TableCell className="font-medium">{item.title}</TableCell>
-                    ) : null}
-                    <TableCell className="max-w-[160px] truncate">{item.counterparty}</TableCell>
-                    <TableCell className="font-mono whitespace-nowrap">
-                      {signedAmount ? (item.direction === "in" ? "+" : "-") : ""}
-                      {item.amount} {item.asset}
-                    </TableCell>
-                    <TableCell>
-                      <StatusBadge status={item.status} />
-                    </TableCell>
-                    <TableCell className="max-w-[240px]">
-                      <TxHashCell note={item.note} />
-                    </TableCell>
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>时间</TableHead>
+                    {showTitleColumn ? <TableHead>标题</TableHead> : null}
+                    <TableHead>对方</TableHead>
+                    <TableHead>金额</TableHead>
+                    <TableHead>状态</TableHead>
+                    <TableHead>交易哈希</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {pager.pageItems.map((item) => (
+                    <TableRow key={item.id} className="message-in">
+                      <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
+                        {new Date(item.createdAt).toLocaleString("zh-CN")}
+                      </TableCell>
+                      {showTitleColumn ? (
+                        <TableCell className="font-medium">{item.title}</TableCell>
+                      ) : null}
+                      <TableCell className="max-w-[160px] truncate">{item.counterparty}</TableCell>
+                      <TableCell className="font-mono whitespace-nowrap">
+                        {signedAmount ? (item.direction === "in" ? "+" : "-") : ""}
+                        {item.amount} {item.asset}
+                      </TableCell>
+                      <TableCell>
+                        <StatusBadge status={item.status} />
+                      </TableCell>
+                      <TableCell className="max-w-[240px]">
+                        <TxHashCell note={item.note} />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              <TablePagination
+                page={pager.page}
+                pageCount={pager.pageCount}
+                total={pager.total}
+                pageSize={pager.pageSize}
+                canPrev={pager.canPrev}
+                canNext={pager.canNext}
+                onPrev={pager.onPrev}
+                onNext={pager.onNext}
+                onPageChange={pager.setPage}
+                onPageSizeChange={pager.setPageSize}
+              />
+            </>
           )}
         </CardContent>
       </Card>
@@ -102,49 +123,33 @@ function TxHashCell({ note }: { note: string }) {
       </span>
     );
   }
-
+  const url = getTxExplorerUrl(hash);
   return (
     <a
-      href={getTxExplorerUrl(hash)}
+      href={url}
       target="_blank"
       rel="noreferrer"
-      className="inline-flex max-w-full items-center gap-1 font-mono text-xs text-[var(--color-foreground)] underline-offset-2 hover:underline"
-      title="在 Sepolia Etherscan 查看"
+      className="inline-flex max-w-full items-center gap-1 font-mono text-xs text-muted-foreground underline-offset-2 hover:underline"
+      title={hash}
     >
-      <span className="truncate">{shortHash(hash)}</span>
+      <span className="truncate">
+        {hash.slice(0, 10)}…{hash.slice(-8)}
+      </span>
       <ExternalLink className="h-3 w-3 shrink-0" aria-hidden />
     </a>
   );
 }
 
 /**
- * Shortens a transaction hash for table display.
- * @param hash - Full tx hash
+ * Compact status badge for ledger rows.
+ * @param status - Ledger status string
  */
-function shortHash(hash: string): string {
-  return `${hash.slice(0, 10)}…${hash.slice(-8)}`;
-}
-
-function StatusBadge({ status }: { status: LedgerRecord["status"] }) {
-  const label =
-    status === "success"
-      ? "成功"
-      : status === "blocked"
-        ? "已拦截"
-        : status === "pending"
-          ? "处理中"
-          : "失败";
-
-  return (
-    <span
-      className={cn(
-        "inline-flex rounded-md px-2 py-0.5 text-xs",
-        status === "success"
-          ? "bg-muted text-[var(--color-foreground)]"
-          : "bg-red-50 text-[var(--color-destructive)]",
-      )}
-    >
-      {label}
-    </span>
-  );
+function StatusBadge({ status }: { status: string }) {
+  const variant =
+    status === "confirmed" || status === "success"
+      ? "default"
+      : status === "failed" || status === "rejected"
+        ? "destructive"
+        : "secondary";
+  return <Badge variant={variant}>{status}</Badge>;
 }

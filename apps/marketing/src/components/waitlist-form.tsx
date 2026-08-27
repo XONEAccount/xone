@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { Button } from "@/components/ui/button";
+import { MarketingButton as Button } from "@/components/ui/marketing-button";
 import { cn } from "@/lib/utils";
 
 const STORAGE_KEY = "xone.site.waitlist";

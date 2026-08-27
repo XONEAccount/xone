@@ -38,7 +38,8 @@
     "tailwind-merge": "^3.3.1",
     "viem": "^2.55.16",
     "zod": "^4.1.5",
-    "zustand": "^5.0.8"
+    "zustand": "^5.0.8",
+    "@xone/ui": "workspace:*"
   },
   "devDependencies": {
     "@xone/assets": "workspace:*",

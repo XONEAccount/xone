@@ -21,7 +21,8 @@
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-router-dom": "^7.8.2",
-    "tailwind-merge": "^3.3.1"
+    "tailwind-merge": "^3.3.1",
+    "@xone/ui": "workspace:*"
   },
   "devDependencies": {
     "@xone/assets": "workspace:*",

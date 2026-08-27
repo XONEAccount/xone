@@ -12,9 +12,23 @@ import {
   Zap,
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
+} from "@/components/ui/sidebar";
 import { useI18n } from "@/hooks/use-i18n";
 import type { MessageKey } from "@/lib/i18n/messages";
-import { cn } from "@/lib/utils";
 
 type NavLinkItem = {
   to: string;
@@ -32,12 +46,12 @@ type NavGroupEntry = {
 
 type NavEntry =
   | {
-    kind: "link";
-    to: string;
-    labelKey: MessageKey;
-    end?: boolean;
-    icon: LucideIcon;
-  }
+      kind: "link";
+      to: string;
+      labelKey: MessageKey;
+      end?: boolean;
+      icon: LucideIcon;
+    }
   | NavGroupEntry;
 
 const navEntries: NavEntry[] = [
@@ -125,27 +139,12 @@ function findActiveGroupId(pathname: string): string | null {
   return null;
 }
 
-const itemClass = (isActive: boolean) =>
-  cn(
-    "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-all duration-200",
-    isActive
-      ? "bg-[var(--color-foreground)] text-[var(--color-background)]"
-      : "text-muted-foreground hover:bg-muted hover:text-[var(--color-foreground)]",
-  );
-
-type AppSidebarNavProps = {
-  /** When false, links are removed from the tab order (sidebar collapsed). */
-  enabled: boolean;
-};
-
 /**
- * Grouped desktop sidebar navigation with click-to-expand sections.
- * @param enabled - Whether nav links are keyboard-accessible
+ * Wallet sidebar nav built on shadcn Sidebar menu primitives.
  */
-export function AppSidebarNav({ enabled }: AppSidebarNavProps) {
+export function AppSidebarNav() {
   const { pathname } = useLocation();
   const { t } = useI18n();
-  const tabIndex = enabled ? 0 : -1;
   const [openGroups, setOpenGroups] = useState<Set<string>>(() => {
     const active = findActiveGroupId(pathname);
     return new Set(active ? [active] : []);
@@ -162,137 +161,76 @@ export function AppSidebarNav({ enabled }: AppSidebarNavProps) {
     });
   }, [pathname]);
 
-  /**
-   * Toggles a nav group open or closed.
-   * @param id - Group id
-   */
-  function toggleGroup(id: string) {
-    setOpenGroups((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
   return (
-    <nav className="flex flex-col gap-1" aria-label={t("nav.main")}>
-      {navEntries.map((entry) => {
-        if (entry.kind === "link") {
-          const Icon = entry.icon;
-          return (
-            <NavLink
-              key={entry.to}
-              to={entry.to}
-              end={entry.end}
-              tabIndex={tabIndex}
-              className={({ isActive }) => itemClass(isActive)}
-            >
-              <Icon className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden />
-              <span>{t(entry.labelKey)}</span>
-            </NavLink>
-          );
-        }
+    <SidebarGroup>
+      <SidebarGroupContent>
+        <SidebarMenu>
+          {navEntries.map((entry) => {
+            if (entry.kind === "link") {
+              const Icon = entry.icon;
+              const active = isPathActive(pathname, entry.to, entry.end);
+              return (
+                <SidebarMenuItem key={entry.to}>
+                  <SidebarMenuButton asChild isActive={active} tooltip={t(entry.labelKey)}>
+                    <NavLink to={entry.to} end={entry.end}>
+                      <Icon strokeWidth={1.75} aria-hidden />
+                      <span>{t(entry.labelKey)}</span>
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              );
+            }
 
-        return (
-          <NavGroup
-            key={entry.id}
-            entry={entry}
-            label={t(entry.labelKey)}
-            open={openGroups.has(entry.id)}
-            pathname={pathname}
-            tabIndex={tabIndex}
-            onToggle={() => toggleGroup(entry.id)}
-            t={t}
-          />
-        );
-      })}
-    </nav>
-  );
-}
+            const Icon = entry.icon;
+            const open = openGroups.has(entry.id);
+            const groupActive = entry.children.some((child) =>
+              isPathActive(pathname, child.to, child.end),
+            );
 
-type NavGroupProps = {
-  entry: NavGroupEntry;
-  label: string;
-  open: boolean;
-  pathname: string;
-  tabIndex: number;
-  onToggle: () => void;
-  t: (key: MessageKey) => string;
-};
-
-/**
- * Expandable sidebar section with a toggle button and nested links.
- */
-function NavGroup({
-  entry,
-  label,
-  open,
-  pathname,
-  tabIndex,
-  onToggle,
-  t,
-}: NavGroupProps) {
-  const Icon = entry.icon;
-  const groupActive = entry.children.some((child) =>
-    isPathActive(pathname, child.to, child.end),
-  );
-
-  return (
-    <div>
-      <button
-        type="button"
-        aria-expanded={open}
-        aria-controls={`nav-group-${entry.id}`}
-        tabIndex={tabIndex}
-        onClick={onToggle}
-        className={cn(
-          "flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-all duration-200",
-          groupActive
-            ? "font-medium text-foreground"
-            : "text-muted-foreground hover:bg-muted hover:text-(--color-foreground)",
-        )}
-      >
-        <Icon className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden />
-        <span className="flex-1 text-left">{label}</span>
-        <ChevronRight
-          className={cn(
-            "h-3.5 w-3.5 shrink-0 transition-transform duration-200",
-            open && "rotate-90",
-          )}
-          strokeWidth={1.75}
-          aria-hidden
-        />
-      </button>
-      <div
-        id={`nav-group-${entry.id}`}
-        className={cn(
-          "grid transition-[grid-template-rows] duration-200 ease-out",
-          open ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
-        )}
-      >
-        <ul className="overflow-hidden">
-          {entry.children.map((child) => (
-            <li key={child.to}>
-              <NavLink
-                to={child.to}
-                end={child.end}
-                tabIndex={open ? tabIndex : -1}
-                className={({ isActive }) =>
-                  cn(
-                    "mt-0.5 flex items-center rounded-md py-2 pl-9 pr-3 text-sm transition-all duration-200",
-                    isActive
-                      ? "bg-[var(--color-foreground)] text-[var(--color-background)]"
-                      : "text-muted-foreground hover:bg-muted hover:text-[var(--color-foreground)]",
-                  )
-                }
+            return (
+              <Collapsible
+                key={entry.id}
+                open={open}
+                onOpenChange={(next) => {
+                  setOpenGroups((prev) => {
+                    const copy = new Set(prev);
+                    if (next) copy.add(entry.id);
+                    else copy.delete(entry.id);
+                    return copy;
+                  });
+                }}
+                className="group/collapsible"
               >
-                {t(child.labelKey)}
-              </NavLink>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </div>
+                <SidebarMenuItem>
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton isActive={groupActive} tooltip={t(entry.labelKey)}>
+                      <Icon strokeWidth={1.75} aria-hidden />
+                      <span>{t(entry.labelKey)}</span>
+                      <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <SidebarMenuSub>
+                      {entry.children.map((child) => {
+                        const childActive = isPathActive(pathname, child.to, child.end);
+                        return (
+                          <SidebarMenuSubItem key={child.to}>
+                            <SidebarMenuSubButton asChild isActive={childActive}>
+                              <NavLink to={child.to} end={child.end}>
+                                <span>{t(child.labelKey)}</span>
+                              </NavLink>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        );
+                      })}
+                    </SidebarMenuSub>
+                  </CollapsibleContent>
+                </SidebarMenuItem>
+              </Collapsible>
+            );
+          })}
+        </SidebarMenu>
+      </SidebarGroupContent>
+    </SidebarGroup>
   );
 }
