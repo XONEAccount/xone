@@ -1,14 +1,17 @@
 import { useEffect, useState } from "react";
-import { Users } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Eye, Users } from "lucide-react";
 import { ListPager } from "@/components/layout/list-pager";
 import { PageHeader } from "@/components/layout/page-header";
 import { SearchBar } from "@/components/layout/search-bar";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
   TableEmpty,
+  TableLoading,
   TableCell,
   TableHead,
   TableHeader,
@@ -36,7 +39,7 @@ export function XoneTenantsPage() {
   const [appliedQ, setAppliedQ] = useState("");
   const [items, setItems] = useState<Tenant[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [searching, setSearching] = useState(false);
+  const [searching, setSearching] = useState(true);
 
   /**
    * Commits draft filter and resets to page 1.
@@ -100,41 +103,53 @@ export function XoneTenantsPage() {
                 <TableHead>Name</TableHead>
                 <TableHead>Id</TableHead>
                 <TableHead>Created</TableHead>
+                <TableHead className="text-right">Operate</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {items.map((row) => (
-                <TableRow key={row.id}>
-                  <TableCell>{row.email}</TableCell>
-                  <TableCell>{row.name || "—"}</TableCell>
-                  <TableCell className="font-mono text-xs">{shorten(row.id)}</TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {new Date(row.created_at).toLocaleString()}
-                  </TableCell>
-                </TableRow>
-              ))}
-              {items.length === 0 ? (
-                <TableEmpty
-                  colSpan={4}
-                  message="No console users"
-                />
-              ) : null}
+              {searching ? (
+                <TableLoading colSpan={5} />
+              ) : (
+                <>
+                  {items.map((row) => (
+                    <TableRow key={row.id}>
+                      <TableCell>{row.email}</TableCell>
+                      <TableCell>{row.name || "—"}</TableCell>
+                      <TableCell className="font-mono text-xs">{shorten(row.id)}</TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {new Date(row.created_at).toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button asChild variant="outline" size="sm">
+                          <Link to={`/xone/tenants/${encodeURIComponent(row.id)}`}>
+                            <Eye className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
+                            Detail
+                          </Link>
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {items.length === 0 ? (
+                    <TableEmpty colSpan={5} message="No console users" />
+                  ) : null}
+                </>
+              )}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
       <ListPager
-          page={pager.page}
-          pageCount={pager.pageCount}
-          total={pager.total}
-          limit={pager.limit}
-          pageSizes={pager.pageSizes}
-          canPrev={pager.canPrev}
-          canNext={pager.canNext}
-          onPrev={pager.prev}
-          onNext={pager.next}
-          onLimitChange={pager.setLimit}
-        />
+        page={pager.page}
+        pageCount={pager.pageCount}
+        total={pager.total}
+        limit={pager.limit}
+        pageSizes={pager.pageSizes}
+        canPrev={pager.canPrev}
+        canNext={pager.canNext}
+        onPrev={pager.prev}
+        onNext={pager.next}
+        onLimitChange={pager.setLimit}
+      />
     </div>
   );
 }

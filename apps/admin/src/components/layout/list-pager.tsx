@@ -1,3 +1,4 @@
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -57,10 +58,12 @@ export function ListPager({
           </SelectContent>
         </Select>
         <Button type="button" variant="outline" size="sm" disabled={!canPrev} onClick={onPrev}>
+          <ChevronLeft className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
           Prev
         </Button>
         <Button type="button" variant="outline" size="sm" disabled={!canNext} onClick={onNext}>
           Next
+          <ChevronRight className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
         </Button>
       </div>
     </div>

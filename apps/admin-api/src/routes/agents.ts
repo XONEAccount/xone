@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
+import { fetchBaseSepoliaBalances } from "../lib/balances.js";
 import { getSupabaseWallet } from "../lib/supabase.js";
 import type { AdminAuthVariables } from "../middleware/admin-auth.js";
 import { requireAdmin } from "../middleware/admin-auth.js";
@@ -95,7 +96,8 @@ agents.get("/", async (c) => {
 });
 
 /**
- * Agent detail without sealed key material.
+ * Agent detail: policy fields, on-chain balances, payments, fundings.
+ * Never returns sealed key material.
  */
 agents.get("/:id", async (c) => {
   const admin = getSupabaseWallet();
@@ -104,6 +106,8 @@ agents.get("/:id", async (c) => {
   }
 
   const id = c.req.param("id");
+  const historyLimit = Math.min(Number(c.req.query("limit") ?? "50") || 50, 100);
+
   const { data, error } = await admin
     .from("developer_agents")
     .select(AGENT_SELECT)
@@ -117,7 +121,62 @@ agents.get("/:id", async (c) => {
     return c.json({ error: "Agent not found" }, 404);
   }
 
-  return c.json({ ok: true, item: data });
+  const owner = String(data.owner_wallet ?? "").toLowerCase();
+  const wallet = String(data.wallet_address ?? "");
+
+  const [onChain, paymentsRes, fundingsRes, ownerProfileRes, a2aSettingsRes] =
+    await Promise.all([
+      fetchBaseSepoliaBalances(wallet),
+      admin
+        .from("agent_payments")
+        .select(
+          "id, agent_id, amount, asset, chain, recipient, merchant, resource, status, provider, failure_reason, idempotency_key, created_at",
+        )
+        .eq("agent_id", id)
+        .order("created_at", { ascending: false })
+        .limit(historyLimit),
+      admin
+        .from("agent_fundings")
+        .select("id, agent_id, tx_hash, from_address, amount, created_at")
+        .eq("agent_id", id)
+        .order("created_at", { ascending: false })
+        .limit(historyLimit),
+      owner
+        ? admin
+            .from("profiles")
+            .select("wallet_address, display_name, created_at, updated_at")
+            .eq("wallet_address", owner)
+            .maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+      admin
+        .from("a2a_agent_settings")
+        .select(
+          "agent_id, wallet_address, enabled, max_amount, max_single_payment, spent_amount",
+        )
+        .eq("agent_id", id)
+        .maybeSingle(),
+    ]);
+
+  const payments = paymentsRes.error ? [] : (paymentsRes.data ?? []);
+  const fundings = fundingsRes.error ? [] : (fundingsRes.data ?? []);
+
+  return c.json({
+    ok: true,
+    item: {
+      ...data,
+      on_chain: onChain,
+      owner_profile: ownerProfileRes.error ? null : (ownerProfileRes.data ?? null),
+      a2a_settings: a2aSettingsRes.error ? null : (a2aSettingsRes.data ?? null),
+      stats: {
+        payments: payments.length,
+        fundings: fundings.length,
+      },
+    },
+    recent: {
+      payments,
+      fundings,
+    },
+  });
 });
 
 /**
@@ -171,13 +230,16 @@ agents.patch("/:id", async (c) => {
     return c.json({ error: "Agent not found" }, 404);
   }
 
-  await writeAdminAudit(admin, {
-    actor: c.get("admin").sub,
-    action: "agent.update",
-    targetType: "developer_agent",
-    targetId: id,
-    metadata: patch,
-  });
+  await writeAdminAudit(
+    {
+      actor: c.get("admin").sub,
+      action: "agent.update",
+      targetType: "developer_agent",
+      targetId: id,
+      metadata: patch,
+    },
+    admin,
+  );
 
   return c.json({ ok: true, item: data });
 });
@@ -213,13 +275,16 @@ agents.post("/:id/revoke-key", async (c) => {
     return c.json({ error: "Agent not found" }, 404);
   }
 
-  await writeAdminAudit(admin, {
-    actor: c.get("admin").sub,
-    action: "agent.revoke_key",
-    targetType: "developer_agent",
-    targetId: id,
-    metadata: { status: "disabled" },
-  });
+  await writeAdminAudit(
+    {
+      actor: c.get("admin").sub,
+      action: "agent.revoke_key",
+      targetType: "developer_agent",
+      targetId: id,
+      metadata: { status: "disabled" },
+    },
+    admin,
+  );
 
   return c.json({ ok: true, item: data });
 });

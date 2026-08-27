@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Shield } from "lucide-react";
+import { Eye, Shield } from "lucide-react";
 import { ListPager } from "@/components/layout/list-pager";
 import { PageHeader } from "@/components/layout/page-header";
 import { SearchBar } from "@/components/layout/search-bar";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
@@ -17,6 +18,7 @@ import {
   Table,
   TableBody,
   TableEmpty,
+  TableLoading,
   TableCell,
   TableHead,
   TableHeader,
@@ -37,8 +39,12 @@ export type LegacyAgent = {
   max_amount: number;
   max_single_payment: number;
   spent_amount: number;
+  allowance_eth: number;
+  asset: string;
+  chain: string;
   status: string;
   created_at: string;
+  updated_at: string | null;
 };
 
 type AppliedFilters = {
@@ -57,7 +63,7 @@ export function LegacyAgentsPage() {
   const [applied, setApplied] = useState<AppliedFilters>({ q: "", status: "" });
   const [items, setItems] = useState<LegacyAgent[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [searching, setSearching] = useState(false);
+  const [searching, setSearching] = useState(true);
 
   /**
    * Commits draft filters and resets to page 1.
@@ -135,46 +141,56 @@ export function LegacyAgentsPage() {
                 <TableHead>Wallet</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Spent</TableHead>
+                <TableHead className="text-right">Operate</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {items.map((row) => (
-                <TableRow key={row.id}>
-                  <TableCell>
-                    <Link className="font-medium hover:underline" to={`/legacy-agents/${row.id}`}>
-                      {row.name}
-                    </Link>
-                    <p className="font-mono text-[11px] text-muted-foreground">{row.api_key_prefix}</p>
-                  </TableCell>
-                  <TableCell className="font-mono text-xs">
-                    {shorten(row.wallet_address, 8, 6)}
-                  </TableCell>
-                  <TableCell>{row.status}</TableCell>
-                  <TableCell className="font-mono text-xs">{row.spent_amount}</TableCell>
-                </TableRow>
-              ))}
-              {items.length === 0 ? (
-                <TableEmpty
-                  colSpan={4}
-                  message="No agents"
-                />
-              ) : null}
+              {searching ? (
+                <TableLoading colSpan={5} />
+              ) : (
+                <>
+                  {items.map((row) => (
+                    <TableRow key={row.id}>
+                      <TableCell>
+                        <p className="font-medium">{row.name}</p>
+                        <p className="font-mono text-[11px] text-muted-foreground">
+                          {row.api_key_prefix}
+                        </p>
+                      </TableCell>
+                      <TableCell className="font-mono text-xs" title={row.wallet_address}>
+                        {shorten(row.wallet_address, 8, 6)}
+                      </TableCell>
+                      <TableCell>{row.status}</TableCell>
+                      <TableCell className="font-mono text-xs">{row.spent_amount}</TableCell>
+                      <TableCell className="text-right">
+                        <Button asChild variant="outline" size="sm">
+                          <Link to={`/legacy-agents/${row.id}`}>
+                            <Eye className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
+                            Detail
+                          </Link>
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {items.length === 0 ? <TableEmpty colSpan={5} message="No agents" /> : null}
+                </>
+              )}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
       <ListPager
-          page={pager.page}
-          pageCount={pager.pageCount}
-          total={pager.total}
-          limit={pager.limit}
-          pageSizes={pager.pageSizes}
-          canPrev={pager.canPrev}
-          canNext={pager.canNext}
-          onPrev={pager.prev}
-          onNext={pager.next}
-          onLimitChange={pager.setLimit}
-        />
+        page={pager.page}
+        pageCount={pager.pageCount}
+        total={pager.total}
+        limit={pager.limit}
+        pageSizes={pager.pageSizes}
+        canPrev={pager.canPrev}
+        canNext={pager.canNext}
+        onPrev={pager.prev}
+        onNext={pager.next}
+        onLimitChange={pager.setLimit}
+      />
     </div>
   );
 }

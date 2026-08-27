@@ -1,5 +1,6 @@
 import { Hono, type Context } from "hono";
 import { z } from "zod";
+import { fetchBaseSepoliaBalances } from "../lib/balances.js";
 import { parsePage } from "../lib/pagination.js";
 import { getSupabaseAdmin } from "../lib/supabase.js";
 import type { AdminAuthVariables } from "../middleware/admin-auth.js";
@@ -8,9 +9,11 @@ import { writeAdminAudit } from "../services/audit.js";
 
 type XoneContext = Context<{ Variables: AdminAuthVariables }>;
 
-/** Safe agent projection — never includes wallet_private_key_enc. */
+/** Safe agent projection — never includes wallet_private_key_enc.
+ * Omit allowlist columns: older console DBs may lack allowed_hosts / allowed_payees.
+ */
 const XONE_AGENT_SELECT =
-  "id, user_id, api_key_id, name, chain, currency, default_amount, daily_limit, per_transaction, remaining_daily, daily_period, wallet_address, wallet_family, status, allowed_hosts, allowed_payees, created_at, updated_at";
+  "id, user_id, api_key_id, name, chain, currency, default_amount, daily_limit, per_transaction, remaining_daily, daily_period, wallet_address, wallet_family, status, created_at, updated_at";
 
 /** Safe API key projection — never includes token_hash. */
 const XONE_KEY_SELECT =
@@ -56,6 +59,81 @@ xone.get("/profiles", async (c) => {
 });
 
 /**
+ * Console user detail: profile, API keys, agent wallets, recent ledger.
+ */
+xone.get("/profiles/:id", async (c) => {
+  const admin = getSupabaseAdmin();
+  if (!admin) return c.json({ error: "Supabase is not configured" }, 503);
+
+  const id = c.req.param("id");
+  const historyLimit = Math.min(Number(c.req.query("limit") ?? "50") || 50, 100);
+
+  const { data, error } = await admin
+    .from("xone_profiles")
+    .select("id, email, name, avatar_url, created_at")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) return c.json({ error: error.message }, 500);
+  if (!data) return c.json({ error: "Profile not found" }, 404);
+
+  const [keysRes, agentsRes, historyRes] = await Promise.all([
+    admin
+      .from("xone_api_keys")
+      .select(XONE_KEY_SELECT)
+      .eq("user_id", id)
+      .order("created_at", { ascending: false }),
+    admin
+      .from("xone_agents")
+      .select(XONE_AGENT_SELECT)
+      .eq("user_id", id)
+      .order("created_at", { ascending: false }),
+    admin
+      .from("xone_agent_history")
+      .select(
+        "id, agent_id, user_id, type, amount, currency, to_address, url, tx_hash, meta, created_at",
+      )
+      .eq("user_id", id)
+      .order("created_at", { ascending: false })
+      .limit(historyLimit),
+  ]);
+
+  const keys = keysRes.error ? [] : (keysRes.data ?? []);
+  const agents = agentsRes.error ? [] : (agentsRes.data ?? []);
+  const history = historyRes.error ? [] : (historyRes.data ?? []);
+
+  const agentBalances = await Promise.all(
+    agents.slice(0, 20).map(async (agent) => {
+      const balances = await fetchBaseSepoliaBalances(String(agent.wallet_address ?? ""));
+      return [String(agent.id), balances] as const;
+    }),
+  );
+  const onChainByAgent = Object.fromEntries(agentBalances);
+
+  return c.json({
+    ok: true,
+    item: {
+      ...data,
+      stats: {
+        keys: keys.length,
+        keys_active: keys.filter((k) => k.status === "active").length,
+        agents: agents.length,
+        agents_active: agents.filter((a) => a.status === "active").length,
+        history: history.length,
+      },
+    },
+    keys,
+    agents: agents.map((agent) => ({
+      ...agent,
+      on_chain: onChainByAgent[String(agent.id)] ?? [],
+    })),
+    recent: {
+      history,
+    },
+  });
+});
+
+/**
  * Lists API keys without secrets.
  */
 xone.get("/api-keys", async (c) => {
@@ -88,6 +166,97 @@ xone.get("/api-keys", async (c) => {
 });
 
 /**
+ * API key detail: owner profile, linked agent wallet, recent spend history.
+ * Never returns token_hash / full secret.
+ */
+xone.get("/api-keys/:id", async (c) => {
+  const admin = getSupabaseAdmin();
+  if (!admin) return c.json({ error: "Supabase is not configured" }, 503);
+
+  const id = c.req.param("id");
+  const historyLimit = Math.min(Number(c.req.query("limit") ?? "50") || 50, 100);
+
+  const { data, error } = await admin
+    .from("xone_api_keys")
+    .select(XONE_KEY_SELECT)
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) return c.json({ error: error.message }, 500);
+  if (!data) return c.json({ error: "API key not found" }, 404);
+
+  const userId = String(data.user_id ?? "");
+
+  const [profileRes, agentRes] = await Promise.all([
+    userId
+      ? admin
+          .from("xone_profiles")
+          .select("id, email, name, avatar_url, created_at")
+          .eq("id", userId)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+    admin
+      .from("xone_agents")
+      .select(XONE_AGENT_SELECT)
+      .eq("api_key_id", id)
+      .maybeSingle(),
+  ]);
+
+  const agent = agentRes.error ? null : (agentRes.data ?? null);
+  let onChain: Awaited<ReturnType<typeof fetchBaseSepoliaBalances>> = [];
+  let history: unknown[] = [];
+  let payIntents: unknown[] = [];
+
+  if (agent) {
+    const agentId = String(agent.id);
+    const [balances, historyRes, intentsRes] = await Promise.all([
+      fetchBaseSepoliaBalances(String(agent.wallet_address ?? "")),
+      admin
+        .from("xone_agent_history")
+        .select(
+          "id, agent_id, user_id, type, amount, currency, to_address, url, tx_hash, meta, created_at",
+        )
+        .eq("agent_id", agentId)
+        .order("created_at", { ascending: false })
+        .limit(historyLimit),
+      admin
+        .from("xone_pay_intents")
+        .select(
+          "id, agent_id, idempotency_key, url, status, max_amount, error_message, created_at, updated_at",
+        )
+        .eq("agent_id", agentId)
+        .order("created_at", { ascending: false })
+        .limit(historyLimit),
+    ]);
+    onChain = balances;
+    history = historyRes.error ? [] : (historyRes.data ?? []);
+    payIntents = intentsRes.error ? [] : (intentsRes.data ?? []);
+  }
+
+  return c.json({
+    ok: true,
+    item: {
+      ...data,
+      owner_profile: profileRes.error ? null : (profileRes.data ?? null),
+      agent: agent
+        ? {
+            ...agent,
+            on_chain: onChain,
+          }
+        : null,
+      stats: {
+        history: history.length,
+        pay_intents: payIntents.length,
+      },
+    },
+    recent: {
+      history,
+      pay_intents: payIntents,
+    },
+  });
+});
+
+/**
  * Soft-deletes an API key (ops emergency revoke).
  */
 xone.post("/api-keys/:id/revoke", async (c) => {
@@ -105,12 +274,15 @@ xone.post("/api-keys/:id/revoke", async (c) => {
   if (error) return c.json({ error: error.message }, 500);
   if (!data) return c.json({ error: "API key not found" }, 404);
 
-  await writeAdminAudit(admin, {
-    actor: c.get("admin").sub,
-    action: "xone.api_key.revoke",
-    targetType: "xone_api_key",
-    targetId: id,
-  });
+  await writeAdminAudit(
+    {
+      actor: c.get("admin").sub,
+      action: "xone.api_key.revoke",
+      targetType: "xone_api_key",
+      targetId: id,
+    },
+    admin,
+  );
 
   return c.json({ ok: true, item: data });
 });
@@ -155,13 +327,16 @@ xone.get("/agents", async (c) => {
 });
 
 /**
- * Agent detail (safe projection).
+ * Agent detail: policy, on-chain balances, owner, key, and recent history.
+ * Never returns sealed key material.
  */
 xone.get("/agents/:id", async (c) => {
   const admin = getSupabaseAdmin();
   if (!admin) return c.json({ error: "Supabase is not configured" }, 503);
 
   const id = c.req.param("id");
+  const historyLimit = Math.min(Number(c.req.query("limit") ?? "50") || 50, 100);
+
   const { data, error } = await admin
     .from("xone_agents")
     .select(XONE_AGENT_SELECT)
@@ -171,7 +346,64 @@ xone.get("/agents/:id", async (c) => {
   if (error) return c.json({ error: error.message }, 500);
   if (!data) return c.json({ error: "Agent not found" }, 404);
 
-  return c.json({ ok: true, item: data });
+  const userId = String(data.user_id ?? "");
+  const apiKeyId = String(data.api_key_id ?? "");
+  const wallet = String(data.wallet_address ?? "");
+
+  const [onChain, historyRes, intentsRes, profileRes, keyRes] = await Promise.all([
+    fetchBaseSepoliaBalances(wallet),
+    admin
+      .from("xone_agent_history")
+      .select(
+        "id, agent_id, user_id, type, amount, currency, to_address, url, tx_hash, meta, created_at",
+      )
+      .eq("agent_id", id)
+      .order("created_at", { ascending: false })
+      .limit(historyLimit),
+    admin
+      .from("xone_pay_intents")
+      .select(
+        "id, agent_id, idempotency_key, url, status, max_amount, error_message, created_at, updated_at",
+      )
+      .eq("agent_id", id)
+      .order("created_at", { ascending: false })
+      .limit(historyLimit),
+    userId
+      ? admin
+          .from("xone_profiles")
+          .select("id, email, name, avatar_url, created_at")
+          .eq("id", userId)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+    apiKeyId
+      ? admin
+          .from("xone_api_keys")
+          .select(XONE_KEY_SELECT)
+          .eq("id", apiKeyId)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+  ]);
+
+  const history = historyRes.error ? [] : (historyRes.data ?? []);
+  const payIntents = intentsRes.error ? [] : (intentsRes.data ?? []);
+
+  return c.json({
+    ok: true,
+    item: {
+      ...data,
+      on_chain: onChain,
+      owner_profile: profileRes.error ? null : (profileRes.data ?? null),
+      api_key: keyRes.error ? null : (keyRes.data ?? null),
+      stats: {
+        history: history.length,
+        pay_intents: payIntents.length,
+      },
+    },
+    recent: {
+      history,
+      pay_intents: payIntents,
+    },
+  });
 });
 
 /**
@@ -230,13 +462,16 @@ xone.patch("/agents/:id/limits", async (c) => {
   if (error) return c.json({ error: error.message }, 500);
   if (!data) return c.json({ error: "Agent not found" }, 404);
 
-  await writeAdminAudit(admin, {
-    actor: c.get("admin").sub,
-    action: "xone.agent.limits",
-    targetType: "xone_agent",
-    targetId: id,
-    metadata: parsed.data,
-  });
+  await writeAdminAudit(
+    {
+      actor: c.get("admin").sub,
+      action: "xone.agent.limits",
+      targetType: "xone_agent",
+      targetId: id,
+      metadata: parsed.data,
+    },
+    admin,
+  );
 
   return c.json({ ok: true, item: data });
 });
@@ -310,13 +545,16 @@ async function setXoneAgentStatus(
 
   if (error) return c.json({ error: error.message }, 500);
 
-  await writeAdminAudit(admin, {
-    actor: c.get("admin").sub,
-    action,
-    targetType: "xone_agent",
-    targetId: id,
-    metadata: { from: current.status, to: status },
-  });
+  await writeAdminAudit(
+    {
+      actor: c.get("admin").sub,
+      action,
+      targetType: "xone_agent",
+      targetId: id,
+      metadata: { from: current.status, to: status },
+    },
+    admin,
+  );
 
   return c.json({ ok: true, item: data });
 }

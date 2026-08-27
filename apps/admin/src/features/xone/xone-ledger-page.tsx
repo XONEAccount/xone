@@ -9,6 +9,7 @@ import {
   Table,
   TableBody,
   TableEmpty,
+  TableLoading,
   TableCell,
   TableHead,
   TableHeader,
@@ -41,7 +42,7 @@ export function XoneLedgerPage() {
   const [appliedAgentId, setAppliedAgentId] = useState("");
   const [items, setItems] = useState<HistoryRow[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [searching, setSearching] = useState(false);
+  const [searching, setSearching] = useState(true);
 
   /**
    * Commits draft filter and resets to page 1.
@@ -109,27 +110,28 @@ export function XoneLedgerPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {items.map((row) => (
-                <TableRow key={row.id}>
-                  <TableCell className="text-muted-foreground">
-                    {new Date(row.created_at).toLocaleString()}
-                  </TableCell>
-                  <TableCell>{row.type}</TableCell>
-                  <TableCell className="font-mono text-xs">{shorten(row.agent_id)}</TableCell>
-                  <TableCell className="font-mono text-xs">
-                    {row.amount != null ? `${row.amount} ${row.currency ?? ""}` : "—"}
-                  </TableCell>
-                  <TableCell className="max-w-[220px] truncate font-mono text-xs">
-                    {row.tx_hash || row.url || "—"}
-                  </TableCell>
-                </TableRow>
-              ))}
-              {items.length === 0 ? (
-                <TableEmpty
-                  colSpan={5}
-                  message="No events"
-                />
-              ) : null}
+              {searching ? (
+                <TableLoading colSpan={5} />
+              ) : (
+                <>
+                  {items.map((row) => (
+                    <TableRow key={row.id}>
+                      <TableCell className="text-muted-foreground">
+                        {new Date(row.created_at).toLocaleString()}
+                      </TableCell>
+                      <TableCell>{row.type}</TableCell>
+                      <TableCell className="font-mono text-xs">{shorten(row.agent_id)}</TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {row.amount != null ? `${row.amount} ${row.currency ?? ""}` : "—"}
+                      </TableCell>
+                      <TableCell className="max-w-[220px] truncate font-mono text-xs">
+                        {row.tx_hash || row.url || "—"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {items.length === 0 ? <TableEmpty colSpan={5} message="No events" /> : null}
+                </>
+              )}
             </TableBody>
           </Table>
         </CardContent>

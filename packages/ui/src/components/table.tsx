@@ -2,6 +2,7 @@ import * as React from "react";
 
 import { cn } from "../lib/utils";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "./empty";
+import { Spinner } from "./spinner";
 
 /**
  * shadcn/ui Table (new-york).
@@ -131,6 +132,26 @@ function TableEmpty({
   );
 }
 
+type TableLoadingProps = {
+  colSpan: number;
+};
+
+/**
+ * Loading table body row with centered shadcn Spinner.
+ * @param colSpan - Number of columns to span
+ */
+function TableLoading({ colSpan }: TableLoadingProps) {
+  return (
+    <TableRow className="hover:bg-transparent">
+      <TableCell colSpan={colSpan} className="h-48">
+        <div className="flex h-full min-h-32 items-center justify-center">
+          <Spinner className="size-6 text-muted-foreground" />
+        </div>
+      </TableCell>
+    </TableRow>
+  );
+}
+
 export {
   Table,
   TableHeader,
@@ -141,4 +162,5 @@ export {
   TableCell,
   TableCaption,
   TableEmpty,
+  TableLoading,
 };

@@ -9,6 +9,7 @@ import {
   Table,
   TableBody,
   TableEmpty,
+  TableLoading,
   TableCell,
   TableHead,
   TableHeader,
@@ -46,7 +47,7 @@ export function PaymentsPage() {
   const [applied, setApplied] = useState<AppliedFilters>({ agentId: "", status: "" });
   const [items, setItems] = useState<Payment[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [searching, setSearching] = useState(false);
+  const [searching, setSearching] = useState(true);
 
   /**
    * Commits draft filters and resets to page 1.
@@ -124,27 +125,28 @@ export function PaymentsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {items.map((row) => (
-                <TableRow key={row.id}>
-                  <TableCell className="text-muted-foreground">
-                    {new Date(row.created_at).toLocaleString()}
-                  </TableCell>
-                  <TableCell className="font-mono text-xs">{shorten(row.agent_id)}</TableCell>
-                  <TableCell className="font-mono text-xs">
-                    {row.amount} {row.asset}
-                  </TableCell>
-                  <TableCell>{row.status}</TableCell>
-                  <TableCell className="max-w-[180px] truncate text-xs">
-                    {row.merchant || row.failure_reason || "—"}
-                  </TableCell>
-                </TableRow>
-              ))}
-              {items.length === 0 ? (
-                <TableEmpty
-                  colSpan={5}
-                  message="No payments"
-                />
-              ) : null}
+              {searching ? (
+                <TableLoading colSpan={5} />
+              ) : (
+                <>
+                  {items.map((row) => (
+                    <TableRow key={row.id}>
+                      <TableCell className="text-muted-foreground">
+                        {new Date(row.created_at).toLocaleString()}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">{shorten(row.agent_id)}</TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {row.amount} {row.asset}
+                      </TableCell>
+                      <TableCell>{row.status}</TableCell>
+                      <TableCell className="max-w-[180px] truncate text-xs">
+                        {row.merchant || row.failure_reason || "—"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {items.length === 0 ? <TableEmpty colSpan={5} message="No payments" /> : null}
+                </>
+              )}
             </TableBody>
           </Table>
         </CardContent>

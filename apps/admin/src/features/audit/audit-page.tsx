@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ScrollText } from "lucide-react";
+import { ClipboardList } from "lucide-react";
 import { ListPager } from "@/components/layout/list-pager";
 import { PageHeader } from "@/components/layout/page-header";
 import { SearchBar } from "@/components/layout/search-bar";
@@ -9,6 +9,7 @@ import {
   Table,
   TableBody,
   TableEmpty,
+  TableLoading,
   TableCell,
   TableHead,
   TableHeader,
@@ -38,7 +39,7 @@ export function AuditPage() {
   const [appliedQ, setAppliedQ] = useState("");
   const [items, setItems] = useState<AuditRow[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [searching, setSearching] = useState(false);
+  const [searching, setSearching] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -73,7 +74,7 @@ export function AuditPage() {
   return (
     <div className="mx-auto max-w-6xl space-y-6 animate-in">
       <PageHeader
-        icon={ScrollText}
+        icon={ClipboardList}
         title="Audit"
         description="Who paused, revoked, or changed limits."
       />
@@ -110,25 +111,26 @@ export function AuditPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {items.map((row) => (
-                <TableRow key={row.id}>
-                  <TableCell className="text-muted-foreground">
-                    {new Date(row.created_at).toLocaleString()}
-                  </TableCell>
-                  <TableCell className="font-mono text-xs">{row.actor}</TableCell>
-                  <TableCell>{row.action}</TableCell>
-                  <TableCell className="font-mono text-xs">
-                    {row.target_type}
-                    {row.target_id ? ` · ${shorten(row.target_id)}` : ""}
-                  </TableCell>
-                </TableRow>
-              ))}
-              {items.length === 0 ? (
-                <TableEmpty
-                  colSpan={4}
-                  message="No audit rows"
-                />
-              ) : null}
+              {searching ? (
+                <TableLoading colSpan={4} />
+              ) : (
+                <>
+                  {items.map((row) => (
+                    <TableRow key={row.id}>
+                      <TableCell className="text-muted-foreground">
+                        {new Date(row.created_at).toLocaleString()}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">{row.actor}</TableCell>
+                      <TableCell>{row.action}</TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {row.target_type}
+                        {row.target_id ? ` · ${shorten(row.target_id)}` : ""}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {items.length === 0 ? <TableEmpty colSpan={4} message="No audit rows" /> : null}
+                </>
+              )}
             </TableBody>
           </Table>
         </CardContent>

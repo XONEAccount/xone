@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Receipt } from "lucide-react";
+import { Banknote } from "lucide-react";
 import { ListPager } from "@/components/layout/list-pager";
 import { PageHeader } from "@/components/layout/page-header";
 import { SearchBar } from "@/components/layout/search-bar";
@@ -9,6 +9,7 @@ import {
   Table,
   TableBody,
   TableEmpty,
+  TableLoading,
   TableCell,
   TableHead,
   TableHeader,
@@ -38,7 +39,7 @@ export function FundingsPage() {
   const [appliedAgentId, setAppliedAgentId] = useState("");
   const [items, setItems] = useState<Funding[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [searching, setSearching] = useState(false);
+  const [searching, setSearching] = useState(true);
 
   /**
    * Commits draft filter and resets to page 1.
@@ -76,7 +77,7 @@ export function FundingsPage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 animate-in">
-      <PageHeader icon={Receipt} title="Fundings" description="Agent funding ledger." />
+      <PageHeader icon={Banknote} title="Fundings" description="Agent funding ledger." />
       <SearchBar searching={searching} onSearch={commitSearch}>
         <Input
           className="max-w-xs"
@@ -101,24 +102,25 @@ export function FundingsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {items.map((row) => (
-                <TableRow key={row.id}>
-                  <TableCell className="text-muted-foreground">
-                    {new Date(row.created_at).toLocaleString()}
-                  </TableCell>
-                  <TableCell className="font-mono text-xs">{shorten(row.agent_id)}</TableCell>
-                  <TableCell className="font-mono text-xs">{row.amount}</TableCell>
-                  <TableCell className="font-mono text-xs">
-                    {row.tx_hash ? shorten(row.tx_hash, 10, 6) : "—"}
-                  </TableCell>
-                </TableRow>
-              ))}
-              {items.length === 0 ? (
-                <TableEmpty
-                  colSpan={4}
-                  message="No fundings"
-                />
-              ) : null}
+              {searching ? (
+                <TableLoading colSpan={4} />
+              ) : (
+                <>
+                  {items.map((row) => (
+                    <TableRow key={row.id}>
+                      <TableCell className="text-muted-foreground">
+                        {new Date(row.created_at).toLocaleString()}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">{shorten(row.agent_id)}</TableCell>
+                      <TableCell className="font-mono text-xs">{row.amount}</TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {row.tx_hash ? shorten(row.tx_hash, 10, 6) : "—"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {items.length === 0 ? <TableEmpty colSpan={4} message="No fundings" /> : null}
+                </>
+              )}
             </TableBody>
           </Table>
         </CardContent>

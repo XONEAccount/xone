@@ -376,117 +376,117 @@ export function AgentsListPage() {
           ) : (
             <>
               <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-28">{t("devWallet.colName")}</TableHead>
-                      <TableHead className="min-w-56">{t("devWallet.colAddress")}</TableHead>
-                      <TableHead>{t("devWallet.colBalance")}</TableHead>
-                      <TableHead>{t("devWallet.colUsedLimit")}</TableHead>
-                      <TableHead>{t("devWallet.colPerTx")}</TableHead>
-                      <TableHead className="w-24">{t("devWallet.colStatus")}</TableHead>
-                      <TableHead className="min-w-48">{t("devWallet.colApiKey")}</TableHead>
-                      <TableHead className="w-[1%] whitespace-nowrap text-left">
-                        {t("devWallet.colActions")}
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {agentsPager.pageItems.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell className="font-medium">
-                      <Button
-                        type="button"
-                        variant="link"
-                        className="h-auto p-0 font-medium"
-                        onClick={() => void onOpenPayments(item)}
-                      >
-                        {item.name}
-                      </Button>
-                    </TableCell>
-                    <TableCell className="min-w-[16rem]" title={item.walletAddress}>
-                      <a
-                        href={getAddressExplorerUrl(item.walletAddress, item.chain)}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1 font-mono text-xs text-foreground underline decoration-foreground/30 underline-offset-2 hover:decoration-foreground"
-                        onClick={(event) => event.stopPropagation()}
-                      >
-                        {displayWalletAddress(item.walletAddress)}
-                        <ExternalLink className="size-3 shrink-0 opacity-60" />
-                      </a>
-                    </TableCell>
-                    <TableCell className="font-mono text-sm">
-                      {onChainBalances.isLoading || onChainBalances.isFetching
-                        ? "…"
-                        : `${onChainBalances.data?.[item.id] ?? "0"} ${item.asset}`}
-                    </TableCell>
-                    <TableCell>
-                      {item.spentAmount}/{item.dailyLimit ?? item.maxAmount}{" "}
-                      {item.currency || item.asset}
-                    </TableCell>
-                    <TableCell>
-                      {item.perTransaction ?? item.maxSinglePayment}{" "}
-                      {item.currency || item.asset}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap">
-                      <Badge
-                        variant={item.status === "paused" ? "outline" : "default"}
-                      >
-                        {item.status === "paused"
-                          ? t("devWallet.statusPaused")
-                          : t("devWallet.statusActive")}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {item.apiKeyPrefix}…
-                    </TableCell>
-                    <TableCell className="w-[1%] whitespace-nowrap text-left">
-                      <div className="flex justify-start gap-2">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-28">{t("devWallet.colName")}</TableHead>
+                    <TableHead className="min-w-56">{t("devWallet.colAddress")}</TableHead>
+                    <TableHead>{t("devWallet.colBalance")}</TableHead>
+                    <TableHead>{t("devWallet.colUsedLimit")}</TableHead>
+                    <TableHead>{t("devWallet.colPerTx")}</TableHead>
+                    <TableHead className="w-24">{t("devWallet.colStatus")}</TableHead>
+                    <TableHead className="min-w-48">{t("devWallet.colApiKey")}</TableHead>
+                    <TableHead className="w-[1%] whitespace-nowrap text-left">
+                      {t("devWallet.colActions")}
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {agentsPager.pageItems.map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell className="font-medium">
                         <Button
                           type="button"
-                          size="sm"
-                          variant="outline"
-                          disabled={busy || item.status === "paused"}
-                          onClick={(event) => onOpenChat(event, item)}
+                          variant="link"
+                          className="h-auto p-0 font-medium"
+                          onClick={() => void onOpenPayments(item)}
                         >
-                          {t("devWallet.chat")}
+                          {item.name}
                         </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          disabled={busy}
-                          onClick={(event) => onOpenEdit(event, item)}
+                      </TableCell>
+                      <TableCell className="min-w-[16rem]" title={item.walletAddress}>
+                        <a
+                          href={getAddressExplorerUrl(item.walletAddress, item.chain)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 font-mono text-xs text-foreground underline decoration-foreground/30 underline-offset-2 hover:decoration-foreground"
+                          onClick={(event) => event.stopPropagation()}
                         >
-                          {t("devWallet.edit")}
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          disabled={busy}
-                          onClick={(event) => onTogglePause(event, item)}
+                          {displayWalletAddress(item.walletAddress)}
+                          <ExternalLink className="size-3 shrink-0 opacity-60" />
+                        </a>
+                      </TableCell>
+                      <TableCell className="font-mono text-sm">
+                        {onChainBalances.isLoading || onChainBalances.isFetching
+                          ? "…"
+                          : `${onChainBalances.data?.[item.id] ?? "0"} ${item.asset}`}
+                      </TableCell>
+                      <TableCell>
+                        {item.spentAmount}/{item.dailyLimit ?? item.maxAmount}{" "}
+                        {item.currency || item.asset}
+                      </TableCell>
+                      <TableCell>
+                        {item.perTransaction ?? item.maxSinglePayment}{" "}
+                        {item.currency || item.asset}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        <Badge
+                          variant={item.status === "paused" ? "outline" : "default"}
                         >
                           {item.status === "paused"
-                            ? t("devWallet.resume")
-                            : t("devWallet.pause")}
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          disabled={busy}
-                          className="text-red-700 hover:bg-red-50 hover:text-red-900"
-                          onClick={(event) => onOpenDelete(event, item)}
-                        >
-                          {t("devWallet.delete")}
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                  </TableBody>
-                </Table>
+                            ? t("devWallet.statusPaused")
+                            : t("devWallet.statusActive")}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {item.apiKeyPrefix}…
+                      </TableCell>
+                      <TableCell className="w-[1%] whitespace-nowrap text-left">
+                        <div className="flex justify-start gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            disabled={busy || item.status === "paused"}
+                            onClick={(event) => onOpenChat(event, item)}
+                          >
+                            {t("devWallet.chat")}
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            disabled={busy}
+                            onClick={(event) => onOpenEdit(event, item)}
+                          >
+                            {t("devWallet.edit")}
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            disabled={busy}
+                            onClick={(event) => onTogglePause(event, item)}
+                          >
+                            {item.status === "paused"
+                              ? t("devWallet.resume")
+                              : t("devWallet.pause")}
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            disabled={busy}
+                            className="text-red-700 hover:bg-red-50 hover:text-red-900"
+                            onClick={(event) => onOpenDelete(event, item)}
+                          >
+                            {t("devWallet.delete")}
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
               <TablePagination
                 page={agentsPager.page}
                 pageCount={agentsPager.pageCount}
@@ -554,18 +554,18 @@ export function AgentsListPage() {
             </Table>
           )}
           {payments.length > 0 ? (
-              <TablePagination
-                page={paymentsPager.page}
-                pageCount={paymentsPager.pageCount}
-                total={paymentsPager.total}
-                pageSize={paymentsPager.pageSize}
-                canPrev={paymentsPager.canPrev}
-                canNext={paymentsPager.canNext}
-                onPrev={paymentsPager.onPrev}
-                onNext={paymentsPager.onNext}
-                onPageChange={paymentsPager.setPage}
-                onPageSizeChange={paymentsPager.setPageSize}
-              />
+            <TablePagination
+              page={paymentsPager.page}
+              pageCount={paymentsPager.pageCount}
+              total={paymentsPager.total}
+              pageSize={paymentsPager.pageSize}
+              canPrev={paymentsPager.canPrev}
+              canNext={paymentsPager.canNext}
+              onPrev={paymentsPager.onPrev}
+              onNext={paymentsPager.onNext}
+              onPageChange={paymentsPager.setPage}
+              onPageSizeChange={paymentsPager.setPageSize}
+            />
           ) : null}
         </DialogContent>
       </Dialog>

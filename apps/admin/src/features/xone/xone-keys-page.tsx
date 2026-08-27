@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { KeyRound } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Eye, KeyRound } from "lucide-react";
 import { ListPager } from "@/components/layout/list-pager";
 import { PageHeader } from "@/components/layout/page-header";
 import { SearchBar } from "@/components/layout/search-bar";
@@ -27,6 +28,7 @@ import {
   Table,
   TableBody,
   TableEmpty,
+  TableLoading,
   TableCell,
   TableHead,
   TableHeader,
@@ -62,7 +64,7 @@ export function XoneKeysPage() {
   const [applied, setApplied] = useState<AppliedFilters>({ q: "", status: "" });
   const [items, setItems] = useState<ApiKey[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [searching, setSearching] = useState(false);
+  const [searching, setSearching] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [revokeTarget, setRevokeTarget] = useState<ApiKey | null>(null);
 
@@ -166,30 +168,45 @@ export function XoneKeysPage() {
                 <TableHead>Prefix</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>User</TableHead>
-                <TableHead />
+                <TableHead className="text-right">Operate</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {items.map((row) => (
-                <TableRow key={row.id}>
-                  <TableCell>{row.name}</TableCell>
-                  <TableCell className="font-mono text-xs">{row.token_prefix}…</TableCell>
-                  <TableCell>{row.status}</TableCell>
-                  <TableCell className="font-mono text-xs">{shorten(row.user_id)}</TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="sm"
-                      disabled={row.status === "deleted" || busyId === row.id}
-                      onClick={() => setRevokeTarget(row)}
-                    >
-                      Revoke
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {items.length === 0 ? <TableEmpty colSpan={5} message="No keys" /> : null}
+              {searching ? (
+                <TableLoading colSpan={5} />
+              ) : (
+                <>
+                  {items.map((row) => (
+                    <TableRow key={row.id}>
+                      <TableCell>{row.name}</TableCell>
+                      <TableCell className="font-mono text-xs">{row.token_prefix}…</TableCell>
+                      <TableCell>{row.status}</TableCell>
+                      <TableCell className="font-mono text-xs">{shorten(row.user_id)}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="inline-flex flex-wrap items-center justify-end gap-2">
+                          <Button asChild variant="outline" size="sm">
+                            <Link to={`/xone/keys/${encodeURIComponent(row.id)}`}>
+                              <Eye className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
+                              Detail
+                            </Link>
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            disabled={row.status === "deleted" || busyId === row.id}
+                            onClick={() => setRevokeTarget(row)}
+                          >
+                            <KeyRound className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
+                            Revoke
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {items.length === 0 ? <TableEmpty colSpan={5} message="No keys" /> : null}
+                </>
+              )}
             </TableBody>
           </Table>
         </CardContent>

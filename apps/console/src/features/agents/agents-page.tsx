@@ -93,7 +93,7 @@ export function AgentsPage() {
       />
 
       {error ? (
-        <p className="text-sm text-[var(--color-destructive)]">{error}</p>
+        <p className="text-sm text-destructive">{error}</p>
       ) : null}
 
       {agents.length === 0 ? (

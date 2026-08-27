@@ -246,7 +246,7 @@ export function ApiKeysPage() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
-                          <span className="max-w-[140px] truncate font-mono text-xs">
+                          <span className="max-w-35 truncate font-mono text-xs">
                             {key.token && revealed[key.id] ? key.token : MASK}
                           </span>
                           <Button

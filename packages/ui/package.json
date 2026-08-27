@@ -19,6 +19,8 @@
     "./skeleton": "./src/components/skeleton.tsx",
     "./alert": "./src/components/alert.tsx",
     "./badge": "./src/components/badge.tsx",
+    "./spinner": "./src/components/spinner.tsx",
+    "./chart": "./src/components/chart.tsx",
     "./input-otp": "./src/components/input-otp.tsx",
     "./label": "./src/components/label.tsx",
     "./toggle": "./src/components/toggle.tsx",
@@ -57,6 +59,7 @@
     "input-otp": "^1.5.0",
     "lucide-react": "^0.542.0",
     "radix-ui": "^1.6.7",
+    "recharts": "2.15.4",
     "tailwind-merge": "^3.3.1"
   },
   "devDependencies": {

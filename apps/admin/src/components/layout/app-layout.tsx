@@ -1,7 +1,10 @@
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import {
+  Banknote,
+  ClipboardList,
   KeyRound,
   LayoutDashboard,
+  LogOut,
   Receipt,
   ScrollText,
   Search,
@@ -41,9 +44,9 @@ const navItems: Array<{
     { to: "/xone/keys", label: "API keys", icon: KeyRound },
     { to: "/xone/tenants", label: "Console users", icon: Users },
     { to: "/payments", label: "Payments", icon: Receipt },
-    { to: "/fundings", label: "Fundings", icon: Receipt },
+    { to: "/fundings", label: "Fundings", icon: Banknote },
     { to: "/xone/ledger", label: "XOne ledger", icon: ScrollText },
-    { to: "/audit", label: "Audit", icon: ScrollText },
+    { to: "/audit", label: "Audit", icon: ClipboardList },
   ];
 
 /**
@@ -113,12 +116,14 @@ export function AppLayout() {
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <div className="hidden rounded-md border border-border px-2.5 py-1.5 text-right sm:block">
-              <p className="mt-1 max-w-35 truncate font-mono text-xs font-medium">
+            <div className="hidden items-center gap-2 rounded-md border border-border px-2.5 py-1.5 sm:flex">
+              <Wallet className="h-3.5 w-3.5 shrink-0 text-muted-foreground" strokeWidth={1.75} aria-hidden />
+              <p className="max-w-35 truncate font-mono text-xs font-medium">
                 {admin?.sub ? `${admin.sub.slice(0, 6)}…${admin.sub.slice(-4)}` : "—"}
               </p>
             </div>
             <Button type="button" variant="outline" size="sm" onClick={logout}>
+              <LogOut className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
               Sign out
             </Button>
           </div>

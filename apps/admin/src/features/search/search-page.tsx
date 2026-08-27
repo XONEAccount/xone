@@ -94,7 +94,10 @@ export function SearchPage() {
           <ResultBlock title="Wallet users" empty={results.walletProfiles.length === 0}>
             {results.walletProfiles.map((p) => (
               <li key={p.wallet_address}>
-                <Link className="font-mono text-sm hover:underline" to="/profiles">
+                <Link
+                  className="font-mono text-sm hover:underline"
+                  to={`/profiles/${encodeURIComponent(p.wallet_address)}`}
+                >
                   {shorten(p.wallet_address, 10, 6)}
                 </Link>
                 {p.display_name ? (

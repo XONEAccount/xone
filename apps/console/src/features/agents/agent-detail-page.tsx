@@ -129,7 +129,7 @@ export function AgentDetailPage() {
         <p className="text-sm text-muted-foreground">{message}</p>
       ) : null}
       {error ? (
-        <p className="text-sm text-[var(--color-destructive)]">{error}</p>
+        <p className="text-sm text-destructive">{error}</p>
       ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -293,7 +293,7 @@ export function AgentDetailPage() {
                       ? `${row.amount} ${row.currency ?? ""}`
                       : "—"}
                   </TableCell>
-                  <TableCell className="max-w-[240px] truncate font-mono text-xs">
+                  <TableCell className="max-w-60 truncate font-mono text-xs">
                     {row.to || row.url || row.txHash || "—"}
                   </TableCell>
                   <TableCell className="text-muted-foreground">

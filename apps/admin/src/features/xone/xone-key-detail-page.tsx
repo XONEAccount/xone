@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, ExternalLink, Pause, Play, Save, Trash2, Wallet } from "lucide-react";
+import { ArrowLeft, ExternalLink, KeyRound } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageLoading } from "@/components/layout/page-loading";
 import {
@@ -16,7 +16,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -28,7 +27,6 @@ import {
 } from "@/components/ui/table";
 import { useAuth } from "@/hooks/use-auth";
 import { cn, errorMessage, shorten } from "@/lib/utils";
-import type { XoneAgent } from "./xone-wallets-page";
 
 type OnChainBalance = { symbol: string; balance: string; chain: string };
 
@@ -51,11 +49,15 @@ type PayIntentRow = {
   max_amount: string | null;
   error_message: string | null;
   created_at: string;
-  updated_at: string | null;
 };
 
-type AgentDetail = XoneAgent & {
-  on_chain: OnChainBalance[];
+type ApiKeyDetail = {
+  id: string;
+  user_id: string;
+  name: string;
+  token_prefix: string;
+  status: string;
+  created_at: string;
   owner_profile: {
     id: string;
     email: string;
@@ -63,13 +65,18 @@ type AgentDetail = XoneAgent & {
     avatar_url: string | null;
     created_at: string;
   } | null;
-  api_key: {
+  agent: {
     id: string;
-    user_id: string;
     name: string;
-    token_prefix: string;
+    chain: string;
+    currency: string;
+    daily_limit: number;
+    per_transaction: number;
+    remaining_daily: number;
+    wallet_address: string;
     status: string;
     created_at: string;
+    on_chain: OnChainBalance[];
   } | null;
   stats: {
     history: number;
@@ -79,7 +86,7 @@ type AgentDetail = XoneAgent & {
 
 type DetailResponse = {
   ok: true;
-  item: AgentDetail;
+  item: ApiKeyDetail;
   recent: {
     history: HistoryRow[];
     pay_intents: PayIntentRow[];
@@ -87,7 +94,7 @@ type DetailResponse = {
 };
 
 /**
- * Formats a numeric amount for display.
+ * Formats amount for display.
  * @param value - Amount
  */
 function fmtAmount(value: string | number | null | undefined): string {
@@ -114,30 +121,26 @@ function explorerTx(hash: string): string {
 }
 
 /**
- * XOne wallet detail: balances, ledger, pay intents, emergency controls.
+ * API key detail: owner, linked agent wallet, ledger, and revoke.
  */
-export function XoneWalletDetailPage() {
+export function XoneKeyDetailPage() {
   const { id = "" } = useParams();
   const { authFetch } = useAuth();
-  const [item, setItem] = useState<AgentDetail | null>(null);
+  const [item, setItem] = useState<ApiKeyDetail | null>(null);
   const [history, setHistory] = useState<HistoryRow[]>([]);
   const [payIntents, setPayIntents] = useState<PayIntentRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [dailyLimit, setDailyLimit] = useState("");
-  const [perTx, setPerTx] = useState("");
-  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [revokeOpen, setRevokeOpen] = useState(false);
 
   /**
-   * Reloads enriched agent detail.
+   * Reloads key detail.
    */
   async function load(): Promise<void> {
-    const res = await authFetch<DetailResponse>(`/api/xone/agents/${id}`);
+    const res = await authFetch<DetailResponse>(`/api/xone/api-keys/${encodeURIComponent(id)}`);
     setItem(res.item);
     setHistory(res.recent.history);
     setPayIntents(res.recent.pay_intents);
-    setDailyLimit(String(res.item.daily_limit));
-    setPerTx(String(res.item.per_transaction));
   }
 
   useEffect(() => {
@@ -156,15 +159,16 @@ export function XoneWalletDetailPage() {
   }, [authFetch, id]);
 
   /**
-   * Runs a mutating action then reloads enriched detail.
-   * @param path - API path
-   * @param init - Fetch init
+   * Soft-deletes the key then reloads.
    */
-  async function run(path: string, init?: RequestInit): Promise<void> {
+  async function confirmRevoke(): Promise<void> {
+    setRevokeOpen(false);
     setBusy(true);
     setError(null);
     try {
-      await authFetch<{ ok: true; item: XoneAgent }>(path, init);
+      await authFetch(`/api/xone/api-keys/${encodeURIComponent(id)}/revoke`, {
+        method: "POST",
+      });
       await load();
     } catch (err) {
       setError(errorMessage(err));
@@ -180,47 +184,25 @@ export function XoneWalletDetailPage() {
   return (
     <div className="mx-auto max-w-6xl space-y-6 animate-in">
       <PageHeader
-        icon={Wallet}
-        title={item?.name ?? "Wallet"}
-        description="On-chain assets, ledger, pay intents, and emergency controls."
+        icon={KeyRound}
+        title={item?.name ?? "API key"}
+        description="Spend token metadata only — full secrets are never shown."
         actions={
           <>
-            {item ? (
-              <>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={busy || item.status === "paused" || item.status === "deleted"}
-                  onClick={() => void run(`/api/xone/agents/${id}/pause`, { method: "POST" })}
-                >
-                  <Pause className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
-                  Pause
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={busy || item.status === "active" || item.status === "deleted"}
-                  onClick={() => void run(`/api/xone/agents/${id}/resume`, { method: "POST" })}
-                >
-                  <Play className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
-                  Resume
-                </Button>
-                <Button
-                  type="button"
-                  variant="destructive"
-                  size="sm"
-                  disabled={busy || item.status === "deleted"}
-                  onClick={() => setDeleteOpen(true)}
-                >
-                  <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
-                  Soft-delete
-                </Button>
-              </>
+            {item && item.status !== "deleted" ? (
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                disabled={busy}
+                onClick={() => setRevokeOpen(true)}
+              >
+                <KeyRound className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
+                Revoke
+              </Button>
             ) : null}
             <Button asChild variant="outline" size="sm">
-              <Link to="/xone/wallets">
+              <Link to="/xone/keys">
                 <ArrowLeft className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
                 Back
               </Link>
@@ -234,38 +216,18 @@ export function XoneWalletDetailPage() {
           <div className="grid gap-4 md:grid-cols-2">
             <Card>
               <CardHeader>
-                <CardTitle>Wallet</CardTitle>
+                <CardTitle>Key</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2 text-sm">
                 <div className="flex flex-wrap items-center gap-2">
-                  <Badge
-                    variant={
-                      item.status === "active"
-                        ? "default"
-                        : item.status === "deleted"
-                          ? "destructive"
-                          : "secondary"
-                    }
-                  >
+                  <Badge variant={item.status === "active" ? "default" : "secondary"}>
                     {item.status}
                   </Badge>
                   <span className="font-mono text-xs text-muted-foreground">{item.id}</span>
                 </div>
-                <p>
-                  {item.currency} · {item.chain}
-                  {item.wallet_family ? ` · ${item.wallet_family}` : ""}
-                </p>
-                {item.default_amount != null ? (
-                  <p className="text-xs text-muted-foreground">
-                    Default amount {item.default_amount}
-                    {item.daily_period ? ` · period ${item.daily_period}` : ""}
-                  </p>
-                ) : null}
+                <p className="font-mono text-xs">{item.token_prefix}…</p>
                 <p className="text-muted-foreground">
                   Created {new Date(item.created_at).toLocaleString()}
-                  {item.updated_at
-                    ? ` · Updated ${new Date(item.updated_at).toLocaleString()}`
-                    : ""}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   History {item.stats.history} · pay intents {item.stats.pay_intents}
@@ -275,39 +237,7 @@ export function XoneWalletDetailPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>On-chain (Base Sepolia)</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2 text-sm">
-                <p className="break-all font-mono text-xs" title={item.wallet_address}>
-                  {item.wallet_address}
-                </p>
-                <a
-                  className="inline-flex items-center gap-1 text-xs text-muted-foreground underline-offset-2 hover:underline"
-                  href={explorerAddress(item.wallet_address)}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  View on explorer
-                  <ExternalLink className="h-3 w-3" aria-hidden />
-                </a>
-                {item.on_chain.length === 0 ? (
-                  <p className="text-muted-foreground">Could not load on-chain balances.</p>
-                ) : (
-                  item.on_chain.map((b) => (
-                    <div key={b.symbol} className="flex justify-between font-mono text-xs">
-                      <span>{b.symbol}</span>
-                      <span>{fmtAmount(b.balance)}</span>
-                    </div>
-                  ))
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Owner / API key</CardTitle>
+                <CardTitle>Owner</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2 text-sm">
                 {item.owner_profile ? (
@@ -316,50 +246,86 @@ export function XoneWalletDetailPage() {
                     {item.owner_profile.name ? (
                       <p className="text-muted-foreground">{item.owner_profile.name}</p>
                     ) : null}
-                    <p className="font-mono text-xs text-muted-foreground">{item.owner_profile.id}</p>
+                    <p className="font-mono text-xs text-muted-foreground">
+                      {item.owner_profile.id}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Joined {new Date(item.owner_profile.created_at).toLocaleString()}
+                    </p>
                   </>
                 ) : (
-                  <p className="font-mono text-xs">{shorten(item.user_id)}</p>
+                  <p className="font-mono text-xs">{item.user_id}</p>
                 )}
-                <div className="border-t pt-2 space-y-1">
-                  {item.api_key ? (
-                    <>
-                      <p>
-                        Key {item.api_key.name}{" "}
-                        <Badge variant="secondary">{item.api_key.status}</Badge>
-                      </p>
-                      <p className="font-mono text-xs">
-                        {item.api_key.token_prefix}… · {shorten(item.api_key.id)}
-                      </p>
-                    </>
-                  ) : (
-                    <p className="font-mono text-xs">Key {shorten(item.api_key_id)}</p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Spend policy</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2 text-sm">
-                <div className="flex justify-between font-mono text-xs">
-                  <span>Remaining daily</span>
-                  <span>
-                    {fmtAmount(item.remaining_daily)} / {fmtAmount(item.daily_limit)}{" "}
-                    {item.currency}
-                  </span>
-                </div>
-                <div className="flex justify-between font-mono text-xs">
-                  <span>Per transaction</span>
-                  <span>
-                    {fmtAmount(item.per_transaction)} {item.currency}
-                  </span>
-                </div>
               </CardContent>
             </Card>
           </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Linked agent wallet</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              {item.agent ? (
+                <>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-medium">{item.agent.name}</p>
+                        <Badge
+                          variant={
+                            item.agent.status === "active"
+                              ? "default"
+                              : item.agent.status === "deleted"
+                                ? "destructive"
+                                : "secondary"
+                          }
+                        >
+                          {item.agent.status}
+                        </Badge>
+                      </div>
+                      <p className="font-mono text-xs text-muted-foreground">{item.agent.id}</p>
+                      <p>
+                        {item.agent.currency} · {item.agent.chain} · remaining{" "}
+                        {fmtAmount(item.agent.remaining_daily)} /{" "}
+                        {fmtAmount(item.agent.daily_limit)}
+                      </p>
+                      <p className="break-all font-mono text-xs" title={item.agent.wallet_address}>
+                        {item.agent.wallet_address}
+                      </p>
+                      <a
+                        className="inline-flex items-center gap-1 text-xs text-muted-foreground underline-offset-2 hover:underline"
+                        href={explorerAddress(item.agent.wallet_address)}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Explorer
+                        <ExternalLink className="h-3 w-3" aria-hidden />
+                      </a>
+                    </div>
+                    <Button asChild variant="outline" size="sm">
+                      <Link to={`/xone/wallets/${item.agent.id}`}>Open wallet</Link>
+                    </Button>
+                  </div>
+                  {item.agent.on_chain.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">
+                      Could not load on-chain balances.
+                    </p>
+                  ) : (
+                    <div className="space-y-1 border-t pt-2">
+                      {item.agent.on_chain.map((b) => (
+                        <div key={b.symbol} className="flex justify-between font-mono text-xs">
+                          <span>{b.symbol}</span>
+                          <span>{fmtAmount(b.balance)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <p className="text-muted-foreground">No agent wallet bound to this key.</p>
+              )}
+            </CardContent>
+          </Card>
 
           <Card>
             <CardHeader>
@@ -391,7 +357,10 @@ export function XoneWalletDetailPage() {
                       <TableCell className="font-mono text-xs" title={row.to_address ?? undefined}>
                         {row.to_address ? shorten(row.to_address, 8, 6) : "—"}
                       </TableCell>
-                      <TableCell className="max-w-[12rem] truncate text-xs" title={row.url ?? undefined}>
+                      <TableCell
+                        className="max-w-[12rem] truncate text-xs"
+                        title={row.url ?? undefined}
+                      >
                         {row.url ?? "—"}
                       </TableCell>
                       <TableCell className="font-mono text-xs">
@@ -463,65 +432,26 @@ export function XoneWalletDetailPage() {
               </Table>
             </CardContent>
           </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Update limits</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-wrap items-end gap-2">
-              <label className="space-y-1 text-sm">
-                <span className="text-muted-foreground">Daily</span>
-                <Input
-                  className="w-32"
-                  value={dailyLimit}
-                  onChange={(e) => setDailyLimit(e.target.value)}
-                />
-              </label>
-              <label className="space-y-1 text-sm">
-                <span className="text-muted-foreground">Per tx</span>
-                <Input className="w-32" value={perTx} onChange={(e) => setPerTx(e.target.value)} />
-              </label>
-              <Button
-                type="button"
-                size="sm"
-                disabled={busy}
-                onClick={() =>
-                  void run(`/api/xone/agents/${id}/limits`, {
-                    method: "PATCH",
-                    body: JSON.stringify({
-                      dailyLimit: Number(dailyLimit),
-                      perTransaction: Number(perTx),
-                    }),
-                  })
-                }
-              >
-                <Save className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
-                Save
-              </Button>
-            </CardContent>
-          </Card>
         </>
       ) : null}
 
-      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+      <AlertDialog open={revokeOpen} onOpenChange={setRevokeOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Soft-delete agent wallet?</AlertDialogTitle>
+            <AlertDialogTitle>Revoke API key?</AlertDialogTitle>
             <AlertDialogDescription>
-              This agent will be marked deleted and stop spending. This cannot be undone from the
-              spend key.
+              {item
+                ? `${item.name} (${item.token_prefix}…) spend tokens will stop working immediately.`
+                : "Spend tokens will stop working immediately."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               className={cn(buttonVariants({ variant: "destructive" }))}
-              onClick={() => {
-                setDeleteOpen(false);
-                void run(`/api/xone/agents/${id}`, { method: "DELETE" });
-              }}
+              onClick={() => void confirmRevoke()}
             >
-              Soft-delete
+              Revoke
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

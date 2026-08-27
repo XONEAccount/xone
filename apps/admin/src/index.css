@@ -35,6 +35,11 @@
   --color-sidebar-accent-foreground: #0a0a0a;
   --color-sidebar-border: #e5e5e5;
   --color-sidebar-ring: #0a0a0a;
+  --color-chart-1: #0a0a0a;
+  --color-chart-2: #525252;
+  --color-chart-3: #a3a3a3;
+  --color-chart-4: #d4d4d4;
+  --color-chart-5: #e5e5e5;
   --radius-sm: 0.375rem;
   --radius-md: 0.5rem;
   --radius-lg: 0.75rem;
