@@ -6,7 +6,7 @@ import type {
   GetHistoryParams,
   UpdateLimitsParams,
   XOneChain,
-} from "@xone/sdk";
+} from "@xonepay/sdk";
 import { api } from "./api";
 import type { AgentDto } from "./types";
 

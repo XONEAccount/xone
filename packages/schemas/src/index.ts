@@ -102,7 +102,7 @@ export const a2aSettleSchema = z.object({
   title: z.string().min(1).max(200),
 });
 
-/** Create a developer agent — params aligned with @xone/sdk `AgentCreateParams`. */
+/** Create a developer agent — params aligned with @xonepay/sdk `AgentCreateParams`. */
 export const createDeveloperAgentSchema = z
   .object({
     ownerAddress: evmAddress,

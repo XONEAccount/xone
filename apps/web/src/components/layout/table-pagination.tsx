@@ -58,20 +58,20 @@ export function TablePagination({
       )}
     >
       <p className="text-sm text-muted-foreground">
-        共 {total} 条 · 第 {page}/{pageCount} 页
+        {total} total · page {page}/{pageCount}
       </p>
       <div className="flex flex-wrap items-center gap-3">
         <Select
           value={String(pageSize)}
           onValueChange={(value) => onPageSizeChange(Number(value) as TablePageSize)}
         >
-          <SelectTrigger className="h-8 w-[7.5rem]" aria-label="每页条数">
+          <SelectTrigger className="h-8 w-[7.5rem]" aria-label="Rows per page">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             {TABLE_PAGE_SIZES.map((size) => (
               <SelectItem key={size} value={String(size)}>
-                {size} / 页
+                {size} / page
               </SelectItem>
             ))}
           </SelectContent>
@@ -83,7 +83,7 @@ export function TablePagination({
               <PaginationLink
                 href="#"
                 size="default"
-                aria-label="上一页"
+                aria-label="Previous page"
                 className={cn("gap-1 pl-2.5", !canPrev && "pointer-events-none opacity-50")}
                 onClick={(event) => {
                   event.preventDefault();
@@ -91,7 +91,7 @@ export function TablePagination({
                 }}
               >
                 <ChevronLeft className="h-4 w-4" />
-                <span>上一页</span>
+                <span>Prev</span>
               </PaginationLink>
             </PaginationItem>
             {pages.map((item, index) =>
@@ -120,14 +120,14 @@ export function TablePagination({
               <PaginationLink
                 href="#"
                 size="default"
-                aria-label="下一页"
+                aria-label="Next page"
                 className={cn("gap-1 pr-2.5", !canNext && "pointer-events-none opacity-50")}
                 onClick={(event) => {
                   event.preventDefault();
                   if (canNext) onNext();
                 }}
               >
-                <span>下一页</span>
+                <span>Next</span>
                 <ChevronRight className="h-4 w-4" />
               </PaginationLink>
             </PaginationItem>

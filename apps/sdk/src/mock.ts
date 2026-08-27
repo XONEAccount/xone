@@ -1,6 +1,6 @@
 /**
  * In-memory mock store helpers for local console / tests.
- * Not part of the public agent runtime API — import from `@xone/sdk/mock`.
+ * Not part of the public agent runtime API — import from `@xonepay/sdk/mock`.
  */
 export {
   createApiKeyRecord,

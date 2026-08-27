@@ -1,4 +1,4 @@
-# @xone/sdk
+# @xonepay/sdk
 
 TypeScript SDK for **policy-gated x402 payments** from agent runtimes. Exposes the same spend surface as **LangChain structured tools**.
 
@@ -11,7 +11,7 @@ For MCP hosts, use the sibling package [`@xone/mcp`](../mcp).
 | Surface                                         | Role                                                        |
 | ----------------------------------------------- | ----------------------------------------------------------- |
 | [Console](https://xone-console.pages.dev/login) | Identity, API keys, limits, allowlists, pause/delete, audit |
-| `@xone/sdk`                                     | Create/load the bound agent and settle x402 under policy    |
+| `@xonepay/sdk`                                     | Create/load the bound agent and settle x402 under policy    |
 | [HTTP API](https://xone-sdk-docs.pages.dev/?doc=api) | Same create / pay / history over `/v1/sdk` (any language) |
 
 **Binding:** one API key → one agent → one wallet.
@@ -68,7 +68,7 @@ Connect with a console key, inspect the agent, and call `pay` against an x402 se
 ## Installation
 
 ```bash
-pnpm add @xone/sdk
+pnpm add @xonepay/sdk
 ```
 
 **Requirements:** Node.js 18+, TypeScript 5 recommended.
@@ -78,7 +78,7 @@ pnpm add @xone/sdk
 ## Quickstart
 
 ```ts
-import { XOne } from "@xone/sdk";
+import { XOne } from "@xonepay/sdk";
 
 const xone = new XOne();
 
@@ -162,7 +162,9 @@ if (!agent) {
 ```
 ---
 
-## API reference: RemoteAgent
+## API reference: SDK methods
+
+Returned by `xone.agent.create()` / `xone.agent.get()` (runtime type `RemoteAgent`).
 
 ### Properties
 

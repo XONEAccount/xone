@@ -12,7 +12,7 @@ export type CreateAgentResponse = {
 
 /**
  * Creates a developer agent with a restricted spending wallet.
- * Params aligned with `@xone/sdk` `AgentCreateParams`.
+ * Params aligned with `@xonepay/sdk` `AgentCreateParams`.
  * @param input - Name, chain, dailyLimit, perTransaction, allowlists
  */
 export async function createDeveloperAgent(input: {

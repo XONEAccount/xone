@@ -1,8 +1,35 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Check, Eye, EyeOff, FlaskConical, KeyRound, LoaderCircle, Plus, RefreshCw, Search } from "lucide-react";
-import type { ApiKeyRecord } from "@xone/sdk";
+import {
+  Check,
+  Copy,
+  Edit,
+  Eye,
+  EyeOff,
+  FlaskConical,
+  KeyRound,
+  LoaderCircle,
+  Pause,
+  Play,
+  Plus,
+  RefreshCw,
+  Trash2,
+  Wallet,
+} from "lucide-react";
+import type { ApiKeyRecord } from "@xonepay/sdk";
+import { ListPager } from "@/components/layout/list-pager";
 import { PageHeader } from "@/components/layout/page-header";
+import { SearchBar } from "@/components/layout/search-bar";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -25,6 +52,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useAccount } from "@/hooks/use-account";
+import { useClientPagination } from "@/hooks/use-client-pagination";
 import { errorMessage, formatDateTime } from "@/utils/format";
 
 const MASK = "xone_••••••••••••••••";
@@ -45,19 +73,21 @@ export function ApiKeysPage() {
     loading,
   } = useAccount();
 
-  const [search, setSearch] = useState("");
+  const [draft, setDraft] = useState("");
+  const [query, setQuery] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [revealed, setRevealed] = useState<Record<string, boolean>>({});
   const [pausingId, setPausingId] = useState<string | null>(null);
+  const [pauseKey, setPauseKey] = useState<ApiKeyRecord | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [deleteKey, setDeleteKey] = useState<ApiKeyRecord | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = query.trim().toLowerCase();
     if (!q) return apiKeys;
     return apiKeys.filter(
       (k) =>
@@ -65,7 +95,20 @@ export function ApiKeysPage() {
         k.token.toLowerCase().includes(q) ||
         k.status.toLowerCase().includes(q),
     );
-  }, [apiKeys, search]);
+  }, [apiKeys, query]);
+
+  const pager = useClientPagination(filtered);
+
+  useEffect(() => {
+    pager.setPage(1);
+  }, [query]);
+
+  /**
+   * Commits the draft search string.
+   */
+  function commitSearch(): void {
+    setQuery(draft);
+  }
 
   /**
    * Creates a key and copies the token.
@@ -123,11 +166,13 @@ export function ApiKeysPage() {
 
   /**
    * Pause / resume the agent bound to this key.
+   * @param key - API key whose bound agent to toggle
    */
   async function onTogglePause(key: ApiKeyRecord): Promise<void> {
     const agent = getAgentByApiKey(key.id);
     if (!agent) {
       setError("No agent is bound to this API key yet.");
+      setPauseKey(null);
       return;
     }
     setPausingId(key.id);
@@ -139,7 +184,26 @@ export function ApiKeysPage() {
       setError(errorMessage(err));
     } finally {
       setPausingId(null);
+      setPauseKey(null);
     }
+  }
+
+  /**
+   * Opens pause confirm, or resumes immediately.
+   * @param key - API key row
+   */
+  function onPauseClick(key: ApiKeyRecord): void {
+    const agent = getAgentByApiKey(key.id);
+    if (!agent) {
+      setError("No agent is bound to this API key yet.");
+      return;
+    }
+    if (agent.getStatus() === "paused") {
+      void onTogglePause(key);
+      return;
+    }
+    setError(null);
+    setPauseKey(key);
   }
 
   return (
@@ -150,15 +214,17 @@ export function ApiKeysPage() {
         description="Create uniquely named keys. Each key binds to one wallet. "
         actions={
           <>
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <SearchBar onSearch={commitSearch}>
               <Input
-                className="w-48 pl-9 sm:w-56"
+                className="w-48 sm:w-56"
                 placeholder="Search"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") commitSearch();
+                }}
               />
-            </div>
+            </SearchBar>
             <Button
               type="button"
               variant="outline"
@@ -233,8 +299,9 @@ export function ApiKeysPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((key) => {
+                {pager.pageItems.map((key) => {
                   const agent = getAgentByApiKey(key.id);
+                  const paused = agent?.getStatus() === "paused";
                   return (
                     <TableRow key={key.id}>
                       <TableCell className="font-medium whitespace-nowrap">{key.name}</TableCell>
@@ -293,29 +360,34 @@ export function ApiKeysPage() {
                             onClick={() => void onCopy(key)}
                           >
                             {copiedId === key.id ? (
-                              <Check className="h-3.5 w-3.5" aria-label="Copied" />
+                              <Check className="h-3.5 w-3.5" strokeWidth={1.75} aria-label="Copied" />
                             ) : (
-                              "Copy"
+                              <Copy className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
                             )}
+                            Copy
                           </Button>
                           <Button
                             type="button"
                             variant="ghost"
                             size="sm"
                             disabled={pausingId === key.id}
-                            onClick={() => void onTogglePause(key)}
+                            onClick={() => onPauseClick(key)}
                           >
                             {pausingId === key.id ? (
                               <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
-                            ) : agent?.getStatus() === "paused" ? (
-                              "Resume"
+                            ) : paused ? (
+                              <Play className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
                             ) : (
-                              "Pause"
+                              <Pause className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
                             )}
+                            {paused ? "Resume" : "Pause"}
                           </Button>
                           {agent ? (
                             <Button type="button" variant="ghost" size="sm" asChild>
-                              <Link to={`/wallet/${agent.id}`}>Wallet</Link>
+                              <Link to={`/wallet/${agent.id}`}>
+                                <Edit className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
+                                edit
+                              </Link>
                             </Button>
                           ) : null}
                           <Button
@@ -329,6 +401,7 @@ export function ApiKeysPage() {
                               setDeleteKey(key);
                             }}
                           >
+                            <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
                             Delete
                           </Button>
                         </div>
@@ -344,6 +417,52 @@ export function ApiKeysPage() {
           </CardContent>
         </Card>
       )}
+
+      {apiKeys.length > 0 ? (
+        <ListPager
+          page={pager.page}
+          pageCount={pager.pageCount}
+          total={pager.total}
+          limit={pager.pageSize}
+          pageSizes={pager.pageSizes}
+          canPrev={pager.canPrev}
+          canNext={pager.canNext}
+          onPrev={pager.onPrev}
+          onNext={pager.onNext}
+          onLimitChange={(n) => pager.setPageSize(n as typeof pager.pageSize)}
+        />
+      ) : null}
+
+      <AlertDialog
+        open={Boolean(pauseKey)}
+        onOpenChange={(open) => {
+          if (!open && !pausingId) setPauseKey(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Pause wallet?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pauseKey
+                ? `The agent bound to ${pauseKey.name} will stop accepting spend until you resume it.`
+                : "The bound agent will stop accepting spend until you resume it."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={Boolean(pausingId)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={!pauseKey || Boolean(pausingId)}
+              onClick={(e) => {
+                e.preventDefault();
+                if (pauseKey) void onTogglePause(pauseKey);
+              }}
+            >
+              {pausingId ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}
+              Pause
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog
         open={Boolean(deleteKey)}

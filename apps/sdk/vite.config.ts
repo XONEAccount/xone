@@ -15,7 +15,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      "@xone/sdk": path.resolve(__dirname, "src/index.ts"),
+      "@xonepay/sdk": path.resolve(__dirname, "src/index.ts"),
     },
   },
   optimizeDeps: {

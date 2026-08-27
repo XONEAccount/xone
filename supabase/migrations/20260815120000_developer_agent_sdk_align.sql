@@ -1,4 +1,4 @@
--- Align developer agents with @xone/sdk AgentCreateParams naming extras.
+-- Align developer agents with @xonepay/sdk AgentCreateParams naming extras.
 
 alter table public.developer_agents
   add column if not exists allowed_hosts text[] not null default '{}'::text[];

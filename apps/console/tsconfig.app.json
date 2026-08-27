@@ -19,8 +19,8 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "@xone/sdk": ["../sdk/src/index.ts"],
-      "@xone/sdk/mock": ["../sdk/src/mock.ts"]
+      "@xonepay/sdk": ["../sdk/src/index.ts"],
+      "@xonepay/sdk/mock": ["../sdk/src/mock.ts"]
     }
   },
   "include": ["src"]

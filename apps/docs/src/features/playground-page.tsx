@@ -73,42 +73,42 @@ const METHODS: MethodDef[] = [
   },
   {
     id: "getStatus",
-    group: "RemoteAgent",
+    group: "SDK methods",
     label: "getStatus()",
     hint: "active · paused · exhausted · deleted",
     needsAgent: true,
   },
   {
     id: "getAddress",
-    group: "RemoteAgent",
+    group: "SDK methods",
     label: "getAddress()",
     hint: "On-chain wallet address",
     needsAgent: true,
   },
   {
     id: "getSpendSnapshot",
-    group: "RemoteAgent",
+    group: "SDK methods",
     label: "getSpendSnapshot()",
     hint: "Address + spend-policy snapshot (not RPC USDC)",
     needsAgent: true,
   },
   {
     id: "getLimits",
-    group: "RemoteAgent",
+    group: "SDK methods",
     label: "getLimits()",
     hint: "Caps, remaining daily, allowlists",
     needsAgent: true,
   },
   {
     id: "getHistory",
-    group: "RemoteAgent",
+    group: "SDK methods",
     label: "getHistory()",
     hint: "Spend and lifecycle events",
     needsAgent: true,
   },
   {
     id: "pay",
-    group: "RemoteAgent",
+    group: "SDK methods",
     label: "pay(params)",
     hint: "Settle an x402 resource (real USDC)",
     needsAgent: true,
@@ -406,7 +406,7 @@ export function PlaygroundPage({ view, onView }: PlaygroundPageProps) {
 
   const methodList = (
     <nav className="space-y-4" aria-label="SDK methods">
-      {(["xone.agent", "RemoteAgent"] as const).map((group) => (
+      {(["xone.agent", "SDK methods"] as const).map((group) => (
         <div key={group}>
           <p className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
             {group}
@@ -966,7 +966,7 @@ function toLimits(agent: PlaygroundAgent) {
  */
 function snippetFor(id: MethodId, payUrl: string): string {
   const url = payUrl.trim() || DEFAULT_PAY_URL;
-  const prefix = `import { XOne } from "@xone/sdk";
+  const prefix = `import { XOne } from "@xonepay/sdk";
 
 const xone = new XOne();
 `;

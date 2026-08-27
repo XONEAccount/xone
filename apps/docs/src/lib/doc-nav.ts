@@ -14,7 +14,7 @@ export interface DocNavGroup {
 export type DocProduct = "sdk" | "mcp" | "api";
 
 /**
- * @xone/sdk TOC
+ * @xonepay/sdk TOC
  */
 export const SDK_DOC_NAV: DocNavGroup[] = [
   {
@@ -24,7 +24,6 @@ export const SDK_DOC_NAV: DocNavGroup[] = [
       { id: "architecture", label: "Architecture" },
       { id: "console-setup", label: "Console setup" },
       { id: "playground", label: "Playground" },
-      { id: "funding", label: "Funding" },
       { id: "environment", label: "Environment" },
       { id: "installation", label: "Installation" },
       { id: "quickstart", label: "Quickstart" },
@@ -47,9 +46,9 @@ export const SDK_DOC_NAV: DocNavGroup[] = [
     ],
   },
   {
-    title: "RemoteAgent",
+    title: "SDK methods",
     items: [
-      { id: "api-reference-remoteagent", label: "Overview" },
+      { id: "api-reference-sdk-methods", label: "Overview" },
       { id: "properties", label: "Properties" },
       { id: "getstatus", label: "getStatus()" },
       { id: "getaddress", label: "getAddress()" },

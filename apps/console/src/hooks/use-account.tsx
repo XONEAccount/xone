@@ -6,7 +6,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { Agent, type ApiKeyRecord, type XOneChain } from "@xone/sdk";
+import { Agent, type ApiKeyRecord, type XOneChain } from "@xonepay/sdk";
 import {
   countAgentsForKey,
   createAgentRecord,
@@ -18,7 +18,7 @@ import {
   getApiKeyRecord,
   listAgentRecords,
   listApiKeyRecords,
-} from "@xone/sdk/mock";
+} from "@xonepay/sdk/mock";
 import { api, isRemoteApiEnabled } from "@/lib/api";
 import { RemoteAgent } from "@/lib/remoteAgent";
 import type { ApiKeyDto } from "@/lib/types";

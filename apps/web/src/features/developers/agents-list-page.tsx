@@ -339,7 +339,7 @@ export function AgentsListPage() {
             />
             {t("devWallet.refresh")}
           </Button>
-          <Button asChild variant="outline">
+          <Button asChild variant="default">
             <Link to="/app/developers">
               <Plus className="size-4" />
               {t("devWallet.create")}

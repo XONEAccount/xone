@@ -1,5 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { XOne, type XOneChain } from "@xone/sdk";
+import { XOne, type XOneChain } from "@xonepay/sdk";
 import { z } from "zod";
 import { missingApiKeyMessage, requireUserApiKey } from "./api-key.js";
 import { McpSpendSession, normalizeApiKey } from "./session.js";

@@ -1,5 +1,5 @@
 {
-  "name": "@xone/sdk",
+  "name": "@xonepay/sdk",
   "version": "0.1.0",
   "description": "XOne SDK — agent wallets and LangChain tools for x402 payments",
   "type": "module",

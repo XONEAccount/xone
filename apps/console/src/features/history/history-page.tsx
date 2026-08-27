@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowDownLeft, ArrowUpRight, Receipt, Search } from "lucide-react";
-import type { AgentHistoryEntry, AgentHistoryType } from "@xone/sdk";
+import type { AgentHistoryEntry, AgentHistoryType } from "@xonepay/sdk";
+import { ListPager } from "@/components/layout/list-pager";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Empty, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
@@ -23,6 +24,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useAccount } from "@/hooks/use-account";
+import { useClientPagination } from "@/hooks/use-client-pagination";
 import { api } from "@/lib/api";
 import type { HistoryDto } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -153,6 +155,12 @@ export function HistoryPage() {
     });
   }, [rows, walletFilter, flowFilter, search]);
 
+  const pager = useClientPagination(filtered);
+
+  useEffect(() => {
+    pager.setPage(1);
+  }, [search, walletFilter, flowFilter]);
+
   return (
     <div className="mx-auto max-w-5xl space-y-6 animate-in">
       <PageHeader
@@ -225,7 +233,7 @@ export function HistoryPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((row) => {
+                {pager.pageItems.map((row) => {
                   const isIncome = row.flow === "income";
                   return (
                     <TableRow key={`${row.agentId}-${row.id}`}>
@@ -295,6 +303,21 @@ export function HistoryPage() {
           </CardContent>
         </Card>
       )}
+
+      {agents.length > 0 ? (
+        <ListPager
+          page={pager.page}
+          pageCount={pager.pageCount}
+          total={pager.total}
+          limit={pager.pageSize}
+          pageSizes={pager.pageSizes}
+          canPrev={pager.canPrev}
+          canNext={pager.canNext}
+          onPrev={pager.onPrev}
+          onNext={pager.onNext}
+          onLimitChange={(n) => pager.setPageSize(n as typeof pager.pageSize)}
+        />
+      ) : null}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 # XOne Docs
 
-Documentation and API playground for `@xone/sdk`, HTTP API, and `@xone/mcp`.
+Documentation and API playground for `@xonepay/sdk`, HTTP API, and `@xone/mcp`.
 
 | Section | URL |
 | --- | --- |

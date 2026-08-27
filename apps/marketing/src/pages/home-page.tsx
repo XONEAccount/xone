@@ -480,7 +480,7 @@ export function HomePage() {
               pay, or{" "}
               <code className="font-mono text-sm">/v1/agents</code> for pause and
               limits. Or use{" "}
-              <code className="font-mono text-sm">@xone/sdk</code> as a typed
+              <code className="font-mono text-sm">@xonepay/sdk</code> as a typed
               client.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
@@ -500,7 +500,7 @@ export function HomePage() {
           </Reveal>
           <Reveal delay={80} variant="scale">
             <pre className="overflow-x-auto rounded-lg border border-border bg-card p-5 font-mono text-xs leading-relaxed sm:text-sm">
-              <code>{`import { XOne } from "@xone/sdk";
+              <code>{`import { XOne } from "@xonepay/sdk";
 
 const xone = new XOne({ agentToken });
 await xone.pay({

@@ -31,7 +31,7 @@ const steps = [
   },
   {
     title: "Pay via SDK or HTTP",
-    body: "Use @xone/sdk or call POST /v1/sdk/agents/:id/pay. Runtime tokens pay and read — pause and limits stay on JWT / Console.",
+    body: "Use @xonepay/sdk or call POST /v1/sdk/agents/:id/pay. Runtime tokens pay and read — pause and limits stay on JWT / Console.",
   },
 ] as const;
 
@@ -79,7 +79,7 @@ export function DevelopersPage() {
         </h1>
         <p className="mt-4 text-lg text-muted-foreground">
           Everyday users open Web or App. Builders integrate through HTTP or
-          `@xone/sdk` — the same secure core. Free during beta.
+          `@xonepay/sdk` — the same secure core. Free during beta.
         </p>
       </Reveal>
 
@@ -201,11 +201,11 @@ export function DevelopersPage() {
       <Reveal delay={80} className="mt-12 space-y-4" variant="scale">
         <h2 className="text-lg font-medium">Install SDK</h2>
         <pre className="overflow-x-auto rounded-lg border border-border bg-card p-4 font-mono text-sm">
-          <code>npm install @xone/sdk</code>
+          <code>npm install @xonepay/sdk</code>
         </pre>
         <h2 className="text-lg font-medium">Pay with SDK</h2>
         <pre className="overflow-x-auto rounded-lg border border-border bg-card p-4 font-mono text-sm leading-relaxed">
-          <code>{`import { XOne } from "@xone/sdk";
+          <code>{`import { XOne } from "@xonepay/sdk";
 
 const xone = new XOne({
   agentToken: process.env.XONE_AGENT_TOKEN!,

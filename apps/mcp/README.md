@@ -1,6 +1,6 @@
 # @xone/mcp
 
-MCP server for **XOne** agent wallets. Wraps [`@xone/sdk`](../sdk) with tools for create, inspect, and x402 pay under console policy.
+MCP server for **XOne** agent wallets. Wraps [`@xonepay/sdk`](../sdk) with tools for create, inspect, and x402 pay under console policy.
 
 Private keys stay on the API. The spend key is **user-supplied** — create stops until the operator provides a `xone_…` key.
 
@@ -10,7 +10,7 @@ Private keys stay on the API. The spend key is **user-supplied** — create stop
 
 | Component | Role |
 | --- | --- |
-| `@xone/sdk` | TypeScript / LangChain runtime |
+| `@xonepay/sdk` | TypeScript / LangChain runtime |
 | `@xone/mcp` | MCP tool surface for AI hosts (Cursor, Claude Desktop, …) |
 | [Console](https://xone-console.pages.dev/login) | Keys, limits, allowlists, pause/delete |
 

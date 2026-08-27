@@ -24,7 +24,7 @@ const SCROLL_OFFSET = 96;
 const DOC_SOURCES: Record<DocProduct, { title: string; subtitle: string; markdown: string }> = {
   sdk: {
     title: "XOne SDK",
-    subtitle: "@xone/sdk",
+    subtitle: "@xonepay/sdk",
     markdown: sdkReadme,
   },
   mcp: {

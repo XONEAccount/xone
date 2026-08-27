@@ -9,8 +9,8 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
-      "@xone/sdk/mock": path.resolve(__dirname, "../sdk/src/mock.ts"),
-      "@xone/sdk": path.resolve(__dirname, "../sdk/src/index.ts"),
+      "@xonepay/sdk/mock": path.resolve(__dirname, "../sdk/src/mock.ts"),
+      "@xonepay/sdk": path.resolve(__dirname, "../sdk/src/index.ts"),
     },
   },
   server: {

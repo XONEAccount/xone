@@ -79,7 +79,7 @@ function parseList(text: string): string[] {
 
 /**
  * Developer flow: create restricted wallet → on-chain fund.
- * Create params aligned with `@xone/sdk` AgentCreateParams / Console.
+ * Create params aligned with `@xonepay/sdk` AgentCreateParams / Console.
  */
 export function CreateAgentPage() {
   const { t } = useI18n();

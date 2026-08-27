@@ -1,8 +1,27 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { LoaderCircle, RefreshCw, Search, Wallet } from "lucide-react";
-import type { Agent, AgentStatus } from "@xone/sdk";
+import {
+  LoaderCircle,
+  Pause,
+  Pencil,
+  Play,
+  RefreshCw,
+  Wallet,
+} from "lucide-react";
+import type { Agent, AgentStatus } from "@xonepay/sdk";
+import { ListPager } from "@/components/layout/list-pager";
 import { PageHeader } from "@/components/layout/page-header";
+import { SearchBar } from "@/components/layout/search-bar";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -18,6 +37,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useAccount } from "@/hooks/use-account";
+import { useClientPagination } from "@/hooks/use-client-pagination";
 import { errorMessage, shortAddress } from "@/utils/format";
 
 /**
@@ -26,12 +46,14 @@ import { errorMessage, shortAddress } from "@/utils/format";
 export function AgentsPage() {
   const { agents, getApiKey, refresh, loading } = useAccount();
 
-  const [search, setSearch] = useState("");
+  const [draft, setDraft] = useState("");
+  const [query, setQuery] = useState("");
   const [pausingId, setPausingId] = useState<string | null>(null);
+  const [pauseTarget, setPauseTarget] = useState<Agent | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = query.trim().toLowerCase();
     if (!q) return agents;
     return agents.filter((a) => {
       const key = getApiKey(a.apiKeyId)?.name ?? "";
@@ -43,10 +65,24 @@ export function AgentsPage() {
         a.getAddress().toLowerCase().includes(q)
       );
     });
-  }, [agents, search, getApiKey]);
+  }, [agents, query, getApiKey]);
+
+  const pager = useClientPagination(filtered);
+
+  useEffect(() => {
+    pager.setPage(1);
+  }, [query]);
+
+  /**
+   * Commits the draft search string.
+   */
+  function commitSearch(): void {
+    setQuery(draft);
+  }
 
   /**
    * Pause / resume a wallet agent.
+   * @param agent - Target agent
    */
   async function onTogglePause(agent: Agent): Promise<void> {
     setPausingId(agent.id);
@@ -58,7 +94,21 @@ export function AgentsPage() {
       setError(errorMessage(err));
     } finally {
       setPausingId(null);
+      setPauseTarget(null);
     }
+  }
+
+  /**
+   * Opens pause confirm, or resumes immediately.
+   * @param agent - Target agent
+   */
+  function onPauseClick(agent: Agent): void {
+    if (agent.getStatus() === "paused") {
+      void onTogglePause(agent);
+      return;
+    }
+    setError(null);
+    setPauseTarget(agent);
   }
 
   return (
@@ -69,15 +119,17 @@ export function AgentsPage() {
         description="Generated agent wallets and spend policy. Runtime tokens can only pay and read — limits stay in this console."
         actions={
           <>
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <SearchBar onSearch={commitSearch}>
               <Input
-                className="w-48 pl-9 sm:w-56"
+                className="w-48 sm:w-56"
                 placeholder="Search"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") commitSearch();
+                }}
               />
-            </div>
+            </SearchBar>
             <Button
               type="button"
               variant="outline"
@@ -124,7 +176,7 @@ export function AgentsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((agent) => {
+                {pager.pageItems.map((agent) => {
                   const status = agent.getStatus();
                   const canPause = ["active", "paused", "exhausted"].includes(status);
                   return (
@@ -143,22 +195,26 @@ export function AgentsPage() {
                       <TableCell className="text-right">
                         <div className="flex flex-wrap justify-end gap-1">
                           <Button type="button" variant="ghost" size="sm" asChild>
-                            <Link to={`/wallet/${agent.id}`}>Open</Link>
+                            <Link to={`/wallet/${agent.id}`}>
+                              <Pencil className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
+                              Edit
+                            </Link>
                           </Button>
                           <Button
                             type="button"
                             variant="ghost"
                             size="sm"
-                            disabled={!canPause}
-                            onClick={() => void onTogglePause(agent)}
+                            disabled={!canPause || pausingId === agent.id}
+                            onClick={() => onPauseClick(agent)}
                           >
                             {pausingId === agent.id ? (
                               <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
                             ) : status === "paused" ? (
-                              "Resume"
+                              <Play className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
                             ) : (
-                              "Pause"
+                              <Pause className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
                             )}
+                            {status === "paused" ? "Resume" : "Pause"}
                           </Button>
                         </div>
                       </TableCell>
@@ -173,15 +229,79 @@ export function AgentsPage() {
           </CardContent>
         </Card>
       )}
+
+      {agents.length > 0 ? (
+        <ListPager
+          page={pager.page}
+          pageCount={pager.pageCount}
+          total={pager.total}
+          limit={pager.pageSize}
+          pageSizes={pager.pageSizes}
+          canPrev={pager.canPrev}
+          canNext={pager.canNext}
+          onPrev={pager.onPrev}
+          onNext={pager.onNext}
+          onLimitChange={(n) => pager.setPageSize(n as typeof pager.pageSize)}
+        />
+      ) : null}
+
+      <AlertDialog
+        open={Boolean(pauseTarget)}
+        onOpenChange={(open) => {
+          if (!open && !pausingId) setPauseTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Pause wallet?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pauseTarget
+                ? `${pauseTarget.name} will stop accepting spend until you resume it.`
+                : "This wallet will stop accepting spend until you resume it."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={Boolean(pausingId)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={!pauseTarget || Boolean(pausingId)}
+              onClick={(e) => {
+                e.preventDefault();
+                if (pauseTarget) void onTogglePause(pauseTarget);
+              }}
+            >
+              {pausingId ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}
+              Pause
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
 
 /**
+ * Agent status badge (shadcn Badge).
  * @param status - Agent status
  */
 function StatusPill({ status }: { status: AgentStatus }) {
   const variant =
-    status === "active" ? "secondary" : status === "deleted" ? "destructive" : "outline";
-  return <Badge variant={variant}>{status}</Badge>;
+    status === "active"
+      ? "secondary"
+      : status === "deleted"
+        ? "destructive"
+        : status === "paused"
+          ? "outline"
+          : "secondary";
+  return (
+    <Badge
+      variant={variant}
+      className={
+        status === "paused"
+          ? "border-border bg-muted text-muted-foreground capitalize"
+          : "capitalize"
+      }
+    >
+      {status}
+    </Badge>
+  );
 }

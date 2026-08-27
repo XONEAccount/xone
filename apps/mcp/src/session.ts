@@ -1,4 +1,4 @@
-import { XOne } from "@xone/sdk";
+import { XOne } from "@xonepay/sdk";
 
 const PLACEHOLDER_KEYS = new Set([
   "xone_",

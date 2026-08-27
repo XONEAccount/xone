@@ -1,6 +1,6 @@
 # XOne HTTP API
 
-You can implement the same **create wallet / get agent / x402 pay / history** flows as `@xone/sdk` by calling the HTTP API directly. The TypeScript SDK is a typed client over these routes when `XONE_API_URL` is set.
+You can implement the same **create wallet / get agent / x402 pay / history** flows as `@xonepay/sdk` by calling the HTTP API directly. The TypeScript SDK is a typed client over these routes when `XONE_API_URL` is set.
 
 **Use the API when:** you are not on Node/TS, you want raw `fetch`/`curl`, or another language runtime.
 
@@ -52,7 +52,7 @@ Authorization: Bearer <supabase_access_token>
 
 ## SDK vs HTTP
 
-| SDK (`@xone/sdk`) | HTTP |
+| SDK (`@xonepay/sdk`) | HTTP |
 | ----------------- | ---- |
 | `xone.agent.create({ apiKey, … })` | `POST /v1/sdk/agents` |
 | `xone.agent.get()` | `GET /v1/sdk/agents` → use `items[0]` |

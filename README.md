@@ -11,7 +11,7 @@ apps/web            Consumer wallet UI (Pages)
 apps/web-api        Wallet / A2A / chat API (@xone/wallet-api, Workers)
 apps/console        Operator console — keys, wallets, limits, ledger
 apps/console-api    Spend + operator HTTP API (/v1/sdk, /v1/agents, …)
-apps/sdk            @xone/sdk — runtime create / get / pay / history
+apps/sdk            @xonepay/sdk — runtime create / get / pay / history
 apps/mcp            @xone/mcp — MCP tools over the same spend surface
 apps/docs           SDK docs + playground (@xone/sdk-playground)
 apps/marketing      Public marketing site
@@ -64,7 +64,7 @@ pnpm dev:site    # marketing
 |---------|------|------|
 | Wallet web + web-api | Privy / Supabase | End-user wallet, A2A, assistant |
 | Console + console-api JWT | Supabase user JWT | Keys, pause/resume, limits, soft-delete, ledger |
-| `/v1/sdk/*` + `@xone/sdk` / `@xone/mcp` | Agent API key (`xone_…`) | Create/get agent, `pay`, history |
+| `/v1/sdk/*` + `@xonepay/sdk` / `@xone/mcp` | Agent API key (`xone_…`) | Create/get agent, `pay`, history |
 | Docs `?doc=api` | — | Same HTTP contract for any language |
 
 **Spend vs operator:** soft-delete, pause, resume, and limit changes are console JWT only — not on the spend token. SDK `getSpendSnapshot()` is address + policy headroom (`remainingDaily` / limits), **not** an on-chain USDC RPC balance. Fund USDC at the agent `address` separately.

@@ -1,7 +1,7 @@
 {
   "name": "@xone/mcp",
   "version": "0.1.0",
-  "description": "XOne MCP server — policy-gated x402 payments via @xone/sdk",
+  "description": "XOne MCP server — policy-gated x402 payments via @xonepay/sdk",
   "type": "module",
   "bin": {
     "xone-mcp": "./dist/cli.js"
@@ -38,7 +38,7 @@
   "license": "MIT",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.25.0",
-    "@xone/sdk": "workspace:*",
+    "@xonepay/sdk": "workspace:*",
     "zod": "^3.25.76"
   },
   "devDependencies": {
