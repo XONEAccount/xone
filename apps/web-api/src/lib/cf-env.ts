@@ -15,6 +15,7 @@ export type WorkerBindings = {
   JWT_SECRET?: string;
   CUSTODY_PRIVATE_KEY?: string;
   CUSTODY_ADDRESS?: string;
+  RELAYER_PRIVATE_KEY?: string;
   RPC_URL?: string;
 };
 
@@ -32,6 +33,7 @@ const BINDING_KEYS: (keyof WorkerBindings)[] = [
   "JWT_SECRET",
   "CUSTODY_PRIVATE_KEY",
   "CUSTODY_ADDRESS",
+  "RELAYER_PRIVATE_KEY",
   "RPC_URL",
 ];
 

@@ -885,6 +885,10 @@ export async function getAgentBalance(agent: DeveloperAgent): Promise<{
   maxSinglePayment: number;
   onChainBalance: string;
   onChainSymbol: string;
+  /** False when RPC read failed — do not treat onChainBalance as authoritative. */
+  onChainOk: boolean;
+  /** Short RPC/read error when onChainOk is false. */
+  onChainError?: string;
 }> {
   const chain = chainFromSlug(agent.chain);
   const tokenAddress =
@@ -895,6 +899,8 @@ export async function getAgentBalance(agent: DeveloperAgent): Promise<{
       : undefined;
 
   let onChainBalance = "0";
+  let onChainOk = false;
+  let onChainError: string | undefined;
   const onChainSymbol: string = agent.asset;
   try {
     onChainBalance = await fetchDisplayBalance(
@@ -903,8 +909,13 @@ export async function getAgentBalance(agent: DeveloperAgent): Promise<{
       agent.asset === "USDC" ? 6 : 18,
       chain,
     );
-  } catch {
+    onChainOk = true;
+  } catch (err) {
     // Keep zeros when RPC is unavailable; policy numbers still return.
+    onChainError =
+      err instanceof Error
+        ? err.message.slice(0, 180)
+        : "RPC balance read failed";
   }
 
   return {
@@ -918,6 +929,8 @@ export async function getAgentBalance(agent: DeveloperAgent): Promise<{
     maxSinglePayment: agent.maxSinglePayment,
     onChainBalance,
     onChainSymbol,
+    onChainOk,
+    ...(onChainError ? { onChainError } : {}),
   };
 }
 

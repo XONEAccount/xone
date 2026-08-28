@@ -8,6 +8,7 @@ import { auth } from "./routes/auth.js";
 import { developer } from "./routes/developer.js";
 import { mcp } from "./routes/mcp.js";
 import { payments } from "./routes/payments.js";
+import { serviceCatalog } from "./routes/service-catalog.js";
 import { transactions } from "./routes/transactions.js";
 import { wallets } from "./routes/wallets.js";
 import { x402 } from "./routes/x402.js";
@@ -109,6 +110,7 @@ export function createApp() {
   app.route("/api/developer", developer);
   app.route("/api/mcp", mcp);
   app.route("/api/x402", x402);
+  app.route("/api/service-catalog", serviceCatalog);
 
   app.notFound((c) => c.json({ error: "Not found" }, 404));
 

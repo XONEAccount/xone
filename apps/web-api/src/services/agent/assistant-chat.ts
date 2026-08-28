@@ -17,7 +17,7 @@ import {
   listDeveloperAgents,
   toDeveloperAgent,
 } from "./developer-agent.js";
-import { payX402Merchant, paymentRequiresConfirmation, quoteX402Merchant } from "./x402-merchant-pay.js";
+import { payX402Merchant, paymentRequiresConfirmation, quoteX402Merchant, withMerchantQuery } from "./x402-merchant-pay.js";
 
 export type AssistantX402Service = {
   id: string;
@@ -30,21 +30,91 @@ export type AssistantX402Service = {
 const SYSTEM_PROMPT = `你是 X-ONE 钱包助手，用简洁中文回答。
 
 工作流（必须遵守）：
-1. 先在 <think>…</think> 中写出简短思考：用户意图、可匹配的 x402 服务、可用 Agent 钱包。
-2. 若用户要调用付费 x402 能力：
-   - 从「已启用」的 x402 目录中判断候选。
-   - 若只有 1 个合适：直接进入下一步。
+1. 先在 <think>…</think> 中写出简短思考：用户意图、可匹配的 x402 / Agent 服务、可用 Agent 钱包。
+2. 涉及付费 / 钱包是否有钱 / 是否可用时：
+   - 必须先调用 list_context 获取【最新】status、allowance、onChainBalance（不要用历史对话里的旧结论）。
+   - status=paused 或 deleted 的钱包不能支付。
+   - 只有 status=active 且 allowance>0 且 onChainOk=true 且 onChainBalance>0 的钱包才能支付。
+   - onChainOk=false 时不要说「余额为 0」，应说明暂时读不到链上余额，请用户刷新或稍后重试。
+   - 禁止编造余额；只能依据 list_context / pay_x402 返回值。
+3. 若用户要调用付费 x402 / Agent 能力：
+   - 从「已启用」的目录中判断候选（含 X402 List 与 Agent List）。
+   - 博查搜索（Bocha Search）：用户问事实、新闻、联网检索类问题时优先选用；调用 pay_x402 时必须传 query=用户问题。
+   - 若只有 1 个合适服务：直接进入下一步。
    - 若有多个都能满足：必须调用 request_x402_choice，等待用户选择（不要自己猜）。
-3. Agent 钱包：
+4. Agent 钱包：
+   - 只向用户展示可支付钱包（见第 2 条）。
    - 若只有 1 个可用钱包：可直接用于支付。
    - 若有多个：必须调用 request_wallet_choice，等待用户选择。
-4. 用户选择完成后，调用 pay_x402：
+5. 用户选择完成后，调用 pay_x402：
+   - 搜索类服务务必带 query。
    - 系统会先报价；若金额未超过该钱包的 perTransaction / 剩余 dailyLimit，将自动付款。
    - 若超过限额，会等待用户手动确认后再付。
-5. 不要编造支付结果；只能依据工具返回。
-6. 不要索要私钥或 API Key。
+6. 不要编造支付结果；只能依据工具返回。
+7. 不要索要私钥或 API Key。
 
 输出用合法 Markdown。`;
+
+type WalletSnapshot = {
+  id: string;
+  name: string;
+  walletAddress: string;
+  chain: string;
+  asset: string;
+  status: string;
+  allowance: number;
+  dailyLimit: number;
+  perTransaction: number;
+  maxAmount: number;
+  maxSinglePayment: number;
+  spentAmount: number;
+  remainingCap: number;
+  onChainBalance: string;
+  onChainOk: boolean;
+  canPay: boolean;
+};
+
+/**
+ * Loads every developer agent with a fresh on-chain balance snapshot.
+ * @param admin - Supabase admin
+ * @param ownerAddress - Owner wallet
+ */
+async function loadWalletSnapshots(
+  admin: SupabaseClient,
+  ownerAddress: string,
+): Promise<WalletSnapshot[]> {
+  const rows = await listDeveloperAgents(admin, ownerAddress);
+  return Promise.all(
+    rows.map(async (w) => {
+      const bal = await getAgentBalance(w);
+      const onChainNum = Number(bal.onChainBalance);
+      const canPay =
+        w.status === "active" &&
+        bal.allowance > 0 &&
+        bal.onChainOk &&
+        Number.isFinite(onChainNum) &&
+        onChainNum > 0;
+      return {
+        id: w.id,
+        name: w.name,
+        walletAddress: w.walletAddress,
+        chain: w.chain,
+        asset: w.asset,
+        status: w.status,
+        allowance: bal.allowance,
+        dailyLimit: w.dailyLimit,
+        perTransaction: w.perTransaction,
+        maxAmount: w.maxAmount,
+        maxSinglePayment: w.maxSinglePayment,
+        spentAmount: bal.spentAmount,
+        remainingCap: bal.remainingCap,
+        onChainBalance: bal.onChainBalance,
+        onChainOk: bal.onChainOk,
+        canPay,
+      };
+    }),
+  );
+}
 
 /**
  * Streams the main 对话 assistant (DeepSeek + x402 routing tools + HITL pickers).
@@ -69,7 +139,8 @@ export async function createAssistantChatResponse(
   }
 
   const enabledServices = x402Services.filter((s) => s.enabled);
-  const wallets = await listDeveloperAgents(admin, ownerAddress);
+  const walletSnapshots = await loadWalletSnapshots(admin, ownerAddress);
+  const spendableWallets = walletSnapshots.filter((w) => w.canPay);
 
   const catalogJson = JSON.stringify(
     enabledServices.map((s) => ({
@@ -82,43 +153,47 @@ export async function createAssistantChatResponse(
     2,
   );
   const walletsJson = JSON.stringify(
-    wallets.map((w) => ({
-      id: w.id,
-      name: w.name,
-      chain: w.chain,
-      asset: w.asset,
-      balanceHint: "client displays on-chain balance",
-      dailyLimit: w.dailyLimit,
-      perTransaction: w.perTransaction,
-      maxAmount: w.maxAmount,
-      allowance: w.allowanceEth,
-      remainingCap: Math.max(0, w.dailyLimit - w.spentAmount),
-      status: w.status,
-    })),
+    {
+      note: "Fresh snapshot for this request. Prefer list_context before claiming balances.",
+      all: walletSnapshots.map((w) => ({
+        id: w.id,
+        name: w.name,
+        status: w.status,
+        chain: w.chain,
+        asset: w.asset,
+        allowance: w.allowance,
+        dailyLimit: w.dailyLimit,
+        perTransaction: w.perTransaction,
+        remainingCap: w.remainingCap,
+        onChainBalance: w.onChainBalance,
+        onChainOk: w.onChainOk,
+        canPay: w.canPay,
+      })),
+      spendable: spendableWallets.map((w) => ({
+        id: w.id,
+        name: w.name,
+        onChainBalance: w.onChainBalance,
+        allowance: w.allowance,
+        remainingCap: w.remainingCap,
+      })),
+    },
     null,
     2,
   );
 
   const tools = {
     list_context: tool({
-      description: "列出当前已启用的 x402 服务目录与可用 Agent 钱包快照。",
+      description:
+        "刷新并列出已启用 x402 服务 + 全部 Agent 钱包的最新 status / allowance / 链上余额。付费或判断是否有钱前必须调用。",
       inputSchema: z.object({}),
-      execute: async () => ({
-        x402Services: enabledServices,
-        wallets: wallets.map((w) => ({
-          id: w.id,
-          name: w.name,
-          walletAddress: w.walletAddress,
-          chain: w.chain,
-          asset: w.asset,
-          allowance: w.allowanceEth,
-          dailyLimit: w.dailyLimit,
-          perTransaction: w.perTransaction,
-          maxAmount: w.maxAmount,
-          maxSinglePayment: w.maxSinglePayment,
-          spentAmount: w.spentAmount,
-        })),
-      }),
+      execute: async () => {
+        const fresh = await loadWalletSnapshots(admin, ownerAddress);
+        return {
+          x402Services: enabledServices,
+          wallets: fresh,
+          spendableWalletIds: fresh.filter((w) => w.canPay).map((w) => w.id),
+        };
+      },
     }),
 
     /**
@@ -149,7 +224,7 @@ export async function createAssistantChatResponse(
      */
     request_wallet_choice: tool({
       description:
-        "当用户有多个 Agent 钱包时，向用户展示列表并等待选择用于支付的钱包。候选只需 id / name / dailyLimit，不要向用户暴露地址。",
+        "当用户有多个可支付 Agent 钱包时，向用户展示列表并等待选择。只传 canPay=true 的候选（id / name / dailyLimit），不要暴露地址。",
       inputSchema: z.object({
         question: z.string().describe("向用户展示的简短说明"),
         candidates: z
@@ -161,17 +236,23 @@ export async function createAssistantChatResponse(
               reason: z.string().optional(),
             }),
           )
-          .min(2)
+          .min(1)
           .max(20),
       }),
     }),
 
     pay_x402: tool({
       description:
-        "使用指定 Agent 钱包支付指定 x402 URL（须为目录中已启用条目）。未超限额时自动执行；超限额需用户确认。",
+        "使用指定 Agent 钱包支付指定 x402 / Agent URL（须为目录中已启用条目）。搜索类服务（如 Bocha）必须传 query。未超限额时自动执行；超限额需用户确认。",
       inputSchema: z.object({
-        x402Id: z.string().describe("目录中的 x402 服务 id"),
+        x402Id: z.string().describe("目录中的服务 id"),
         agentId: z.string().describe("Developer Agent 钱包 id"),
+        query: z
+          .string()
+          .min(1)
+          .max(500)
+          .optional()
+          .describe("搜索类服务的用户问题（Bocha Search 必填）"),
         idempotencyKey: z
           .string()
           .min(8)
@@ -179,7 +260,7 @@ export async function createAssistantChatResponse(
           .optional()
           .describe("重试时复用同一 key"),
       }),
-      needsApproval: async ({ x402Id, agentId }) => {
+      needsApproval: async ({ x402Id, agentId, query }) => {
         const service = enabledServices.find((s) => s.id === x402Id);
         if (!service) return true;
 
@@ -191,14 +272,22 @@ export async function createAssistantChatResponse(
         if (!agentRow) return true;
 
         const agent = toDeveloperAgent(agentRow);
-        const quote = await quoteX402Merchant(service.url);
+        const merchantUrl = withMerchantQuery(service.url, query);
+        const quote = await quoteX402Merchant(merchantUrl);
         if (!quote) return true;
         return paymentRequiresConfirmation(quote.amount, agent);
       },
-      execute: async ({ x402Id, agentId, idempotencyKey }) => {
+      execute: async ({ x402Id, agentId, query, idempotencyKey }) => {
         const service = enabledServices.find((s) => s.id === x402Id);
         if (!service) {
           return { ok: false, error: "x402 服务未找到或未启用" };
+        }
+
+        if (/bocha|search/i.test(service.id + service.name) && !query?.trim()) {
+          return {
+            ok: false,
+            error: "Bocha Search 需要 query（用户问题）",
+          };
         }
 
         const agentRow = await getDeveloperAgentRowForOwner(
@@ -209,11 +298,45 @@ export async function createAssistantChatResponse(
         if (!agentRow) {
           return { ok: false, error: "Agent 钱包未找到" };
         }
+        if (agentRow.status !== "active") {
+          return {
+            ok: false,
+            error: `Agent 钱包当前状态为 ${agentRow.status}，无法支付（需 active）`,
+          };
+        }
 
         const balance = await getAgentBalance(toDeveloperAgent(agentRow));
+        if (!balance.onChainOk) {
+          return {
+            ok: false,
+            error: "暂时读不到链上余额，请稍后重试（不要当成余额为 0）",
+            wallet: {
+              id: balance.walletAddress,
+              status: agentRow.status,
+              allowance: balance.allowance,
+              onChainBalance: balance.onChainBalance,
+              onChainOk: false,
+            },
+          };
+        }
+        if (Number(balance.onChainBalance) <= 0) {
+          return {
+            ok: false,
+            error: "该 Agent 链上 USDC 余额为 0，请先充值后再支付",
+            wallet: {
+              id: balance.walletAddress,
+              status: agentRow.status,
+              allowance: balance.allowance,
+              onChainBalance: balance.onChainBalance,
+              onChainOk: true,
+            },
+          };
+        }
+
+        const merchantUrl = withMerchantQuery(service.url, query);
 
         const result = await payX402Merchant(admin, agentRow, {
-          merchantUrl: service.url,
+          merchantUrl,
           idempotencyKey: idempotencyKey ?? crypto.randomUUID(),
         });
 
@@ -222,17 +345,21 @@ export async function createAssistantChatResponse(
             ok: false,
             error: result.error,
             service,
+            query: query ?? null,
             wallet: {
               id: balance.walletAddress,
+              status: agentRow.status,
               allowance: balance.allowance,
               onChainBalance: balance.onChainBalance,
+              onChainOk: balance.onChainOk,
             },
           };
         }
 
         return {
           ok: true,
-          service: { id: service.id, name: service.name, url: service.url },
+          service: { id: service.id, name: service.name, url: merchantUrl },
+          query: query ?? null,
           payment: {
             id: result.payment.id,
             amount: result.payment.amount,
@@ -268,7 +395,7 @@ export async function createAssistantChatResponse(
 ## 已启用 x402 目录
 ${catalogJson}
 
-## 可用 Agent 钱包
+## Agent 钱包快照（本请求开始时；付费前请再 list_context）
 ${walletsJson}`,
     messages: modelMessages,
     tools,

@@ -1,9 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { wrapFetchWithPayment, x402Client, x402HTTPClient } from "@x402/fetch";
 import { ExactEvmScheme } from "@x402/evm/exact/client";
+import { UptoEvmScheme } from "@x402/evm/upto/client";
 import type { PaymentRequirements } from "@x402/core/types";
 import { privateKeyToAccount } from "viem/accounts";
-import { decryptSecret } from "../../lib/crypto.js";
+import { unsealAgentPrivateKey } from "../../lib/agent-seal.js";
 import { getEnv } from "../../lib/env.js";
 import {
   toDeveloperAgent,
@@ -19,6 +20,19 @@ const ALLOWED_MERCHANT_ORIGINS = new Set([
   "http://localhost:4021",
   "http://127.0.0.1:4021",
 ]);
+
+/**
+ * Appends a search query to an x402 merchant URL (`?q=`).
+ * @param merchantUrl - Base catalog URL
+ * @param query - Optional user question for search agents
+ */
+export function withMerchantQuery(merchantUrl: string, query?: string): string {
+  const q = query?.trim();
+  if (!q) return merchantUrl;
+  const url = new URL(merchantUrl);
+  url.searchParams.set("q", q);
+  return url.toString();
+}
 
 export type MerchantPayResult =
   | {
@@ -298,19 +312,22 @@ export async function payX402Merchant(
   }
 
   const env = getEnv();
-  const sealSecret = env.jwtSecret || env.supabaseServiceRoleKey;
-  if (!sealSecret) {
+  if (!env.jwtSecret && !env.supabaseServiceRoleKey) {
     return { ok: false, status: 400, error: "Server cannot unseal agent key" };
   }
 
   let privateKey: `0x${string}`;
   try {
-    privateKey = (await decryptSecret(
+    privateKey = (await unsealAgentPrivateKey(
       agentRow.encrypted_private_key,
-      sealSecret,
     )) as `0x${string}`;
-  } catch {
-    return { ok: false, status: 400, error: "Failed to unseal agent key" };
+  } catch (err) {
+    return {
+      ok: false,
+      status: 400,
+      error:
+        err instanceof Error ? err.message : "Failed to unseal agent key",
+    };
   }
 
   const signer = privateKeyToAccount(privateKey);
@@ -330,6 +347,7 @@ export async function payX402Merchant(
   const selectedRef: { current: PaymentRequirements | null } = { current: null };
   const client = new x402Client()
     .register("eip155:*", new ExactEvmScheme(signer))
+    .register("eip155:*", new UptoEvmScheme(signer))
     .registerPolicy((_version, requirements) => {
       const allowed = requirements.filter((req) => {
         const human = atomicUsdcToDecimal(req.amount);
@@ -367,6 +385,15 @@ export async function payX402Merchant(
 
   if (!response.ok) {
     const text = await response.text().catch(() => "");
+    if (response.status === 412) {
+      return {
+        ok: false,
+        status: 502,
+        error:
+          `商家返回 HTTP 412（Permit2 未授权）：upto 方案需先 approve Permit2。` +
+          `Bocha Search 已改为 exact 方案，请确认 seller 已部署最新版本。详情: ${text.slice(0, 160)}`,
+      };
+    }
     return {
       ok: false,
       status: 502,

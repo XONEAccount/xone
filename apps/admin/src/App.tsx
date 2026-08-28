@@ -17,6 +17,7 @@ import { PaymentsPage } from "@/features/payments/payments-page";
 import { ProfileDetailPage } from "@/features/profiles/profile-detail-page";
 import { ProfilesPage } from "@/features/profiles/profiles-page";
 import { SearchPage } from "@/features/search/search-page";
+import { ServiceCatalogPage } from "@/features/service-catalog/service-catalog-page";
 import { XoneKeyDetailPage } from "@/features/xone/xone-key-detail-page";
 import { XoneKeysPage } from "@/features/xone/xone-keys-page";
 import { XoneLedgerPage } from "@/features/xone/xone-ledger-page";
@@ -69,6 +70,7 @@ export function App() {
               <Route path="legacy-agents/:id" element={<LegacyAgentDetailPage />} />
               <Route path="payments" element={<PaymentsPage />} />
               <Route path="fundings" element={<FundingsPage />} />
+              <Route path="service-catalog" element={<ServiceCatalogPage />} />
               <Route path="audit" element={<AuditPage />} />
               <Route path="xone/tenants" element={<XoneTenantsPage />} />
               <Route path="xone/tenants/:id" element={<XoneTenantDetailPage />} />

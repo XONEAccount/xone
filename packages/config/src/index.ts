@@ -59,6 +59,15 @@ export const SUPPORTED_ASSETS = [
   },
 ] as const;
 
+export {
+  USDC_AUTHORIZATION_TTL_SECONDS,
+  USDC_CONTRACT_ADDRESS,
+  USDC_DECIMALS,
+  USDC_TRANSFER_AUTHORIZATION_TYPES,
+  usdcAuthorizationAbi,
+  usdcTransferAuthorizationDomain,
+} from "./usdc-eip3009.js";
+
 export const DEFAULT_PAYMENT_POLICY: {
   maxAutoAmount: string;
   maxDailyAutoAmount: string;

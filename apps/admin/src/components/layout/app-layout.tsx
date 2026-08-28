@@ -4,6 +4,7 @@ import {
   ClipboardList,
   KeyRound,
   LayoutDashboard,
+  ListTree,
   LogOut,
   Receipt,
   ScrollText,
@@ -45,6 +46,7 @@ const navItems: Array<{
     { to: "/xone/tenants", label: "Console users", icon: Users },
     { to: "/payments", label: "Payments", icon: Receipt },
     { to: "/fundings", label: "Fundings", icon: Banknote },
+    { to: "/service-catalog", label: "Service catalog", icon: ListTree },
     { to: "/xone/ledger", label: "XOne ledger", icon: ScrollText },
     { to: "/audit", label: "Audit", icon: ClipboardList },
   ];

@@ -1,18 +1,27 @@
 import {
   HTTPFacilitatorClient,
   x402ResourceServer,
+  type HTTPRequestContext,
 } from "@x402/core/server";
 import { ExactEvmScheme } from "@x402/evm/exact/server";
 import { UptoEvmScheme } from "@x402/evm/upto/server";
 import { paymentMiddleware, setSettlementOverrides } from "@x402/hono";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import {
+  estimateBochaSearchPriceUsd,
+  runBochaSearch,
+} from "./bocha.js";
 
 export type SellerBindings = {
   EVM_ADDRESS?: string;
   FACILITATOR_URL?: string;
   NETWORK?: string;
   CORS_ORIGIN?: string;
+  /** Bocha Web Search API key (optional — mock results without it). */
+  BOCHA_API_KEY?: string;
+  /** DeepSeek key for AI price estimate in [0.01, 0.1] USDC. */
+  DEEPSEEK_API_KEY?: string;
 };
 
 type AppEnv = {
@@ -37,8 +46,19 @@ function getSellerConfig(bindings?: SellerBindings) {
     "eip155:84532") as `${string}:${string}`;
   const corsOrigin =
     bindings?.CORS_ORIGIN || process.env.CORS_ORIGIN || "*";
+  const bochaApiKey =
+    bindings?.BOCHA_API_KEY || process.env.BOCHA_API_KEY || "";
+  const deepseekApiKey =
+    bindings?.DEEPSEEK_API_KEY || process.env.DEEPSEEK_API_KEY || "";
 
-  return { evmAddress, facilitatorUrl, network, corsOrigin };
+  return {
+    evmAddress,
+    facilitatorUrl,
+    network,
+    corsOrigin,
+    bochaApiKey,
+    deepseekApiKey,
+  };
 }
 
 /**
@@ -65,6 +85,8 @@ export function createApp(bindings?: SellerBindings) {
         "FACILITATOR_URL",
         "NETWORK",
         "CORS_ORIGIN",
+        "BOCHA_API_KEY",
+        "DEEPSEEK_API_KEY",
       ] as const) {
         const value = c.env[key];
         if (typeof value === "string" && value.length > 0) {
@@ -115,6 +137,38 @@ export function createApp(bindings?: SellerBindings) {
       description: "AI text generation — billed by token usage",
       mimeType: "application/json",
     },
+    "GET /bocha/search": {
+      accepts: [
+        {
+          // exact (EIP-3009) — no Permit2 approve needed (upto returns HTTP 412 without it).
+          scheme: "exact",
+          price: async (ctx: HTTPRequestContext) => {
+            let query = "";
+            try {
+              const url = new URL(ctx.adapter.getUrl());
+              query = (
+                url.searchParams.get("q") ??
+                url.searchParams.get("query") ??
+                ""
+              ).trim();
+            } catch {
+              query = "";
+            }
+            const cfg = getSellerConfig();
+            const { priceUsd } = await estimateBochaSearchPriceUsd(
+              query,
+              cfg.deepseekApiKey || undefined,
+            );
+            return `$${priceUsd.toFixed(2)}`;
+          },
+          network,
+          payTo: evmAddress,
+        },
+      ],
+      description:
+        "Bocha web search for a user question (?q=). Exact USDC price estimated in [$0.01, $0.10].",
+      mimeType: "application/json",
+    },
   };
 
   // Eagerly sync facilitator capabilities before serving paid routes.
@@ -130,7 +184,10 @@ export function createApp(bindings?: SellerBindings) {
   // Must run before paymentMiddleware so paid routes wait for (or fail) init.
   app.use(async (c, next) => {
     const path = c.req.path;
-    const needsFacilitator = path === "/weather" || path === "/api/generate";
+    const needsFacilitator =
+      path === "/weather" ||
+      path === "/api/generate" ||
+      path === "/bocha/search";
     if (needsFacilitator) {
       const ok = await facilitatorReady;
       if (!ok) {
@@ -182,6 +239,45 @@ export function createApp(bindings?: SellerBindings) {
     });
   });
 
+  /**
+   * Paid Bocha search. Query via `?q=`; exact price estimated in [$0.01, $0.10] at 402 time.
+   */
+  app.get("/bocha/search", async (c) => {
+    const query = (c.req.query("q") ?? c.req.query("query") ?? "").trim();
+    if (!query) {
+      return c.json(
+        { error: "Missing search query. Pass ?q= your question." },
+        400,
+      );
+    }
+
+    const cfg = getSellerConfig(c.env);
+    const { priceUsd, method } = await estimateBochaSearchPriceUsd(
+      query,
+      cfg.deepseekApiKey || undefined,
+    );
+
+    try {
+      const payload = await runBochaSearch(
+        query,
+        cfg.bochaApiKey || undefined,
+        priceUsd,
+        method,
+      );
+      return c.json(payload);
+    } catch (err) {
+      return c.json(
+        {
+          error: err instanceof Error ? err.message : String(err),
+          query,
+          priceUsd,
+          priceMethod: method,
+        },
+        502,
+      );
+    }
+  });
+
   app.get("/public", (c) => {
     return c.json({
       message: "This is a free public endpoint. No payment required.",
@@ -198,6 +294,8 @@ export function createApp(bindings?: SellerBindings) {
       facilitatorReady: facilitatorOk,
       address: cfg.evmAddress,
       network: cfg.network,
+      bochaConfigured: Boolean(cfg.bochaApiKey),
+      aiPriceConfigured: Boolean(cfg.deepseekApiKey),
     });
   });
 

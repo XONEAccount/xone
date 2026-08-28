@@ -2,13 +2,13 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { fetchServiceCatalog } from "@/lib/service-catalog-api";
 
-/** Shared x402 catalog entry (name / URL / description are platform-owned). */
-export type X402Agent = {
+/** Shared Agent List catalog entry (platform-owned; users toggle enabled). */
+export type CatalogAgent = {
   id: string;
   name: string;
-  /** Absolute x402 resource URL. */
+  /** Absolute x402 resource URL (may accept ?q= for search agents). */
   url: string;
-  /** What this endpoint does (for the model + UI). */
+  /** What this agent does (shown in UI + sent to Chat). */
   description: string;
   enabled: boolean;
 };
@@ -16,21 +16,21 @@ export type X402Agent = {
 /**
  * Fallback when API is unreachable (matches DB seed).
  */
-export const SHARED_X402_CATALOG: Omit<X402Agent, "enabled">[] = [
+export const SHARED_AGENT_CATALOG: Omit<CatalogAgent, "enabled">[] = [
   {
-    id: "x402-weather",
-    name: "天气查询",
-    url: "https://xone-x402-seller.tskwangyi.workers.dev/weather",
+    id: "agent-bocha-search",
+    name: "Bocha Search",
+    url: "https://xone-x402-seller.tskwangyi.workers.dev/bocha/search",
     description:
-      "查询天气信息的 x402 付费接口。用户询问天气、气温、预报时优先选用。",
+      "Use Bocha web search to answer the user’s factual / current-events question. Pass the question as pay_x402.query. Price is AI-estimated between $0.01–$0.10 USDC per call.",
   },
 ];
 
-type X402AgentsState = {
-  /** Per-id enabled overrides (missing = default enabled). */
+type AgentListState = {
   enabledById: Record<string, boolean>;
-  catalog: Omit<X402Agent, "enabled">[];
-  agents: X402Agent[];
+  /** Remote/platform definitions (without enabled). */
+  catalog: Omit<CatalogAgent, "enabled">[];
+  agents: CatalogAgent[];
   loading: boolean;
   error: string | null;
   /**
@@ -38,21 +38,21 @@ type X402AgentsState = {
    */
   refreshCatalog: () => Promise<void>;
   /**
-   * Toggles enabled flag for a shared catalog entry.
-   * @param id - Catalog entry id
+   * Toggles enabled for a catalog entry.
+   * @param id - Catalog id
    */
   toggleEnabled: (id: string) => void;
 };
 
 /**
- * Builds the visible catalog from shared definitions + user toggles.
+ * Resolves catalog rows with user enable overrides.
  * @param catalog - Platform rows
- * @param enabledById - User enable overrides
+ * @param enabledById - Overrides (missing = enabled)
  */
 function resolveAgents(
-  catalog: Omit<X402Agent, "enabled">[],
+  catalog: Omit<CatalogAgent, "enabled">[],
   enabledById: Record<string, boolean>,
-): X402Agent[] {
+): CatalogAgent[] {
   return catalog.map((item) => ({
     ...item,
     enabled: enabledById[item.id] ?? true,
@@ -60,21 +60,21 @@ function resolveAgents(
 }
 
 /**
- * Shared x402 Agent List. Catalog is admin-managed; enable/disable is per-user.
+ * Agent List catalog store (Service List → Agent List).
  */
-export const useX402AgentsStore = create<X402AgentsState>()(
+export const useAgentListStore = create<AgentListState>()(
   persist(
     (set, get) => ({
       enabledById: {},
-      catalog: SHARED_X402_CATALOG,
-      agents: resolveAgents(SHARED_X402_CATALOG, {}),
+      catalog: SHARED_AGENT_CATALOG,
+      agents: resolveAgents(SHARED_AGENT_CATALOG, {}),
       loading: false,
       error: null,
 
       async refreshCatalog() {
         set({ loading: true, error: null });
         try {
-          const items = await fetchServiceCatalog("x402");
+          const items = await fetchServiceCatalog("agent");
           const catalog =
             items.length > 0
               ? items.map((i) => ({
@@ -83,7 +83,7 @@ export const useX402AgentsStore = create<X402AgentsState>()(
                   url: i.url,
                   description: i.description,
                 }))
-              : SHARED_X402_CATALOG;
+              : SHARED_AGENT_CATALOG;
           const enabledById = get().enabledById;
           set({
             catalog,
@@ -95,6 +95,7 @@ export const useX402AgentsStore = create<X402AgentsState>()(
           set({
             loading: false,
             error: err instanceof Error ? err.message : "Failed to load catalog",
+            // Keep last good catalog / fallback.
             agents: resolveAgents(get().catalog, get().enabledById),
           });
         }
@@ -110,35 +111,18 @@ export const useX402AgentsStore = create<X402AgentsState>()(
       },
     }),
     {
-      name: "xone-x402-agent-list",
+      name: "xone-service-agent-list",
       /**
-       * Persist enable overrides + last catalog snapshot.
        * @param persisted - Stored slice
        * @param current - Current state
        */
       merge: (persisted, current) => {
-        const p = persisted as
-          | Partial<X402AgentsState> & {
-              agents?: Array<{ id: string; enabled?: boolean }>;
-            }
-          | undefined;
-
-        const enabledById: Record<string, boolean> = {
-          ...(p?.enabledById ?? {}),
-        };
-        if (Array.isArray(p?.agents)) {
-          for (const row of p.agents) {
-            if (row?.id && typeof row.enabled === "boolean") {
-              enabledById[row.id] = row.enabled;
-            }
-          }
-        }
-
+        const p = persisted as Partial<AgentListState> | undefined;
+        const enabledById = { ...(p?.enabledById ?? {}) };
         const catalog =
           Array.isArray(p?.catalog) && p.catalog.length > 0
             ? p.catalog
             : current.catalog;
-
         return {
           ...current,
           enabledById,

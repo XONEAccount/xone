@@ -87,6 +87,54 @@ export async function fundDeveloperAgent(
 }
 
 /**
+ * Gas-sponsored fund: user signs USDC EIP-3009; relayer pays gas and credits allowance.
+ * @param agentId - Agent id
+ * @param ownerAddress - Owner wallet
+ * @param amount - USDC amount (human decimal)
+ * @param authorization - Signed transfer authorization fields
+ * @param signature - EIP-712 signature hex
+ */
+export async function fundDeveloperAgentRelay(
+  agentId: string,
+  ownerAddress: string,
+  amount: number,
+  authorization: {
+    from: string;
+    to: string;
+    value: string;
+    validAfter: string;
+    validBefore: string;
+    nonce: string;
+  },
+  signature: string,
+): Promise<{ agent: DeveloperAgent; txHash: string }> {
+  const data = await apiFetch<{ ok: true; agent: DeveloperAgent; txHash: string }>(
+    `/api/developer/agents/${agentId}/fund/relay`,
+    {
+      method: "POST",
+      body: {
+        ownerAddress,
+        amount,
+        ...authorization,
+        signature,
+      },
+      token: "demo",
+      idempotencyKey: authorization.nonce,
+    },
+  );
+  return { agent: data.agent, txHash: data.txHash };
+}
+
+/**
+ * Whether the API has a gas relayer configured for agent funding.
+ */
+export async function getFundRelayStatus(): Promise<{ enabled: boolean }> {
+  return apiFetch<{ enabled: boolean }>("/api/developer/fund-relay/status", {
+    token: "demo",
+  });
+}
+
+/**
  * Runs the first machine payment via the x402 endpoint using the agent API key.
  * @param apiKey - One-time returned agent key
  * @param input - Pay payload

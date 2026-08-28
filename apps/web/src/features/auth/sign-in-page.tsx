@@ -13,6 +13,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useWalletAccount } from "@/hooks/use-wallet-account";
 import { useI18n } from "@/hooks/use-i18n";
+import type { MessageKey } from "@/lib/i18n/messages";
 import { cn } from "@/lib/utils";
 import { assertChainAlignment } from "@/web3";
 
@@ -22,10 +23,10 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const CREATE_WAIT_MS = 12_000;
 
 /**
- * 登录页：邮箱验证码、Google / GitHub、外部钱包。
+ * Sign-in: email OTP, Google / GitHub, external wallet.
  */
 export function SignInPage() {
-  const { t } = useI18n();
+  const { t, locale, toggleLocale } = useI18n();
   const { ready, authenticated, login, logout } = usePrivy();
   const { address } = useWalletAccount();
   const navigate = useNavigate();
@@ -48,6 +49,17 @@ export function SignInPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center px-4 py-10">
+      <div className="absolute top-4 right-4">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={toggleLocale}
+          aria-label={t("auth.language")}
+        >
+          {locale === "zh" ? t("settings.switchToEn") : t("settings.switchToZh")}
+        </Button>
+      </div>
       <div className="w-full max-w-[380px] space-y-8 animate-in">
         <div className="space-y-3 text-center">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-md border border-border bg-white shadow-[0_8px_24px_rgba(10,10,10,0.04)]">
@@ -55,7 +67,7 @@ export function SignInPage() {
           </div>
           <div className="space-y-1">
             <h1 className="text-3xl font-semibold tracking-tight">{t("brand.name")}</h1>
-            <p className="text-sm text-muted-foreground">登录以使用钱包</p>
+            <p className="text-sm text-muted-foreground">{t("auth.subtitle")}</p>
           </div>
         </div>
 
@@ -70,7 +82,7 @@ export function SignInPage() {
             ) : authenticated && !address ? (
               <div className="space-y-3 py-2 text-center">
                 <p className="text-sm text-muted-foreground">
-                  {createTimedOut ? "钱包创建超时，请重新登录后再试。" : "正在创建钱包…"}
+                  {createTimedOut ? t("auth.createTimedOut") : t("auth.creatingWallet")}
                 </p>
                 {createTimedOut ? (
                   <Button
@@ -79,7 +91,7 @@ export function SignInPage() {
                     className="w-full"
                     onClick={() => void logout()}
                   >
-                    返回登录
+                    {t("auth.backToLogin")}
                   </Button>
                 ) : null}
               </div>
@@ -103,6 +115,7 @@ type AuthPending = "email" | "otp" | SocialProvider | "wallet";
  * @param onWallet - Opens Privy wallet-only login
  */
 function LoginMethods({ onWallet }: { onWallet: () => void }) {
+  const { t } = useI18n();
   const { authenticated, logout } = usePrivy();
   const { sendCode, loginWithCode } = useLoginWithEmail();
   const { initOAuth, loading: oauthLoading } = useLoginWithOAuth();
@@ -139,7 +152,7 @@ function LoginMethods({ onWallet }: { onWallet: () => void }) {
       setStep("otp");
       setCode("");
     } catch (err) {
-      setError(friendlyAuthError(err));
+      setError(friendlyAuthError(err, t));
     } finally {
       setPending(null);
     }
@@ -158,7 +171,7 @@ function LoginMethods({ onWallet }: { onWallet: () => void }) {
     try {
       await loginWithCode({ code: otp });
     } catch (err) {
-      setError(friendlyAuthError(err));
+      setError(friendlyAuthError(err, t));
     } finally {
       setPending(null);
     }
@@ -176,7 +189,7 @@ function LoginMethods({ onWallet }: { onWallet: () => void }) {
       await ensureLoggedOut();
       await initOAuth({ provider });
     } catch (err) {
-      setError(friendlyAuthError(err));
+      setError(friendlyAuthError(err, t));
       setPending(null);
     }
   }
@@ -192,7 +205,7 @@ function LoginMethods({ onWallet }: { onWallet: () => void }) {
       await ensureLoggedOut();
       onWallet();
     } catch (err) {
-      setError(friendlyAuthError(err));
+      setError(friendlyAuthError(err, t));
     } finally {
       window.setTimeout(() => setPending(null), 400);
     }
@@ -202,7 +215,7 @@ function LoginMethods({ onWallet }: { onWallet: () => void }) {
     return (
       <form className="space-y-4" onSubmit={(e) => void onVerifyCode(e)}>
         <p className="text-sm text-muted-foreground">
-          验证码已发送至 <span className="font-medium text-foreground">{email.trim()}</span>
+          {t("auth.codeSent", { email: email.trim() })}
         </p>
         <InputOTP
           maxLength={6}
@@ -223,7 +236,7 @@ function LoginMethods({ onWallet }: { onWallet: () => void }) {
           </InputOTPGroup>
         </InputOTP>
         <Button type="submit" className="w-full" disabled={busy || code.length < 6}>
-          {pending === "otp" ? <Spinner /> : "登录"}
+          {pending === "otp" ? <Spinner /> : t("auth.signIn")}
         </Button>
         <Button
           type="button"
@@ -236,7 +249,7 @@ function LoginMethods({ onWallet }: { onWallet: () => void }) {
             setError(null);
           }}
         >
-          使用其他邮箱
+          {t("auth.otherEmail")}
         </Button>
         {error ? <AuthError message={error} /> : null}
       </form>
@@ -264,7 +277,7 @@ function LoginMethods({ onWallet }: { onWallet: () => void }) {
           />
         </div>
         <Button type="submit" disabled={busy || !emailValid} className="shrink-0">
-          {pending === "email" ? <Spinner /> : "提交"}
+          {pending === "email" ? <Spinner /> : t("auth.submit")}
         </Button>
       </form>
 
@@ -304,7 +317,7 @@ function LoginMethods({ onWallet }: { onWallet: () => void }) {
         ) : (
           <Wallet className="h-4 w-4" strokeWidth={1.75} aria-hidden />
         )}
-        使用钱包继续
+        {t("auth.continueWithWallet")}
       </Button>
 
       {error ? <AuthError message={error} /> : null}
@@ -313,10 +326,11 @@ function LoginMethods({ onWallet }: { onWallet: () => void }) {
 }
 
 function Divider() {
+  const { t } = useI18n();
   return (
     <div className="flex items-center gap-3 py-1" role="separator">
       <span className="h-px flex-1 bg-border" />
-      <span className="text-[11px] tracking-wide text-muted-foreground">或</span>
+      <span className="text-[11px] tracking-wide text-muted-foreground">{t("auth.or")}</span>
       <span className="h-px flex-1 bg-border" />
     </div>
   );
@@ -369,23 +383,27 @@ function GoogleMark() {
 }
 
 /**
- * Maps Privy / network errors into short Chinese copy.
+ * Maps Privy / network errors into short localized copy.
  * @param err - Thrown value
+ * @param t - Translator
  */
-function friendlyAuthError(err: unknown): string {
+function friendlyAuthError(
+  err: unknown,
+  t: (key: MessageKey) => string,
+): string {
   const message = err instanceof Error ? err.message : String(err);
   const lower = message.toLowerCase();
   if (lower.includes("not allowed")) {
-    return "该登录方式未对该 Web Client 开放。请到 Privy Dashboard → Clients 勾选后保存。";
+    return t("auth.errorNotAllowed");
   }
   if (lower.includes("invalid") && lower.includes("code")) {
-    return "验证码不正确，请重试。";
+    return t("auth.errorInvalidCode");
   }
   if (lower.includes("too many")) {
-    return "尝试次数过多，请重新获取验证码。";
+    return t("auth.errorTooMany");
   }
   if (lower.includes("network") || lower.includes("fetch")) {
-    return "网络异常，请稍后重试。";
+    return t("auth.errorNetwork");
   }
-  return message || "登录失败，请重试。";
+  return message || t("auth.errorGeneric");
 }

@@ -107,6 +107,8 @@ const en = {
   "chat.historyFailed": "Cloud history failed; using local backup",
   "chat.pickX402": "Choose an x402 service",
   "chat.pickWallet": "Choose an agent wallet",
+  "chat.pickWalletEmpty":
+    "No wallets with balance and allowance. Fund an agent wallet first.",
   "chat.balance": "Balance {balance} {asset}",
   "chat.payOverLimitTitle": "Payment exceeds limit — confirm to continue",
   "chat.payOverLimitBody":
@@ -115,6 +117,9 @@ const en = {
   "chat.payDailyRemaining": " · daily left {remaining}/{daily}",
   "chat.payAnyway": "Pay anyway",
   "chat.cancel": "Cancel",
+  "chat.awaitingChoice": "Select a service or wallet above before sending another message.",
+  "chat.missingToolResult":
+    "A previous step is still waiting for your choice. Pick a wallet/service above (or Clear chat) before sending again.",
   "chat.toolDone": "Finished `{tool}`",
   "chat.toolRunning": "Calling `{tool}`…",
   "chat.reasoning": "Reasoning",
@@ -184,7 +189,49 @@ const en = {
     "Send USDC to wallet {address}. Must be ≤ available {available} USDC.",
   "devWallet.fundAction": "Fund",
   "devWallet.fundAvailable": "Available {amount} {asset}",
+  "devWallet.fundConfirmTitle": "Confirm on-chain fund",
+  "devWallet.fundConfirmDesc":
+    "Sign to authorize a USDC transfer to the agent wallet. Network fees are covered by X-ONE.",
+  "devWallet.fundConfirmRecipient": "Recipient agent",
+  "devWallet.fundConfirmAmount": "Amount",
+  "devWallet.fundConfirmFee": "Network fee",
+  "devWallet.fundConfirmFeeValue": "Covered by X-ONE",
+  "devWallet.fundConfirmSubmit": "Sign and fund",
+  "devWallet.fundConfirmSubmitting": "Signing…",
   "devWallet.viewList": "View my wallets",
+
+  "x402.title": "X402 List",
+  "x402.cardTitle": "Available services",
+  "x402.empty": "No services yet",
+  "x402.count": "{total} total · {enabled} enabled",
+  "x402.noData": "No data",
+  "x402.colName": "Name",
+  "x402.colDescription": "Description",
+  "x402.colUrl": "x402 URL",
+  "x402.colStatus": "Status",
+  "x402.enabled": "Enabled",
+  "x402.disabled": "Disabled",
+  "x402.catalog.x402-weather.name": "Weather",
+  "x402.catalog.x402-weather.description":
+    "Paid x402 weather endpoint. Prefer when the user asks about weather, temperature, or forecast.",
+
+  "auth.subtitle": "Sign in to use your wallet",
+  "auth.creatingWallet": "Creating wallet…",
+  "auth.createTimedOut": "Wallet creation timed out. Sign in again and retry.",
+  "auth.backToLogin": "Back to sign in",
+  "auth.codeSent": "Code sent to {email}",
+  "auth.signIn": "Sign in",
+  "auth.otherEmail": "Use another email",
+  "auth.submit": "Continue",
+  "auth.or": "or",
+  "auth.continueWithWallet": "Continue with wallet",
+  "auth.errorNotAllowed":
+    "This sign-in method is not enabled for this Web Client. Enable it in Privy Dashboard → Clients.",
+  "auth.errorInvalidCode": "Incorrect code. Please try again.",
+  "auth.errorTooMany": "Too many attempts. Request a new code.",
+  "auth.errorNetwork": "Network error. Please try again.",
+  "auth.errorGeneric": "Sign-in failed. Please try again.",
+  "auth.language": "Language",
 } as const;
 
 const zh: Record<MessageKey, string> = {
@@ -290,6 +337,7 @@ const zh: Record<MessageKey, string> = {
   "chat.historyFailed": "云端会话加载失败，已尝试本地备份",
   "chat.pickX402": "选择 x402 服务",
   "chat.pickWallet": "选择 Agent 钱包",
+  "chat.pickWalletEmpty": "没有可用余额与 allowance 的钱包，请先给 Agent 钱包充值。",
   "chat.balance": "余额 {balance} {asset}",
   "chat.payOverLimitTitle": "支付超过限额，需手动确认",
   "chat.payOverLimitBody":
@@ -298,6 +346,9 @@ const zh: Record<MessageKey, string> = {
   "chat.payDailyRemaining": " · 剩余 daily {remaining}/{daily}",
   "chat.payAnyway": "仍要支付",
   "chat.cancel": "取消",
+  "chat.awaitingChoice": "请先在上方选择服务或钱包，再发送新消息。",
+  "chat.missingToolResult":
+    "上一步还在等待你的选择。请先点选上方的钱包/服务（或清空会话）后再发送。",
   "chat.toolDone": "已完成 `{tool}`",
   "chat.toolRunning": "正在调用 `{tool}`…",
   "chat.reasoning": "思考过程",
@@ -367,7 +418,49 @@ const zh: Record<MessageKey, string> = {
     "将 USDC 转到 Wallet 地址 {address}。需 ≤ 钱包可用 {available} USDC。",
   "devWallet.fundAction": "转入额度",
   "devWallet.fundAvailable": "当前 Wallet 可用 {amount} {asset}",
+  "devWallet.fundConfirmTitle": "确认链上转入",
+  "devWallet.fundConfirmDesc":
+    "签名授权 USDC 转入 Agent 钱包。网络费由 X-ONE 承担。",
+  "devWallet.fundConfirmRecipient": "收款 Agent",
+  "devWallet.fundConfirmAmount": "金额",
+  "devWallet.fundConfirmFee": "网络费",
+  "devWallet.fundConfirmFeeValue": "由 X-ONE 承担",
+  "devWallet.fundConfirmSubmit": "签名并转入",
+  "devWallet.fundConfirmSubmitting": "签名并转入…",
   "devWallet.viewList": "查看我的 Wallet",
+
+  "x402.title": "X402 List",
+  "x402.cardTitle": "可用服务",
+  "x402.empty": "暂无服务",
+  "x402.count": "共 {total} 个 · 已启用 {enabled} 个",
+  "x402.noData": "暂无数据",
+  "x402.colName": "名称",
+  "x402.colDescription": "功能介绍",
+  "x402.colUrl": "x402 URL",
+  "x402.colStatus": "状态",
+  "x402.enabled": "已启用",
+  "x402.disabled": "已禁用",
+  "x402.catalog.x402-weather.name": "天气查询",
+  "x402.catalog.x402-weather.description":
+    "查询天气信息的 x402 付费接口。用户询问天气、气温、预报时优先选用。",
+
+  "auth.subtitle": "登录以使用钱包",
+  "auth.creatingWallet": "正在创建钱包…",
+  "auth.createTimedOut": "钱包创建超时，请重新登录后再试。",
+  "auth.backToLogin": "返回登录",
+  "auth.codeSent": "验证码已发送至 {email}",
+  "auth.signIn": "登录",
+  "auth.otherEmail": "使用其他邮箱",
+  "auth.submit": "提交",
+  "auth.or": "或",
+  "auth.continueWithWallet": "使用钱包继续",
+  "auth.errorNotAllowed":
+    "该登录方式未对该 Web Client 开放。请到 Privy Dashboard → Clients 勾选后保存。",
+  "auth.errorInvalidCode": "验证码不正确，请重试。",
+  "auth.errorTooMany": "尝试次数过多，请重新获取验证码。",
+  "auth.errorNetwork": "网络异常，请稍后重试。",
+  "auth.errorGeneric": "登录失败，请重试。",
+  "auth.language": "语言",
 };
 
 export const messages: Record<Locale, Record<MessageKey, string>> = {

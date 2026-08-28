@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { getTxExplorerUrl } from "@xone/config";
+import { useSignTypedData } from "@privy-io/react-auth";
+import { getTxExplorerUrl, USDC_TRANSFER_AUTHORIZATION_TYPES } from "@xone/config";
 import {
   ArrowDownToLine,
   Check,
@@ -36,18 +37,21 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useEnsureEmbeddedWallet } from "@/hooks/use-ensure-embedded-wallet";
 import { useI18n } from "@/hooks/use-i18n";
-import { useSendAsset } from "@/hooks/use-send-asset";
 import { useWalletAccount } from "@/hooks/use-wallet-account";
 import { useWalletBalances } from "@/hooks/use-wallet-balances";
 import { shortAddress } from "@/lib/address";
 import {
   createDeveloperAgent,
-  fundDeveloperAgent,
+  fundDeveloperAgentRelay,
+  getFundRelayStatus,
   listDeveloperAgents,
 } from "@/lib/developer-api";
 import { recordTransferOnServer } from "@/lib/record-transfer";
 import { cn } from "@/lib/utils";
-import { buildSendTransaction, estimateSendFee } from "@/web3";
+import {
+  buildUsdcTransferTypedData,
+  serializeUsdcAuthorizationMessage,
+} from "@/web3/usdc-authorization";
 
 type Step = 1 | 2;
 
@@ -84,8 +88,8 @@ function parseList(text: string): string[] {
 export function CreateAgentPage() {
   const { t } = useI18n();
   const { address } = useWalletAccount();
+  const { signTypedData } = useSignTypedData();
   const { ensureEmbeddedWalletAddress } = useEnsureEmbeddedWallet();
-  const { sendAsset } = useSendAsset();
   const queryClient = useQueryClient();
   const owner = address?.toLowerCase() ?? "";
   const { usdc, refetch: refetchBalances } = useWalletBalances();
@@ -99,7 +103,7 @@ export function CreateAgentPage() {
   const [allowedPayeesText, setAllowedPayeesText] = useState("");
   const [fundAmount, setFundAmount] = useState(String(FIRST_PAY_AMOUNT));
   const [fundOpen, setFundOpen] = useState(false);
-  const [fundFee, setFundFee] = useState("估算中…");
+  const [fundRelayEnabled, setFundRelayEnabled] = useState<boolean | null>(null);
   const [fundTxHash, setFundTxHash] = useState<string | null>(null);
   const [funding, setFunding] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -116,19 +120,11 @@ export function CreateAgentPage() {
       .catch(() => setExistingNames([]));
   }, [owner]);
 
-  const fundTransaction = useMemo(() => {
-    if (!fundOpen || !agent) return null;
-    try {
-      return buildSendTransaction(
-        agent.walletAddress,
-        fundAmount.trim(),
-        AGENT_ASSET,
-        AGENT_CHAIN,
-      );
-    } catch (err) {
-      return err instanceof Error ? err : new Error("无法构建转入交易");
-    }
-  }, [fundOpen, agent, fundAmount]);
+  useEffect(() => {
+    void getFundRelayStatus()
+      .then((status) => setFundRelayEnabled(status.enabled))
+      .catch(() => setFundRelayEnabled(false));
+  }, []);
 
   const supportsOnChainFund = Boolean(agent);
 
@@ -191,11 +187,15 @@ export function CreateAgentPage() {
   }
 
   /**
-   * Opens confirm dialog after validating amount; estimates gas for the on-chain fund.
+   * Opens confirm dialog after validating amount for gas-sponsored relay fund.
    */
   async function onOpenFundConfirm() {
     if (!agent || !owner || !address) {
       setError("请先连接钱包");
+      return;
+    }
+    if (fundRelayEnabled === false) {
+      setError("Gas Relayer 未配置，请联系管理员设置 RELAYER_PRIVATE_KEY");
       return;
     }
     const amount = Number(fundAmount);
@@ -214,56 +214,58 @@ export function CreateAgentPage() {
     }
 
     setError(null);
-    setFundFee("估算中…");
     setFundOpen(true);
-    try {
-      const fee = await estimateSendFee(
-        agent.walletAddress,
-        fundAmount.trim(),
-        AGENT_ASSET,
-        address,
-        AGENT_CHAIN,
-      );
-      setFundFee(fee);
-    } catch {
-      setFundFee("暂无法估算，以钱包确认为准");
-    }
   }
 
   /**
-   * Signs and broadcasts the on-chain USDC fund transfer to the agent wallet.
+   * Signs USDC EIP-3009 authorization; relayer broadcasts and pays gas.
    */
   async function onConfirmFundSend() {
-    if (!agent || fundTransaction instanceof Error || !fundTransaction) return;
+    if (!agent || !address) return;
     setFunding(true);
     setError(null);
     try {
-      const hash = await sendAsset(
-        agent.walletAddress,
-        fundAmount.trim(),
-        AGENT_ASSET,
-        AGENT_CHAIN,
+      const typedData = buildUsdcTransferTypedData({
+        from: address,
+        to: agent.walletAddress as `0x${string}`,
+        amount: fundAmount.trim(),
+      });
+      const { signature } = await signTypedData(
+        {
+          domain: typedData.domain,
+          types: {
+            TransferWithAuthorization: [...USDC_TRANSFER_AUTHORIZATION_TYPES.TransferWithAuthorization],
+          },
+          primaryType: typedData.primaryType,
+          message: {
+            from: typedData.message.from,
+            to: typedData.message.to,
+            value: typedData.message.value.toString(),
+            validAfter: typedData.message.validAfter.toString(),
+            validBefore: typedData.message.validBefore.toString(),
+            nonce: typedData.message.nonce,
+          },
+        },
+        {
+          address,
+          uiOptions: { showWalletUIs: true },
+        },
       );
-      await onFundTxSent(hash);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "链上转入失败");
+      const amount = Number(fundAmount);
+      const authorization = serializeUsdcAuthorizationMessage(typedData.message);
+      const { agent: updated, txHash } = await fundDeveloperAgentRelay(
+        agent.id,
+        owner,
+        amount,
+        authorization,
+        signature,
+      );
+      setAgent(updated);
+      setFundTxHash(txHash);
       setFundOpen(false);
-    } finally {
-      setFunding(false);
-    }
-  }
-
-  /**
-   * After on-chain send: credit allowance + ledger, refresh balances.
-   * @param txHash - Submitted transaction hash
-   */
-  async function onFundTxSent(txHash: string) {
-    if (!agent || !owner || !address) return;
-    const amount = Number(fundAmount);
-    setFundTxHash(txHash);
-    setBusy(true);
-    setError(null);
-    try {
+      void refetchBalances();
+      void queryClient.invalidateQueries({ queryKey: ["wallet-balances"] });
+      void queryClient.invalidateQueries({ queryKey: ["wallet-txs"] });
       void recordTransferOnServer({
         txHash,
         from: address,
@@ -272,21 +274,11 @@ export function CreateAgentPage() {
         asset: AGENT_ASSET,
         status: "submitted",
       }).catch((err) => console.warn("[fund] ledger record failed", err));
-
-      const updated = await fundDeveloperAgent(agent.id, owner, amount, txHash);
-      setAgent(updated);
-      setFundOpen(false);
-      void refetchBalances();
-      void queryClient.invalidateQueries({ queryKey: ["wallet-balances"] });
-      void queryClient.invalidateQueries({ queryKey: ["wallet-txs"] });
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? `链上已发送，但记账失败：${err.message}（tx ${txHash}）`
-          : "转入记账失败",
-      );
+      setError(err instanceof Error ? err.message : "链上转入失败");
+      setFundOpen(false);
     } finally {
-      setBusy(false);
+      setFunding(false);
     }
   }
 
@@ -492,53 +484,48 @@ export function CreateAgentPage() {
       ) : null}
 
       <Dialog open={fundOpen} onOpenChange={setFundOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle>确认链上转入</DialogTitle>
-            <DialogDescription>
-              将从你的钱包发送 USDC 到 Agent 地址，确认后余额会减少。
-            </DialogDescription>
+            <DialogTitle>{t("devWallet.fundConfirmTitle")}</DialogTitle>
+            <DialogDescription>{t("devWallet.fundConfirmDesc")}</DialogDescription>
           </DialogHeader>
           {agent ? (
             <div className="space-y-1 text-sm">
               <p>
-                <span className="text-muted-foreground">收款 Agent</span>
+                <span className="text-muted-foreground">{t("devWallet.fundConfirmRecipient")}</span>
                 <br />
                 <span className="break-all font-mono text-xs">{agent.walletAddress}</span>
               </p>
               <p>
-                <span className="text-muted-foreground">金额</span> · {fundAmount}{" "}
-                {agent.asset}
+                <span className="text-muted-foreground">{t("devWallet.fundConfirmAmount")}</span>
+                {" · "}
+                {fundAmount} {agent.asset}
               </p>
               <p>
-                <span className="text-muted-foreground">预估手续费</span> · {fundFee}
+                <span className="text-muted-foreground">{t("devWallet.fundConfirmFee")}</span>
+                {" · "}
+                {t("devWallet.fundConfirmFeeValue")}
               </p>
             </div>
           ) : null}
-          <DialogFooter className="sm:flex-col">
-            {fundTransaction instanceof Error ? (
-              <p className="text-sm text-destructive" role="alert">
-                {fundTransaction.message}
-              </p>
-            ) : fundTransaction ? (
-              <Button
-                type="button"
-                className="w-full"
-                disabled={funding}
-                onClick={() => void onConfirmFundSend()}
-              >
-                {funding ? (
-                  <>
-                    <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden />
-                    发送中…
-                  </>
-                ) : (
-                  "确认发送"
-                )}
-              </Button>
-            ) : null}
+          <DialogFooter className="sm:flex-col sm:space-x-0 gap-2">
+            <Button
+              type="button"
+              className="w-full"
+              disabled={funding || fundRelayEnabled === false}
+              onClick={() => void onConfirmFundSend()}
+            >
+              {funding ? (
+                <>
+                  <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden />
+                  {t("devWallet.fundConfirmSubmitting")}
+                </>
+              ) : (
+                t("devWallet.fundConfirmSubmit")
+              )}
+            </Button>
             <Button type="button" variant="outline" disabled={funding} onClick={() => setFundOpen(false)}>
-              取消
+              {t("devWallet.cancel")}
             </Button>
           </DialogFooter>
         </DialogContent>

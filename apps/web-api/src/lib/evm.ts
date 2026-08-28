@@ -19,18 +19,44 @@ export function chainFromSlug(slug?: string): Chain {
 }
 
 /**
+ * Picks an RPC URL for the target chain.
+ * `RPC_URL` overrides Base Sepolia only; never reuse an Ethereum Sepolia URL for Base.
+ * @param chain - Target chain
+ */
+function resolveRpcUrl(chain: Chain): string {
+  const env = getEnv();
+  const custom = env.rpcUrl.trim();
+  const fallback = chain.rpcUrls.default.http[0]!;
+
+  if (chain.id === baseSepolia.id) {
+    if (!custom) return fallback;
+    // Common misconfig: ethereum-sepolia RPC used for base-sepolia agents.
+    if (/ethereum-sepolia|eth-sepolia|11155111/i.test(custom) && !/base/i.test(custom)) {
+      return fallback;
+    }
+    return custom;
+  }
+
+  if (chain.id === sepolia.id) {
+    const ethOnly = process.env.ETH_SEPOLIA_RPC_URL?.trim();
+    if (ethOnly) return ethOnly;
+    if (custom && /ethereum-sepolia|eth-sepolia/i.test(custom) && !/base/i.test(custom)) {
+      return custom;
+    }
+    return fallback;
+  }
+
+  return fallback;
+}
+
+/**
  * Builds a viem public client for reads.
  * @param chain - Target chain
  */
 export function getPublicClient(chain: Chain = baseSepolia): PublicClient {
-  const env = getEnv();
-  const rpcUrl =
-    env.rpcUrl && chain.id === baseSepolia.id
-      ? env.rpcUrl
-      : chain.rpcUrls.default.http[0];
   return createPublicClient({
     chain,
-    transport: http(rpcUrl),
+    transport: http(resolveRpcUrl(chain)),
   });
 }
 

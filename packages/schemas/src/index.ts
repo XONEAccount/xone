@@ -188,6 +188,19 @@ export const fundDeveloperAgentSchema = z.object({
   txHash,
 });
 
+/** Gas-sponsored fund via USDC EIP-3009 + relayer. */
+export const fundDeveloperAgentRelaySchema = z.object({
+  ownerAddress: evmAddress,
+  amount: z.number().positive().max(100),
+  from: evmAddress,
+  to: evmAddress,
+  value: z.string().regex(/^\d+$/, "Invalid atomic USDC value"),
+  validAfter: z.string().regex(/^\d+$/, "Invalid validAfter"),
+  validBefore: z.string().regex(/^\d+$/, "Invalid validBefore"),
+  nonce: z.string().regex(/^0x[a-fA-F0-9]{64}$/, "Invalid authorization nonce"),
+  signature: z.string().regex(/^0x[a-fA-F0-9]+$/, "Invalid signature"),
+});
+
 /** Update developer agent spend caps (owner only) — SDK-aligned names. */
 export const updateDeveloperAgentSchema = z
   .object({
@@ -322,6 +335,7 @@ export type A2AUpdateAgentInput = z.infer<typeof a2aUpdateAgentSchema>;
 export type A2ASettleInput = z.infer<typeof a2aSettleSchema>;
 export type CreateDeveloperAgentInput = z.infer<typeof createDeveloperAgentSchema>;
 export type FundDeveloperAgentInput = z.infer<typeof fundDeveloperAgentSchema>;
+export type FundDeveloperAgentRelayInput = z.infer<typeof fundDeveloperAgentRelaySchema>;
 export type UpdateDeveloperAgentInput = z.infer<typeof updateDeveloperAgentSchema>;
 export type DeleteDeveloperAgentInput = z.infer<typeof deleteDeveloperAgentSchema>;
 export type PauseResumeDeveloperAgentInput = z.infer<

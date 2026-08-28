@@ -31,6 +31,7 @@ export function getEnv() {
     jwtSecret: process.env.JWT_SECRET ?? "",
     custodyPrivateKey: process.env.CUSTODY_PRIVATE_KEY ?? "",
     custodyAddress: process.env.CUSTODY_ADDRESS ?? "",
+    relayerPrivateKey: process.env.RELAYER_PRIVATE_KEY ?? "",
     rpcUrl: process.env.RPC_URL ?? "",
   };
 }

@@ -10,6 +10,7 @@ import { fundings } from "./routes/fundings.js";
 import { payments } from "./routes/payments.js";
 import { profiles } from "./routes/profiles.js";
 import { search } from "./routes/search.js";
+import { serviceCatalog } from "./routes/service-catalog.js";
 import { xone } from "./routes/xone.js";
 
 type AppEnv = {
@@ -54,6 +55,7 @@ export function createApp() {
   app.route("/api/fundings", fundings);
   app.route("/api/audit", audit);
   app.route("/api/xone", xone);
+  app.route("/api/service-catalog", serviceCatalog);
 
   return app;
 }

@@ -23,6 +23,7 @@ No test commands.
 |------|------|--------|-------|-------------|
 | `GET /weather` | Paid | exact | $0.001 | Mock weather data |
 | `GET /api/generate` | Paid | upto | $0.10 max | Mock LLM generation |
+| `GET /bocha/search?q=` | Paid | exact | $0.01–$0.10 (dynamic) | Bocha web search (AI-priced, EIP-3009) |
 | `GET /public` | Free | — | — | Public endpoint |
 | `GET /health` | Free | — | — | Health check |
 

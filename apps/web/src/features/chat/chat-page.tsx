@@ -43,6 +43,7 @@ import {
 import { listDeveloperAgents } from "@/lib/developer-api";
 import { getWebEnv } from "@/lib/env";
 import { cn } from "@/lib/utils";
+import { useAgentListStore } from "@/stores/agent-list";
 import { useX402AgentsStore } from "@/stores/x402-agents";
 import { fetchTokenBalances, findDisplayBalance } from "@/web3";
 
@@ -62,12 +63,52 @@ function buildWelcome(text: string): UIMessage[] {
 
 /**
  * Whether messages contain real user/assistant turns beyond the welcome.
- * @param messages - UI messages
+ * @param messages - Chat messages
  */
 function hasPersistedContent(messages: UIMessage[]): boolean {
   return messages.some(
     (m) => m.id !== "welcome" && (m.role === "user" || m.role === "assistant"),
   );
+}
+
+const HITL_TOOLS = new Set(["request_x402_choice", "request_wallet_choice"]);
+
+/**
+ * True when a client-side HITL tool is waiting for addToolOutput.
+ * @param messages - Chat messages
+ */
+function hasPendingHitlTool(messages: UIMessage[]): boolean {
+  for (const message of messages) {
+    if (message.role !== "assistant") continue;
+    for (const part of message.parts) {
+      if (!isToolUIPart(part)) continue;
+      const name = getToolName(part);
+      if (!HITL_TOOLS.has(name)) continue;
+      if (
+        part.state === "input-available" ||
+        part.state === "input-streaming" ||
+        part.state === "approval-requested"
+      ) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+/**
+ * Maps SDK errors into clearer chat copy.
+ * @param message - Raw error message
+ * @param t - Translator
+ */
+function friendlyChatError(
+  message: string,
+  t: (key: import("@/lib/i18n/messages").MessageKey) => string,
+): string {
+  if (/Tool result is missing|MissingToolResults/i.test(message)) {
+    return t("chat.missingToolResult");
+  }
+  return message;
 }
 
 /**
@@ -78,10 +119,24 @@ export function ChatPage() {
   const { address } = useWalletAccount();
   const ownerAddress = address?.toLowerCase() ?? "";
   const x402Agents = useX402AgentsStore((s) => s.agents);
-  const enabledX402 = useMemo(
-    () => x402Agents.filter((a) => a.enabled),
-    [x402Agents],
-  );
+  const catalogAgents = useAgentListStore((s) => s.agents);
+  const refreshX402Catalog = useX402AgentsStore((s) => s.refreshCatalog);
+  const refreshAgentCatalog = useAgentListStore((s) => s.refreshCatalog);
+
+  useEffect(() => {
+    void refreshX402Catalog();
+    void refreshAgentCatalog();
+  }, [refreshX402Catalog, refreshAgentCatalog]);
+
+  const enabledX402 = useMemo(() => {
+    const fromX402 = x402Agents.filter((a) => a.enabled);
+    const fromAgents = catalogAgents.filter((a) => a.enabled);
+    const byId = new Map<string, (typeof fromX402)[number]>();
+    for (const row of [...fromX402, ...fromAgents]) {
+      byId.set(row.id, row);
+    }
+    return [...byId.values()];
+  }, [x402Agents, catalogAgents]);
   const welcome = useMemo(() => buildWelcome(t("chat.welcome")), [t]);
 
   const [wallets, setWallets] = useState<DeveloperAgent[]>([]);
@@ -98,20 +153,6 @@ export function ChatPage() {
       return;
     }
     let cancelled = false;
-    void listDeveloperAgents(ownerAddress)
-      .then((rows) => {
-        if (!cancelled) {
-          setWallets(rows);
-          setWalletsError(null);
-        }
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          setWalletsError(
-            err instanceof Error ? err.message : t("chat.loadWalletsFailed"),
-          );
-        }
-      });
 
     void (async () => {
       try {
@@ -144,6 +185,8 @@ export function ChatPage() {
   const balancesQuery = useQuery({
     queryKey: ["chat-agent-balances", walletKeys],
     enabled: wallets.length > 0,
+    refetchOnWindowFocus: true,
+    refetchInterval: 15_000,
     queryFn: async () => {
       const entries = await Promise.all(
         wallets.map(async (agent) => {
@@ -154,6 +197,59 @@ export function ChatPage() {
       return Object.fromEntries(entries) as Record<string, string>;
     },
   });
+
+  /**
+   * Reloads agent rows (status / allowance) so pause/resume is reflected promptly.
+   */
+  useEffect(() => {
+    if (!ownerAddress) {
+      setWallets([]);
+      return;
+    }
+    let cancelled = false;
+    const refresh = () => {
+      void listDeveloperAgents(ownerAddress)
+        .then((rows) => {
+          if (!cancelled) {
+            setWallets(rows);
+            setWalletsError(null);
+          }
+        })
+        .catch((err) => {
+          if (!cancelled) {
+            setWalletsError(
+              err instanceof Error ? err.message : t("chat.loadWalletsFailed"),
+            );
+          }
+        });
+    };
+    refresh();
+    const timer = window.setInterval(refresh, 15_000);
+    const onFocus = () => refresh();
+    window.addEventListener("focus", onFocus);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [ownerAddress, t]);
+
+  /**
+   * Forces a fresh wallet list + on-chain balances before the next assistant turn.
+   */
+  async function refreshWalletsBeforeSend(): Promise<void> {
+    if (!ownerAddress) return;
+    try {
+      const rows = await listDeveloperAgents(ownerAddress);
+      setWallets(rows);
+      setWalletsError(null);
+    } catch (err) {
+      setWalletsError(
+        err instanceof Error ? err.message : t("chat.loadWalletsFailed"),
+      );
+    }
+    await balancesQuery.refetch();
+  }
 
   if (!ownerAddress) {
     return (
@@ -189,6 +285,7 @@ export function ChatPage() {
       initialMessages={initialMessages}
       welcome={welcome}
       onCleared={() => setInitialMessages(welcome)}
+      onBeforeSend={refreshWalletsBeforeSend}
     />
   );
 }
@@ -210,6 +307,7 @@ type ChatPanelProps = {
   initialMessages: UIMessage[];
   welcome: UIMessage[];
   onCleared: () => void;
+  onBeforeSend: () => Promise<void>;
 };
 
 /**
@@ -227,6 +325,7 @@ function ChatPanel({
   initialMessages,
   welcome,
   onCleared,
+  onBeforeSend,
 }: ChatPanelProps) {
   const { t } = useI18n();
   const apiUrl = getWebEnv().apiUrl;
@@ -235,6 +334,7 @@ function ChatPanel({
   const [saveHint, setSaveHint] = useState<string | null>(null);
   const x402Ref = useRef(x402Services);
   x402Ref.current = x402Services;
+  const autoResolvedTools = useRef(new Set<string>());
 
   const transport = useMemo(
     () =>
@@ -278,12 +378,61 @@ function ChatPanel({
   });
 
   const busy = status === "submitted" || status === "streaming";
+  const awaitingHitl = hasPendingHitlTool(messages);
+  const composerLocked = busy || awaitingHitl;
 
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
     el.scrollTop = el.scrollHeight;
   }, [messages, status]);
+
+  /**
+   * If wallet picker has no fundable candidates, resolve the HITL tool so chat is not stuck.
+   */
+  useEffect(() => {
+    if (balancesLoading) return;
+    for (const message of messages) {
+      if (message.role !== "assistant") continue;
+      for (const part of message.parts) {
+        if (!isToolUIPart(part)) continue;
+        if (getToolName(part) !== "request_wallet_choice") continue;
+        if (part.state !== "input-available") continue;
+        const input = part.input as {
+          candidates?: Array<{ id: string }>;
+        };
+        const candidates = input?.candidates ?? [];
+        const fundable = candidates.filter((c) => {
+          const agent = wallets.find((w) => w.id === c.id);
+          const bal = Number(balancesById[c.id] ?? "0");
+          const allowance = agent?.allowanceEth ?? 0;
+          return (
+            agent?.status === "active" &&
+            allowance > 0 &&
+            Number.isFinite(bal) &&
+            bal > 0
+          );
+        });
+        if (candidates.length > 0 && fundable.length === 0) {
+          if (autoResolvedTools.current.has(part.toolCallId)) continue;
+          autoResolvedTools.current.add(part.toolCallId);
+          void addToolOutput({
+            tool: "request_wallet_choice",
+            toolCallId: part.toolCallId,
+            state: "output-error",
+            errorText: t("chat.pickWalletEmpty"),
+          });
+        }
+      }
+    }
+  }, [
+    messages,
+    wallets,
+    balancesById,
+    balancesLoading,
+    addToolOutput,
+    t,
+  ]);
 
   useEffect(() => {
     if (status !== "ready") return;
@@ -301,15 +450,16 @@ function ChatPanel({
   }, [messages, status, ownerAddress, t]);
 
   /**
-   * Sends the composer text.
+   * Sends the composer text after refreshing wallet status/balances.
    * @param event - Form submit
    */
-  function onSubmit(event: FormEvent) {
+  async function onSubmit(event: FormEvent) {
     event.preventDefault();
     const text = input.trim();
-    if (!text || busy) return;
+    if (!text || composerLocked) return;
     setInput("");
     setSaveHint(null);
+    await onBeforeSend();
     void sendMessage({ text });
   }
 
@@ -413,9 +563,12 @@ function ChatPanel({
                 {t("chat.thinking")}
               </p>
             ) : null}
+            {awaitingHitl && !busy ? (
+              <p className="text-xs text-muted-foreground">{t("chat.awaitingChoice")}</p>
+            ) : null}
             {error ? (
               <p className="text-sm text-destructive" role="alert">
-                {error.message}
+                {friendlyChatError(error.message, t)}
               </p>
             ) : null}
           </div>
@@ -425,14 +578,14 @@ function ChatPanel({
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder={t("chat.placeholder")}
-              disabled={busy}
+              disabled={composerLocked}
             />
             {busy ? (
               <Button type="button" variant="outline" onClick={() => stop()}>
                 {t("chat.stop")}
               </Button>
             ) : null}
-            <Button type="submit" disabled={busy || !input.trim()}>
+            <Button type="submit" disabled={composerLocked || !input.trim()}>
               <SendHorizontal className="h-4 w-4" aria-hidden />
               {t("chat.send")}
             </Button>
@@ -445,7 +598,7 @@ function ChatPanel({
                 type="button"
                 size="sm"
                 variant="outline"
-                disabled={busy}
+                disabled={composerLocked}
                 onClick={() => setInput(hint)}
               >
                 {hint}
@@ -600,29 +753,40 @@ function MessageBubble({
                 state === "output-available"
                   ? (part.output as { selectedId?: string } | undefined)?.selectedId
                   : undefined;
+              const options = (input?.candidates ?? [])
+                .map((c) => {
+                  const agent = wallets.find((w) => w.id === c.id);
+                  const asset = agent?.currency || agent?.asset || "USDC";
+                  const balanceRaw = balancesById[c.id] ?? "0";
+                  const balanceNum = Number(balanceRaw);
+                  const allowance = agent?.allowanceEth ?? 0;
+                  const hasFunds =
+                    agent?.status === "active" &&
+                    allowance > 0 &&
+                    (balancesLoading || (Number.isFinite(balanceNum) && balanceNum > 0));
+                  if (!hasFunds) return null;
+                  const balance = balancesLoading ? "…" : balanceRaw;
+                  const daily = agent?.dailyLimit ?? agent?.maxAmount ?? "—";
+                  const perTx =
+                    agent?.perTransaction ?? agent?.maxSinglePayment ?? "—";
+                  return {
+                    id: c.id,
+                    title: c.name,
+                    detail: t("chat.balance", { balance, asset }),
+                    meta: `dailyLimit ${daily} · perTx ${perTx} ${asset}`,
+                    icon: true,
+                  };
+                })
+                .filter((o): o is NonNullable<typeof o> => o != null);
               return (
                 <ChoiceCard
                   key={`${message.id}-tool-${index}`}
                   title={t("chat.pickWallet")}
-                  question={input?.question}
-                  options={(input?.candidates ?? []).map((c) => {
-                    const agent = wallets.find((w) => w.id === c.id);
-                    const asset = agent?.currency || agent?.asset || "USDC";
-                    const balance = balancesLoading
-                      ? "…"
-                      : (balancesById[c.id] ?? "0");
-                    const daily = agent?.dailyLimit ?? agent?.maxAmount ?? "—";
-                    const perTx =
-                      agent?.perTransaction ?? agent?.maxSinglePayment ?? "—";
-                    return {
-                      id: c.id,
-                      title: c.name,
-                      detail: t("chat.balance", { balance, asset }),
-                      meta: `dailyLimit ${daily} · perTx ${perTx} ${asset}`,
-                      icon: true,
-                    };
-                  })}
-                  disabled={done || busy}
+                  question={
+                    options.length === 0 ? t("chat.pickWalletEmpty") : input?.question
+                  }
+                  options={options}
+                  disabled={done || busy || options.length === 0}
                   selectedId={selected}
                   onSelect={(id) => onPickWallet(toolCallId, id)}
                 />

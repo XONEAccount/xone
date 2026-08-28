@@ -3,6 +3,7 @@ import {
   createDeveloperAgentSchema,
   deleteDeveloperAgentSchema,
   developerAgentChatSchema,
+  fundDeveloperAgentRelaySchema,
   fundDeveloperAgentSchema,
   pauseResumeDeveloperAgentSchema,
   updateDeveloperAgentSchema,
@@ -22,6 +23,7 @@ import {
   updateDeveloperAgentLimits,
 } from "../services/agent/developer-agent.js";
 import { createDeveloperAgentChatResponse } from "../services/agent/developer-agent-chat.js";
+import { isFundRelayEnabled, relayFundDeveloperAgent, getRelayerAddress } from "../services/agent/fund-relay.js";
 import type { UIMessage } from "ai";
 
 const developer = new Hono<{ Variables: AuthVariables }>();
@@ -107,6 +109,17 @@ developer.get("/agents/:id", async (c) => {
 });
 
 /**
+ * GET /api/developer/fund-relay/status — whether gas-sponsored fund is available.
+ */
+developer.get("/fund-relay/status", async (c) => {
+  const enabled = isFundRelayEnabled();
+  return c.json({
+    enabled,
+    relayerAddress: enabled ? getRelayerAddress() : null,
+  });
+});
+
+/**
  * POST /api/developer/agents/:id/fund — credit allowance after on-chain ETH transfer.
  */
 developer.post("/agents/:id/fund", async (c) => {
@@ -129,6 +142,32 @@ developer.post("/agents/:id/fund", async (c) => {
     return c.json({ ok: true, agent, txHash: parsed.data.txHash });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Fund failed";
+    return c.json({ error: message }, 400);
+  }
+});
+
+/**
+ * POST /api/developer/agents/:id/fund/relay — gas-sponsored USDC fund via EIP-3009 relayer.
+ */
+developer.post("/agents/:id/fund/relay", async (c) => {
+  const parsed = fundDeveloperAgentRelaySchema.safeParse(await c.req.json());
+  if (!parsed.success) {
+    return c.json({ error: "Invalid payload", details: parsed.error.flatten() }, 400);
+  }
+
+  if (!isFundRelayEnabled()) {
+    return c.json({ error: "Gas relayer is not configured (RELAYER_PRIVATE_KEY)" }, 503);
+  }
+
+  const admin = getSupabaseAdmin();
+  if (!admin) return c.json({ error: "Database not configured" }, 503);
+
+  try {
+    const result = await relayFundDeveloperAgent(admin, c.req.param("id"), parsed.data);
+    return c.json({ ok: true, agent: result.agent, txHash: result.txHash });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Relay fund failed";
+    console.error("[developer] fund/relay", error);
     return c.json({ error: message }, 400);
   }
 });
