@@ -57,7 +57,7 @@ export function SpendingChart() {
         : "spending.rangeYear";
 
   return (
-    <section className="space-y-3 fade-up delay-2">
+    <section className="space-y-3 fade-up delay-3">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="text-sm font-medium">{t("spending.title")}</h2>

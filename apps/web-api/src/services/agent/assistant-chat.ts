@@ -60,6 +60,9 @@ Workflow (must follow):
    - Over the limit waits for manual confirmation.
 6. Never invent payment results; only use tool returns.
 7. Never ask for private keys or API keys.
+8. When pay_x402 returns ok=true:
+   - Treat it as success. Summarize merchantBody / search results for the user.
+   - Fields like settlementTxHash / onChainSettlementTxHash are blockchain transaction hashes (0x… hex). They are NEVER HTTP status codes. Do not claim HTTP 404/502 because a hash starts with 0x404… or similar.
 
 Use valid Markdown in the reply.`;
   }
@@ -89,6 +92,9 @@ Use valid Markdown in the reply.`;
    - 若超过限额，会等待用户手动确认后再付。
 6. 不要编造支付结果；只能依据工具返回。
 7. 不要索要私钥或 API Key。
+8. 当 pay_x402 返回 ok=true 时：
+   - 视为支付成功，必须根据 merchantBody / searchResults 向用户总结答案。
+   - settlementTxHash / onChainSettlementTxHash 是链上交易哈希（0x 开头的十六进制），绝不是 HTTP 状态码。不要因为哈希以 0x404… 等开头就声称「HTTP 404 / 服务失败」。
 
 输出用合法 Markdown。`;
 }
@@ -314,7 +320,8 @@ export async function createAssistantChatResponse(
         const agent = toDeveloperAgent(agentRow);
         const merchantUrl = withMerchantQuery(service.url, query);
         const quote = await quoteX402Merchant(merchantUrl);
-        if (!quote) return true;
+        // Quote probe failed → still attempt auto-pay in execute (don't scare with a false "over limit" card).
+        if (!quote) return false;
         return paymentRequiresConfirmation(quote.amount, agent);
       },
       execute: async ({ x402Id, agentId, query, idempotencyKey }) => {
@@ -398,6 +405,7 @@ export async function createAssistantChatResponse(
 
         return {
           ok: true,
+          paid: true,
           service: { id: service.id, name: service.name, url: merchantUrl },
           query: query ?? null,
           payment: {
@@ -407,7 +415,14 @@ export async function createAssistantChatResponse(
             status: result.payment.status,
             merchant: result.payment.merchant,
           },
-          receipt: result.receipt,
+          // Promote merchant payload so the model answers from search/content, not tx hashes.
+          searchResults: result.receipt.merchantBody,
+          onChainSettlementTxHash: result.receipt.settlementTx
+            ? {
+                note: "Blockchain transaction hash only — NOT an HTTP status code",
+                hash: result.receipt.settlementTx,
+              }
+            : null,
           agent: {
             id: result.agent.id,
             name: result.agent.name,

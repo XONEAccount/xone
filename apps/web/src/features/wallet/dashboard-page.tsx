@@ -3,15 +3,14 @@ import { useQuery } from "@tanstack/react-query";
 import {
   ArrowLeftRight,
   ArrowUpRight,
-  CircleDollarSign,
   CreditCard,
-  Hexagon,
   MessageSquare,
   QrCode,
   type LucideIcon,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SpendingChart } from "@/features/wallet/spending-chart";
+import { RecentActivity } from "@/features/wallet/recent-activity";
 import { useI18n } from "@/hooks/use-i18n";
 import { useWalletAccount } from "@/hooks/use-wallet-account";
 import { useWalletBalances } from "@/hooks/use-wallet-balances";
@@ -50,11 +49,11 @@ const toneWell: Record<ActionTone, string> = {
 };
 
 /**
- * Wallet home: balance overview, shortcuts, and spending chart.
+ * Wallet home: balance overview, shortcuts, recent activity, and spending chart.
  */
 export function DashboardPage() {
   const { t } = useI18n();
-  const { address, usdc, balances, isLoading } = useWalletBalances();
+  const { address, usdc, isLoading } = useWalletBalances();
   const { address: ownerAddress } = useWalletAccount();
   const a2aBalance = useA2AStore((s) => s.a2aBalance);
   const owner = ownerAddress?.toLowerCase() ?? address?.toLowerCase() ?? "";
@@ -106,7 +105,7 @@ export function DashboardPage() {
               key={action.to}
               to={action.to}
               className={cn(
-                "hover-lift surface-card flex flex-col items-start gap-3 rounded-xl p-4",
+                "hover-lift surface-card flex flex-col items-center gap-3 rounded-xl p-4",
                 cnDelay(index),
               )}
             >
@@ -119,53 +118,9 @@ export function DashboardPage() {
         })}
       </section>
 
-      <SpendingChart />
+      <RecentActivity />
 
-      <section className="space-y-3 fade-up delay-3">
-        <h2 className="text-sm font-medium">{t("dashboard.assets")}</h2>
-        <div className="surface-card divide-y divide-border overflow-hidden rounded-xl">
-          {(balances.length
-            ? [...balances].sort((a, b) =>
-              a.symbol === "USDC" ? -1 : b.symbol === "USDC" ? 1 : 0,
-            )
-            : [
-              { symbol: "USDC", name: "USD Coin", displayValue: "0" },
-              { symbol: "ETH", name: "Ether", displayValue: "0" },
-            ]
-          ).map((asset) => (
-            <div
-              key={asset.symbol}
-              className="flex items-center justify-between px-4 py-3 text-sm transition-colors hover:bg-muted/50"
-            >
-              <div className="flex items-center gap-3">
-                <span
-                  className={cn(
-                    "icon-well h-9 w-9",
-                    asset.symbol === "USDC" ? "icon-well-teal" : "icon-well-slate",
-                  )}
-                >
-                  {asset.symbol === "USDC" ? (
-                    <CircleDollarSign className="h-4 w-4" strokeWidth={1.75} aria-hidden />
-                  ) : (
-                    <Hexagon className="h-4 w-4" strokeWidth={1.75} aria-hidden />
-                  )}
-                </span>
-                <div>
-                  <p className="font-medium">{asset.symbol}</p>
-                  <p className="text-xs text-muted-foreground">{asset.name}</p>
-                </div>
-              </div>
-              <p className="font-mono font-medium">
-                {isLoading
-                  ? "…"
-                  : Number(asset.displayValue).toLocaleString(undefined, {
-                    maximumFractionDigits: 6,
-                  })}
-              </p>
-            </div>
-          ))}
-        </div>
-      </section>
+      <SpendingChart />
     </div>
   );
 }

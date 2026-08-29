@@ -135,6 +135,29 @@ export async function getFundRelayStatus(): Promise<{ enabled: boolean }> {
 }
 
 /**
+ * Withdraws USDC from an agent wallet back to the owner (main) wallet.
+ * @param agentId - Agent id
+ * @param ownerAddress - Owner wallet
+ * @param amount - USDC amount (human decimal)
+ */
+export async function withdrawDeveloperAgent(
+  agentId: string,
+  ownerAddress: string,
+  amount: number,
+): Promise<{ agent: DeveloperAgent; txHash: string }> {
+  const data = await apiFetch<{ ok: true; agent: DeveloperAgent; txHash: string }>(
+    `/api/developer/agents/${agentId}/withdraw`,
+    {
+      method: "POST",
+      body: { ownerAddress, amount },
+      token: "demo",
+      idempotencyKey: crypto.randomUUID(),
+    },
+  );
+  return { agent: data.agent, txHash: data.txHash };
+}
+
+/**
  * Runs the first machine payment via the x402 endpoint using the agent API key.
  * @param apiKey - One-time returned agent key
  * @param input - Pay payload

@@ -201,6 +201,12 @@ export const fundDeveloperAgentRelaySchema = z.object({
   signature: z.string().regex(/^0x[a-fA-F0-9]+$/, "Invalid signature"),
 });
 
+/** Owner-initiated withdraw: agent wallet USDC → main wallet (server-signed EIP-3009). */
+export const withdrawDeveloperAgentSchema = z.object({
+  ownerAddress: evmAddress,
+  amount: z.number().positive().max(100),
+});
+
 /** Update developer agent spend caps (owner only) — SDK-aligned names. */
 export const updateDeveloperAgentSchema = z
   .object({
@@ -338,6 +344,7 @@ export type A2ASettleInput = z.infer<typeof a2aSettleSchema>;
 export type CreateDeveloperAgentInput = z.infer<typeof createDeveloperAgentSchema>;
 export type FundDeveloperAgentInput = z.infer<typeof fundDeveloperAgentSchema>;
 export type FundDeveloperAgentRelayInput = z.infer<typeof fundDeveloperAgentRelaySchema>;
+export type WithdrawDeveloperAgentInput = z.infer<typeof withdrawDeveloperAgentSchema>;
 export type UpdateDeveloperAgentInput = z.infer<typeof updateDeveloperAgentSchema>;
 export type DeleteDeveloperAgentInput = z.infer<typeof deleteDeveloperAgentSchema>;
 export type PauseResumeDeveloperAgentInput = z.infer<

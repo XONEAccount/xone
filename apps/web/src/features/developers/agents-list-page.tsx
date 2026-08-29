@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useState, type FormEvent, type MouseEvent } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { getAddressExplorerUrl } from "@xone/config";
+import { useSignTypedData } from "@privy-io/react-auth";
+import { getAddressExplorerUrl, USDC_TRANSFER_AUTHORIZATION_TYPES } from "@xone/config";
 import { useWalletAccount } from "@/hooks/use-wallet-account";
-import { Bot, ExternalLink, Plus, RefreshCw } from "lucide-react";
+import { useWalletBalances } from "@/hooks/use-wallet-balances";
+import { Bot, ExternalLink, LoaderCircle, Plus, RefreshCw } from "lucide-react";
 import type { AgentPayment, DeveloperAgent } from "@xone/types";
 import { PageHeader } from "@/components/layout/page-header";
 import { TablePagination } from "@/components/layout/table-pagination";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -27,6 +29,7 @@ import {
   TableEmpty,
   TableHead,
   TableHeader,
+  TableLoading,
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
@@ -36,15 +39,25 @@ import { useClientPagination } from "@/hooks/use-client-pagination";
 import { useI18n } from "@/hooks/use-i18n";
 import {
   deleteDeveloperAgent,
+  fundDeveloperAgentRelay,
   getDeveloperAgentDetail,
+  getFundRelayStatus,
   listDeveloperAgents,
   pauseDeveloperAgent,
   resumeDeveloperAgent,
   updateDeveloperAgent,
+  withdrawDeveloperAgent,
 } from "@/lib/developer-api";
 import { shortAddress } from "@/lib/address";
+import { recordTransferOnServer } from "@/lib/record-transfer";
 import { cn } from "@/lib/utils";
+import {
+  buildUsdcTransferTypedData,
+  serializeUsdcAuthorizationMessage,
+} from "@/web3/usdc-authorization";
 import { fetchTokenBalances, findDisplayBalance } from "@/web3";
+
+type TransferMode = "in" | "out";
 
 /**
  * Formats a wallet address with a longer visible prefix/suffix.
@@ -62,6 +75,9 @@ function displayWalletAddress(address: string): string {
 export function AgentsListPage() {
   const { t } = useI18n();
   const { address } = useWalletAccount();
+  const { usdc, refetch: refetchMainBalances } = useWalletBalances();
+  const { signTypedData } = useSignTypedData();
+  const queryClient = useQueryClient();
   const owner = address?.toLowerCase() ?? "";
   const [agents, setAgents] = useState<DeveloperAgent[]>([]);
   const [selected, setSelected] = useState<DeveloperAgent | null>(null);
@@ -88,6 +104,14 @@ export function AgentsListPage() {
   const [chatOpen, setChatOpen] = useState(false);
   const [chatAgent, setChatAgent] = useState<DeveloperAgent | null>(null);
 
+  const [transferOpen, setTransferOpen] = useState(false);
+  const [transferMode, setTransferMode] = useState<TransferMode>("in");
+  const [transferAgent, setTransferAgent] = useState<DeveloperAgent | null>(null);
+  const [transferAmount, setTransferAmount] = useState("1");
+  const [transferBusy, setTransferBusy] = useState(false);
+  const [transferError, setTransferError] = useState<string | null>(null);
+  const [fundRelayEnabled, setFundRelayEnabled] = useState<boolean | null>(null);
+
   const agentsPager = useClientPagination(agents);
   const paymentsPager = useClientPagination(payments);
 
@@ -108,6 +132,12 @@ export function AgentsListPage() {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    void getFundRelayStatus()
+      .then((s) => setFundRelayEnabled(s.enabled))
+      .catch(() => setFundRelayEnabled(false));
+  }, []);
 
   const walletKeys = agents.map((a) => `${a.id}:${a.walletAddress}`).join("|");
   const onChainBalances = useQuery({
@@ -179,6 +209,138 @@ export function AgentsListPage() {
     event.stopPropagation();
     setChatAgent(agent);
     setChatOpen(true);
+  }
+
+  /**
+   * Opens deposit / withdraw dialog for one agent.
+   * @param event - Click event
+   * @param agent - Target agent
+   * @param mode - in = main→agent, out = agent→main
+   */
+  function onOpenTransfer(event: MouseEvent, agent: DeveloperAgent, mode: TransferMode) {
+    event.stopPropagation();
+    setTransferAgent(agent);
+    setTransferMode(mode);
+    setTransferAmount("1");
+    setTransferOpen(true);
+    setTransferError(null);
+    setError(null);
+  }
+
+  /**
+   * Runs deposit (EIP-3009 + relay) or withdraw (server-signed) after validation.
+   */
+  async function onConfirmTransfer() {
+    if (!transferAgent || !owner || !address) {
+      setTransferError(t("devWallet.transferNeedWallet"));
+      return;
+    }
+    if (fundRelayEnabled === false) {
+      setTransferError(t("devWallet.transferRelayOff"));
+      return;
+    }
+    const amount = Number(transferAmount);
+    if (!(amount > 0)) {
+      setTransferError(t("devWallet.transferInvalidAmount"));
+      return;
+    }
+
+    const agentBalance = Number(onChainBalances.data?.[transferAgent.id] ?? "0");
+    if (transferMode === "in") {
+      if (amount > usdc) {
+        setTransferError(t("devWallet.transferInsufficientMain"));
+        return;
+      }
+      if (
+        transferAgent.allowanceEth + amount >
+        (transferAgent.dailyLimit ?? transferAgent.maxAmount)
+      ) {
+        setTransferError(t("devWallet.transferExceedsDaily"));
+        return;
+      }
+    } else if (amount > agentBalance) {
+      setTransferError(t("devWallet.transferInsufficientAgent"));
+      return;
+    }
+
+    setTransferBusy(true);
+    setTransferError(null);
+    setError(null);
+    try {
+      if (transferMode === "in") {
+        const typedData = buildUsdcTransferTypedData({
+          from: address as `0x${string}`,
+          to: transferAgent.walletAddress as `0x${string}`,
+          amount: transferAmount.trim(),
+        });
+        const { signature } = await signTypedData(
+          {
+            domain: typedData.domain,
+            types: {
+              TransferWithAuthorization: [
+                ...USDC_TRANSFER_AUTHORIZATION_TYPES.TransferWithAuthorization,
+              ],
+            },
+            primaryType: typedData.primaryType,
+            message: {
+              from: typedData.message.from,
+              to: typedData.message.to,
+              value: typedData.message.value.toString(),
+              validAfter: typedData.message.validAfter.toString(),
+              validBefore: typedData.message.validBefore.toString(),
+              nonce: typedData.message.nonce,
+            },
+          },
+          {
+            address: address as `0x${string}`,
+            uiOptions: { showWalletUIs: true },
+          },
+        );
+        const authorization = serializeUsdcAuthorizationMessage(typedData.message);
+        const { agent: updated, txHash } = await fundDeveloperAgentRelay(
+          transferAgent.id,
+          owner,
+          amount,
+          authorization,
+          signature,
+        );
+        setAgents((prev) => prev.map((row) => (row.id === updated.id ? updated : row)));
+        void recordTransferOnServer({
+          txHash,
+          from: address,
+          to: transferAgent.walletAddress,
+          amount: transferAmount.trim(),
+          asset: "USDC",
+          status: "submitted",
+        }).catch((err) => console.warn("[transfer-in] ledger record failed", err));
+      } else {
+        const { agent: updated, txHash } = await withdrawDeveloperAgent(
+          transferAgent.id,
+          owner,
+          amount,
+        );
+        setAgents((prev) => prev.map((row) => (row.id === updated.id ? updated : row)));
+        void recordTransferOnServer({
+          txHash,
+          from: transferAgent.walletAddress,
+          to: address,
+          amount: transferAmount.trim(),
+          asset: "USDC",
+          status: "submitted",
+        }).catch((err) => console.warn("[transfer-out] ledger record failed", err));
+      }
+
+      setTransferOpen(false);
+      setTransferAgent(null);
+      void onChainBalances.refetch();
+      void refetchMainBalances();
+      void queryClient.invalidateQueries({ queryKey: ["wallet-balances"] });
+      void queryClient.invalidateQueries({ queryKey: ["wallet-txs"] });
+    } catch (err) {
+      setTransferError(err instanceof Error ? err.message : "Transfer failed");
+    } finally {
+      setTransferBusy(false);
+    }
   }
 
   /**
@@ -359,15 +521,34 @@ export function AgentsListPage() {
       <Card>
         <CardHeader>
           <CardDescription>
-            {loading
-              ? t("devWallet.loading")
-              : agents.length === 0
-                ? t("devWallet.emptyHint")
-                : t("devWallet.count", { count: agents.length })}
+            {agents.length === 0
+              ? loading
+                ? "\u00a0"
+                : t("devWallet.emptyHint")
+              : t("devWallet.count", { count: agents.length })}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {agents.length === 0 ? (
+          {loading ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-28">{t("devWallet.colName")}</TableHead>
+                  <TableHead className="min-w-56">{t("devWallet.colAddress")}</TableHead>
+                  <TableHead>{t("devWallet.colBalance")}</TableHead>
+                  <TableHead>{t("devWallet.colUsedLimit")}</TableHead>
+                  <TableHead>{t("devWallet.colPerTx")}</TableHead>
+                  <TableHead className="w-24">{t("devWallet.colStatus")}</TableHead>
+                  <TableHead className="w-[1%] whitespace-nowrap text-left">
+                    {t("devWallet.colActions")}
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                <TableLoading colSpan={7} />
+              </TableBody>
+            </Table>
+          ) : agents.length === 0 ? (
             <Empty className="border-0 py-10 md:py-12">
               <EmptyHeader>
                 <EmptyTitle>{t("devWallet.noData")}</EmptyTitle>
@@ -384,7 +565,6 @@ export function AgentsListPage() {
                     <TableHead>{t("devWallet.colUsedLimit")}</TableHead>
                     <TableHead>{t("devWallet.colPerTx")}</TableHead>
                     <TableHead className="w-24">{t("devWallet.colStatus")}</TableHead>
-                    <TableHead className="min-w-48">{t("devWallet.colApiKey")}</TableHead>
                     <TableHead className="w-[1%] whitespace-nowrap text-left">
                       {t("devWallet.colActions")}
                     </TableHead>
@@ -437,11 +617,26 @@ export function AgentsListPage() {
                             : t("devWallet.statusActive")}
                         </Badge>
                       </TableCell>
-                      <TableCell>
-                        {item.apiKeyPrefix}…
-                      </TableCell>
                       <TableCell className="w-[1%] whitespace-nowrap text-left">
                         <div className="flex justify-start gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            disabled={busy || transferBusy}
+                            onClick={(event) => onOpenTransfer(event, item, "in")}
+                          >
+                            {t("devWallet.transferIn")}
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            disabled={busy || transferBusy}
+                            onClick={(event) => onOpenTransfer(event, item, "out")}
+                          >
+                            {t("devWallet.transferOut")}
+                          </Button>
                           <Button
                             type="button"
                             size="sm"
@@ -703,6 +898,85 @@ export function AgentsListPage() {
               onClick={() => void onConfirmPause()}
             >
               {busy ? t("devWallet.pausePending") : t("devWallet.pauseConfirm")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={transferOpen}
+        onOpenChange={(open) => {
+          setTransferOpen(open);
+          if (!open) {
+            setTransferAgent(null);
+            setTransferError(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {transferMode === "in"
+                ? t("devWallet.transferInTitle", { name: transferAgent?.name ?? "—" })
+                : t("devWallet.transferOutTitle", { name: transferAgent?.name ?? "—" })}
+            </DialogTitle>
+            <DialogDescription>
+              {transferMode === "in"
+                ? t("devWallet.transferInDesc")
+                : t("devWallet.transferOutDesc")}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <label className="block space-y-1.5 text-sm">
+              <span className="text-muted-foreground">{t("devWallet.transferAmount")}</span>
+              <Input
+                value={transferAmount}
+                onChange={(e) => {
+                  setTransferAmount(e.target.value);
+                  setTransferError(null);
+                }}
+                inputMode="decimal"
+                disabled={transferBusy}
+              />
+            </label>
+            <p className="text-xs text-muted-foreground">
+              {transferMode === "in"
+                ? t("devWallet.transferMainAvailable", { amount: usdc.toFixed(4) })
+                : t("devWallet.transferAgentAvailable", {
+                    amount: onChainBalances.data?.[transferAgent?.id ?? ""] ?? "0",
+                  })}
+            </p>
+            {fundRelayEnabled === false ? (
+              <p className="text-xs text-destructive">{t("devWallet.transferRelayOff")}</p>
+            ) : null}
+            {transferError ? (
+              <p className="text-xs text-destructive" role="alert">
+                {transferError}
+              </p>
+            ) : null}
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={transferBusy}
+              onClick={() => setTransferOpen(false)}
+            >
+              {t("devWallet.cancel")}
+            </Button>
+            <Button
+              type="button"
+              disabled={transferBusy || !owner}
+              onClick={() => void onConfirmTransfer()}
+            >
+              {transferBusy ? (
+                <>
+                  <LoaderCircle className="size-4 animate-spin" aria-hidden />
+                  {t("devWallet.transferSubmitting")}
+                </>
+              ) : (
+                t("devWallet.transferConfirm")
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

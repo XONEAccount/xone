@@ -38,7 +38,7 @@ export function AgentListPage() {
   const enabledCount = sorted.filter((a) => a.enabled).length;
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-6 animate-in">
+    <div className=" flex  flex-col gap-6 animate-in">
       <PageHeader icon={Bot} title="Agent List" tone="emerald" />
       {error ? (
         <p className="text-sm text-muted-foreground">

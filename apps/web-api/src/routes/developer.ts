@@ -7,6 +7,7 @@ import {
   fundDeveloperAgentSchema,
   pauseResumeDeveloperAgentSchema,
   updateDeveloperAgentSchema,
+  withdrawDeveloperAgentSchema,
 } from "@xone/schemas";
 import type { AuthVariables } from "../middleware/auth.js";
 import { requireAuth } from "../middleware/auth.js";
@@ -23,7 +24,12 @@ import {
   updateDeveloperAgentLimits,
 } from "../services/agent/developer-agent.js";
 import { createDeveloperAgentChatResponse } from "../services/agent/developer-agent-chat.js";
-import { isFundRelayEnabled, relayFundDeveloperAgent, getRelayerAddress } from "../services/agent/fund-relay.js";
+import {
+  isFundRelayEnabled,
+  relayFundDeveloperAgent,
+  relayWithdrawDeveloperAgent,
+  getRelayerAddress,
+} from "../services/agent/fund-relay.js";
 import type { UIMessage } from "ai";
 
 const developer = new Hono<{ Variables: AuthVariables }>();
@@ -168,6 +174,32 @@ developer.post("/agents/:id/fund/relay", async (c) => {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Relay fund failed";
     console.error("[developer] fund/relay", error);
+    return c.json({ error: message }, 400);
+  }
+});
+
+/**
+ * POST /api/developer/agents/:id/withdraw — move USDC from agent wallet back to owner.
+ */
+developer.post("/agents/:id/withdraw", async (c) => {
+  const parsed = withdrawDeveloperAgentSchema.safeParse(await c.req.json());
+  if (!parsed.success) {
+    return c.json({ error: "Invalid payload", details: parsed.error.flatten() }, 400);
+  }
+
+  if (!isFundRelayEnabled()) {
+    return c.json({ error: "Gas relayer is not configured (RELAYER_PRIVATE_KEY)" }, 503);
+  }
+
+  const admin = getSupabaseAdmin();
+  if (!admin) return c.json({ error: "Database not configured" }, 503);
+
+  try {
+    const result = await relayWithdrawDeveloperAgent(admin, c.req.param("id"), parsed.data);
+    return c.json({ ok: true, agent: result.agent, txHash: result.txHash });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Withdraw failed";
+    console.error("[developer] withdraw", error);
     return c.json({ error: message }, 400);
   }
 });

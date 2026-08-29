@@ -64,7 +64,7 @@ export function X402AgentsPage() {
   const enabledCount = sorted.filter((a) => a.enabled).length;
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-6 animate-in">
+    <div className="flex flex-col gap-6 animate-in">
       <PageHeader icon={List} title={t("x402.title")} tone="sky" />
 
       <Card className="fade-up">
@@ -91,7 +91,7 @@ export function X402AgentsPage() {
                     <TableHead>{t("x402.colName")}</TableHead>
                     <TableHead>{t("x402.colDescription")}</TableHead>
                     <TableHead>{t("x402.colUrl")}</TableHead>
-                    <TableHead className="w-[7rem]">{t("x402.colStatus")}</TableHead>
+                    <TableHead className="w-28">{t("x402.colStatus")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -100,10 +100,10 @@ export function X402AgentsPage() {
                       <TableCell className="font-medium">
                         {catalogCopy(t, agent.id, "name", agent.name)}
                       </TableCell>
-                      <TableCell className="max-w-[280px] text-sm text-muted-foreground">
+                      <TableCell className="max-w-70 text-sm text-muted-foreground">
                         {catalogCopy(t, agent.id, "description", agent.description)}
                       </TableCell>
-                      <TableCell className="max-w-[220px]">
+                      <TableCell className="max-w-55">
                         <a
                           href={agent.url}
                           target="_blank"

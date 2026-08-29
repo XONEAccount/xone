@@ -8,4 +8,5 @@ export {
   TableCell,
   TableCaption,
   TableEmpty,
+  TableLoading,
 } from "@xone/ui/table";
