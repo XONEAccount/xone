@@ -166,6 +166,7 @@ agents.post("/assistant/chat", async (c) => {
       parsed.data.ownerAddress,
       parsed.data.messages as UIMessage[],
       parsed.data.x402Services,
+      parsed.data.locale,
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : "Chat failed";

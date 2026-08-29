@@ -26,7 +26,7 @@ export function WalletPrivyProvider({ children }: { children: ReactNode }) {
           showWalletLoginFirst: false,
           walletChainType: "ethereum-only",
         },
-        loginMethods: ["email", "google", "github", "wallet"],
+        loginMethods: ["email", "google", "github", "twitter", "telegram", "wallet"],
         embeddedWallets: {
           ethereum: {
             createOnLogin: "users-without-wallets",

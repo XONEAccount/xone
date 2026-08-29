@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { useLoginWithEmail, useLoginWithOAuth, usePrivy } from "@privy-io/react-auth";
+import { useLoginWithEmail, useLoginWithOAuth, useLoginWithTelegram, usePrivy } from "@privy-io/react-auth";
 import { LoaderCircle, Mail, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -23,7 +23,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const CREATE_WAIT_MS = 12_000;
 
 /**
- * Sign-in: email OTP, Google / GitHub, external wallet.
+ * Sign-in: email OTP, social OAuth, Telegram, external wallet.
  */
 export function SignInPage() {
   const { t, locale, toggleLocale } = useI18n();
@@ -107,11 +107,11 @@ export function SignInPage() {
   );
 }
 
-type SocialProvider = "google" | "github";
-type AuthPending = "email" | "otp" | SocialProvider | "wallet";
+type SocialProvider = "google" | "github" | "twitter";
+type AuthPending = "email" | "otp" | SocialProvider | "telegram" | "wallet";
 
 /**
- * Headless email OTP + Google / GitHub OAuth + wallet connect.
+ * Headless email OTP + Google / GitHub / X OAuth + Telegram + wallet connect.
  * @param onWallet - Opens Privy wallet-only login
  */
 function LoginMethods({ onWallet }: { onWallet: () => void }) {
@@ -119,6 +119,7 @@ function LoginMethods({ onWallet }: { onWallet: () => void }) {
   const { authenticated, logout } = usePrivy();
   const { sendCode, loginWithCode } = useLoginWithEmail();
   const { initOAuth, loading: oauthLoading } = useLoginWithOAuth();
+  const { login: loginWithTelegram } = useLoginWithTelegram();
 
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
@@ -178,10 +179,10 @@ function LoginMethods({ onWallet }: { onWallet: () => void }) {
   }
 
   /**
-   * Starts Google or GitHub OAuth (redirect / popup).
+   * Starts Google / GitHub / X OAuth (redirect / popup).
    * @param provider - OAuth provider id
    */
-  async function onOAuth(provider: "google" | "github") {
+  async function onOAuth(provider: SocialProvider) {
     if (busy) return;
     setError(null);
     setPending(provider);
@@ -190,6 +191,23 @@ function LoginMethods({ onWallet }: { onWallet: () => void }) {
       await initOAuth({ provider });
     } catch (err) {
       setError(friendlyAuthError(err, t));
+      setPending(null);
+    }
+  }
+
+  /**
+   * Starts Telegram login via Privy's Telegram widget flow.
+   */
+  async function onTelegram() {
+    if (busy) return;
+    setError(null);
+    setPending("telegram");
+    try {
+      await ensureLoggedOut();
+      await loginWithTelegram();
+    } catch (err) {
+      setError(friendlyAuthError(err, t));
+    } finally {
       setPending(null);
     }
   }
@@ -290,7 +308,7 @@ function LoginMethods({ onWallet }: { onWallet: () => void }) {
         disabled={busy}
         onClick={() => void onOAuth("google")}
       >
-        {pending === "google" || oauthLoading ? <Spinner /> : <GoogleMark />}
+        {pending === "google" ? <Spinner /> : <GoogleMark />}
         Google
       </Button>
 
@@ -303,6 +321,28 @@ function LoginMethods({ onWallet }: { onWallet: () => void }) {
       >
         {pending === "github" ? <Spinner /> : <GitHubMark />}
         GitHub
+      </Button>
+
+      <Button
+        type="button"
+        variant="outline"
+        className="h-11 w-full justify-center"
+        disabled={busy}
+        onClick={() => void onOAuth("twitter")}
+      >
+        {pending === "twitter" ? <Spinner /> : <XMark />}
+        X
+      </Button>
+
+      <Button
+        type="button"
+        variant="outline"
+        className="h-11 w-full justify-center"
+        disabled={busy}
+        onClick={() => void onTelegram()}
+      >
+        {pending === "telegram" ? <Spinner /> : <TelegramMark />}
+        Telegram
       </Button>
 
       <Button
@@ -377,6 +417,28 @@ function GoogleMark() {
       <path
         fill="#EA4335"
         d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A8.99 8.99 0 0 0 .96 4.96L3.97 7.29C4.68 5.16 6.66 3.58 9 3.58Z"
+      />
+    </svg>
+  );
+}
+
+function XMark() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden>
+      <path
+        fill="currentColor"
+        d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.227-8.451L1.5 2.25h7.08l4.263 5.622L18.244 2.25Zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77Z"
+      />
+    </svg>
+  );
+}
+
+function TelegramMark() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden>
+      <path
+        fill="#26A5E4"
+        d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"
       />
     </svg>
   );

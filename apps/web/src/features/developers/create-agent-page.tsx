@@ -55,7 +55,7 @@ type Step = 1 | 2;
 
 const AGENT_CHAIN = "base-sepolia" as const;
 const AGENT_ASSET = "USDC" as const;
-const FIRST_PAY_AMOUNT = 0.001;
+const FIRST_PAY_AMOUNT = 1;
 
 const CHAINS = [
   { label: "Base Sepolia", value: "base-sepolia" as const },
@@ -439,10 +439,10 @@ export function CreateAgentPage() {
                   />
                   <Button
                     type="button"
-                    variant="outline"
                     disabled={busy || !owner || !supportsOnChainFund}
                     onClick={() => void onOpenFundConfirm()}
                   >
+                    <ArrowDownToLine className="size-4" aria-hidden />
                     {t("devWallet.fundAction")}
                   </Button>
                 </div>
@@ -467,8 +467,11 @@ export function CreateAgentPage() {
                     </>
                   ) : null}
                 </p>
-                <Button asChild variant="outline">
-                  <Link to="/app/developers/wallet">{t("devWallet.viewList")}</Link>
+                <Button asChild>
+                  <Link to="/app/developers/wallet">
+                    <Wallet className="size-4" aria-hidden />
+                    {t("devWallet.viewList")}
+                  </Link>
                 </Button>
               </div>
             ) : null}

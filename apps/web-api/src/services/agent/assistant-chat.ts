@@ -27,7 +27,44 @@ export type AssistantX402Service = {
   enabled: boolean;
 };
 
-const SYSTEM_PROMPT = `你是 X-ONE 钱包助手，用简洁中文回答。
+type AssistantLocale = "en" | "zh";
+
+/**
+ * Builds the system prompt so replies match the UI locale.
+ * @param locale - `en` | `zh` from the web client
+ */
+function buildSystemPrompt(locale: AssistantLocale): string {
+  if (locale === "en") {
+    return `You are the X-ONE wallet assistant. Reply in clear, concise English. All user-facing text (answers, picker questions, reasons) must be English even if tool payloads are Chinese.
+
+Workflow (must follow):
+1. First write brief reasoning inside <think>…</think>: user intent, matching x402 / Agent services, available Agent wallets.
+2. When payment / balance / spendability is involved:
+   - Always call list_context first for the latest status, allowance, onChainBalance (do not reuse stale conclusions from chat history).
+   - Wallets with status=paused or deleted cannot pay.
+   - Only wallets with status=active AND allowance>0 AND onChainOk=true AND onChainBalance>0 can pay.
+   - If onChainOk=false, do not say the balance is 0; say on-chain balance is temporarily unavailable and suggest refresh/retry.
+   - Never invent balances; only use list_context / pay_x402 returns.
+3. If the user wants a paid x402 / Agent capability:
+   - Pick candidates from the enabled catalog (X402 List + Agent List).
+   - Bocha Search: prefer for facts, news, web search; when calling pay_x402 always pass query=the user question.
+   - If exactly one suitable service: proceed to the next step.
+   - If multiple fit: must call request_x402_choice and wait (do not guess).
+4. Agent wallets:
+   - Only show spendable wallets (see rule 2).
+   - If exactly one spendable wallet: you may use it directly.
+   - If multiple: must call request_wallet_choice and wait.
+5. After the user chooses, call pay_x402:
+   - Search services must include query.
+   - The system quotes first; under perTransaction / remaining dailyLimit it auto-pays.
+   - Over the limit waits for manual confirmation.
+6. Never invent payment results; only use tool returns.
+7. Never ask for private keys or API keys.
+
+Use valid Markdown in the reply.`;
+  }
+
+  return `你是 X-ONE 钱包助手，用简洁中文回答。
 
 工作流（必须遵守）：
 1. 先在 <think>…</think> 中写出简短思考：用户意图、可匹配的 x402 / Agent 服务、可用 Agent 钱包。
@@ -54,6 +91,7 @@ const SYSTEM_PROMPT = `你是 X-ONE 钱包助手，用简洁中文回答。
 7. 不要索要私钥或 API Key。
 
 输出用合法 Markdown。`;
+}
 
 type WalletSnapshot = {
   id: string;
@@ -122,12 +160,14 @@ async function loadWalletSnapshots(
  * @param ownerAddress - Owner wallet
  * @param messages - UI messages from useChat
  * @param x402Services - Client catalog (Agent List)
+ * @param locale - UI locale for reply language
  */
 export async function createAssistantChatResponse(
   admin: SupabaseClient,
   ownerAddress: string,
   messages: UIMessage[],
   x402Services: AssistantX402Service[],
+  locale: AssistantLocale = "zh",
 ): Promise<Response> {
   const env = getEnv();
   const apiKey = env.deepseekApiKey || env.openaiApiKey;
@@ -388,14 +428,21 @@ export async function createAssistantChatResponse(
 
   const modelMessages = await convertToModelMessages(messages);
 
+  const catalogHeading =
+    locale === "en" ? "## Enabled x402 catalog" : "## 已启用 x402 目录";
+  const walletsHeading =
+    locale === "en"
+      ? "## Agent wallet snapshot (at request start; call list_context again before paying)"
+      : "## Agent 钱包快照（本请求开始时；付费前请再 list_context）";
+
   const result = streamText({
     model,
-    system: `${SYSTEM_PROMPT}
+    system: `${buildSystemPrompt(locale)}
 
-## 已启用 x402 目录
+${catalogHeading}
 ${catalogJson}
 
-## Agent 钱包快照（本请求开始时；付费前请再 list_context）
+${walletsHeading}
 ${walletsJson}`,
     messages: modelMessages,
     tools,

@@ -280,6 +280,8 @@ export const assistantChatSchema = z.object({
   messages: z.array(z.any()).min(1),
   /** Enabled (and optionally disabled) catalog from the client Agent List. */
   x402Services: z.array(x402CatalogEntrySchema).max(50).default([]),
+  /** UI locale — assistant replies in this language. */
+  locale: z.enum(["en", "zh"]).default("zh"),
 });
 
 /** Load / save persisted assistant chat (UIMessage[]). */

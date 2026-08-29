@@ -98,6 +98,19 @@ function hasPendingHitlTool(messages: UIMessage[]): boolean {
 }
 
 /**
+ * Whether an assistant message already has something to show (text, tools, or reasoning).
+ * @param message - Assistant UI message
+ */
+function assistantHasVisibleContent(message: UIMessage): boolean {
+  return message.parts.some((part) => {
+    if (part.type === "text" && part.text.trim().length > 0) return true;
+    if (isReasoningUIPart(part) && part.text.trim().length > 0) return true;
+    if (isToolUIPart(part)) return true;
+    return false;
+  });
+}
+
+/**
  * Maps SDK errors into clearer chat copy.
  * @param message - Raw error message
  * @param t - Translator
@@ -108,6 +121,10 @@ function friendlyChatError(
 ): string {
   if (/Tool result is missing|MissingToolResults/i.test(message)) {
     return t("chat.missingToolResult");
+  }
+  // DeepSeek / OpenAI-compatible billing — not wallet USDC.
+  if (/insufficient\s*balance/i.test(message)) {
+    return t("chat.errorLlmBalance");
   }
   return message;
 }
@@ -328,13 +345,15 @@ function ChatPanel({
   onCleared,
   onBeforeSend,
 }: ChatPanelProps) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const apiUrl = getWebEnv().apiUrl;
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [input, setInput] = useState("");
   const [saveHint, setSaveHint] = useState<string | null>(null);
   const x402Ref = useRef(x402Services);
   x402Ref.current = x402Services;
+  const localeRef = useRef(locale);
+  localeRef.current = locale;
   const autoResolvedTools = useRef(new Set<string>());
 
   const transport = useMemo(
@@ -344,6 +363,7 @@ function ChatPanel({
         headers: { Authorization: "Bearer demo" },
         body: {
           ownerAddress,
+          locale,
         },
         prepareSendMessagesRequest: ({ id, messages, body, headers, credentials, api }) => ({
           api,
@@ -354,11 +374,12 @@ function ChatPanel({
             id,
             messages,
             ownerAddress,
+            locale: localeRef.current,
             x402Services: x402Ref.current,
           },
         }),
       }),
-    [apiUrl, ownerAddress],
+    [apiUrl, ownerAddress, locale],
   );
 
   const {
@@ -381,6 +402,12 @@ function ChatPanel({
   const busy = status === "submitted" || status === "streaming";
   const awaitingHitl = hasPendingHitlTool(messages);
   const composerLocked = busy || awaitingHitl;
+  const lastMessage = messages[messages.length - 1];
+  /** Show thinking until the assistant has any visible text / tools / reasoning. */
+  const showThinking =
+    busy &&
+    (lastMessage?.role !== "assistant" ||
+      !assistantHasVisibleContent(lastMessage));
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -451,16 +478,17 @@ function ChatPanel({
   }, [messages, status, ownerAddress, t]);
 
   /**
-   * Sends the composer text after refreshing wallet status/balances.
+   * Sends the composer text immediately so the user bubble appears at once.
+   * Wallet refresh runs in parallel and must not block the optimistic UI.
    * @param event - Form submit
    */
-  async function onSubmit(event: FormEvent) {
+  function onSubmit(event: FormEvent) {
     event.preventDefault();
     const text = input.trim();
     if (!text || composerLocked) return;
     setInput("");
     setSaveHint(null);
-    await onBeforeSend();
+    void onBeforeSend();
     void sendMessage({ text });
   }
 
@@ -562,12 +590,7 @@ function ChatPanel({
                 }}
               />
             ))}
-            {busy ? (
-              <p className="mr-8 flex items-center gap-2 text-sm text-muted-foreground">
-                <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden />
-                {t("chat.thinking")}
-              </p>
-            ) : null}
+            {showThinking ? <ThinkingIndicator label={t("chat.thinking")} /> : null}
             {awaitingHitl && !busy ? (
               <p className="text-xs text-muted-foreground">{t("chat.awaitingChoice")}</p>
             ) : null}
@@ -653,21 +676,13 @@ function MessageBubble({
       )}
     >
       <div
-        className={cn(
-          "flex size-9 shrink-0 items-center justify-center rounded-full border",
-          isUser ? "chat-warm-user" : "chat-warm-bot",
-        )}
+        className="flex size-9 shrink-0 items-center justify-center rounded-full border chat-warm-bot"
         aria-hidden
       >
         {isUser ? <UserRound className="size-4" /> : <Bot className="size-4" />}
       </div>
 
-      <div
-        className={cn(
-          "min-w-0 max-w-[90%] space-y-2 rounded-xl border px-3 py-2 text-sm shadow-sm",
-          isUser ? "chat-warm-user" : "border-border bg-card text-foreground",
-        )}
-      >
+      <div className="min-w-0 max-w-[90%] space-y-2 rounded-xl border border-border bg-card px-3 py-2 text-sm text-foreground shadow-sm">
         {message.parts.map((part, index) => {
           if (isReasoningUIPart(part)) {
             return (
@@ -874,6 +889,31 @@ function MessageBubble({
 
           return null;
         })}
+      </div>
+    </div>
+  );
+}
+
+type ThinkingIndicatorProps = {
+  label: string;
+};
+
+/**
+ * Bot-row placeholder while waiting for the first assistant tokens / tools.
+ * @param props - Localized thinking label
+ */
+function ThinkingIndicator({ label }: ThinkingIndicatorProps) {
+  return (
+    <div className="message-in flex gap-3" aria-live="polite" aria-busy="true">
+      <div
+        className="flex size-9 shrink-0 items-center justify-center rounded-full border chat-warm-bot"
+        aria-hidden
+      >
+        <Bot className="size-4" />
+      </div>
+      <div className="flex min-w-0 max-w-[90%] items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-sm text-muted-foreground shadow-sm">
+        <LoaderCircle className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
+        <span>{label}</span>
       </div>
     </div>
   );

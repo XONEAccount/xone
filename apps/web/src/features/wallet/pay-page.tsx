@@ -2,33 +2,40 @@ import { useState } from "react";
 import { Check, Copy, CreditCard, ExternalLink } from "lucide-react";
 import { DEFAULT_CHAIN } from "@xone/config";
 import { useWalletAccount } from "@/hooks/use-wallet-account";
+import { useI18n } from "@/hooks/use-i18n";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import type { MessageKey } from "@/lib/i18n/messages";
 import { USDC_ADDRESS, appChainLabel } from "@/web3";
 
-const FAUCETS = [
+const FAUCETS: Array<{
+  name: string;
+  href: string;
+  noteKey: MessageKey;
+}> = [
   {
     name: "Circle Base Sepolia USDC",
     href: "https://faucet.circle.com/",
-    note: "领取测试 USDC（选择 Base Sepolia）",
+    noteKey: "pay.faucet.circle.note",
   },
   {
     name: "Coinbase Base Sepolia Faucet",
     href: "https://www.coinbase.com/faucets/base-ethereum-sepolia-faucet",
-    note: "领取测试 ETH（付 gas）",
+    noteKey: "pay.faucet.coinbase.note",
   },
   {
     name: "Alchemy Base Sepolia Faucet",
     href: "https://www.alchemy.com/faucets/base-sepolia",
-    note: "领取测试 ETH（付 gas）",
+    noteKey: "pay.faucet.alchemy.note",
   },
-] as const;
+];
 
 /**
- * 充值页（Sepolia）：BuyWidget 在测试网会因法币汇率崩溃，改为水龙头引导。
+ * Top-up page (Sepolia): faucet guidance instead of fiat BuyWidget on testnet.
  */
 export function PayPage() {
+  const { t } = useI18n();
   const { address: connected } = useWalletAccount();
   const address = connected ?? "";
   const [copied, setCopied] = useState(false);
@@ -45,21 +52,22 @@ export function PayPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-lg flex-col gap-6 animate-in md:mx-0">
-      <PageHeader icon={CreditCard} title="充值" tone="amber" />
+      <PageHeader icon={CreditCard} title={t("pay.title")} tone="amber" />
 
       <Card className="fade-up">
         <CardHeader>
-          <CardTitle>测试网充值</CardTitle>
+          <CardTitle>{t("pay.cardTitle")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            当前网络是 {appChainLabel}。测试网请用水龙头领取，向他人转账请用「转账」。
-            向他人转账请用「转账」。
+            {t("pay.intro", { chain: appChainLabel })}
           </p>
 
           <div className="rounded-md border border-border bg-muted p-4">
-            <p className="text-xs text-muted-foreground">收款地址</p>
-            <p className="mt-1 break-all font-mono text-sm">{address || "未连接钱包"}</p>
+            <p className="text-xs text-muted-foreground">{t("pay.receiveAddress")}</p>
+            <p className="mt-1 break-all font-mono text-sm">
+              {address || t("pay.notConnected")}
+            </p>
             <Button
               type="button"
               className="mt-3 w-full"
@@ -70,33 +78,38 @@ export function PayPage() {
               {copied ? (
                 <>
                   <Check className="h-4 w-4" aria-hidden />
-                  已复制
+                  {t("pay.copied")}
                 </>
               ) : (
                 <>
                   <Copy className="h-4 w-4" aria-hidden />
-                  复制地址
+                  {t("pay.copyAddress")}
                 </>
               )}
             </Button>
           </div>
 
           <div className="space-y-2 text-sm">
-            <p className="font-medium">资产说明</p>
+            <p className="font-medium">{t("pay.assetsTitle")}</p>
             <ul className="list-inside list-disc space-y-1 text-muted-foreground">
-              <li>网络：{DEFAULT_CHAIN.name}（chainId {DEFAULT_CHAIN.id}）</li>
-              <li>原生币：ETH</li>
               <li>
-                USDC：
+                {t("pay.network", {
+                  name: DEFAULT_CHAIN.name,
+                  id: DEFAULT_CHAIN.id,
+                })}
+              </li>
+              <li>{t("pay.native")}</li>
+              <li>
+                {t("pay.usdc")}
                 <span className="break-all font-mono text-xs">
-                  {USDC_ADDRESS ?? "未配置"}
+                  {USDC_ADDRESS ?? t("pay.usdcMissing")}
                 </span>
               </li>
             </ul>
           </div>
 
           <div className="space-y-2">
-            <p className="text-sm font-medium">水龙头</p>
+            <p className="text-sm font-medium">{t("pay.faucetsTitle")}</p>
             {FAUCETS.map((faucet) => (
               <a
                 key={faucet.href}
@@ -108,7 +121,7 @@ export function PayPage() {
                 <span>
                   <span className="font-medium">{faucet.name}</span>
                   <span className="mt-0.5 block text-xs text-muted-foreground">
-                    {faucet.note}
+                    {t(faucet.noteKey)}
                   </span>
                 </span>
                 <ExternalLink className="h-4 w-4 shrink-0" aria-hidden />
