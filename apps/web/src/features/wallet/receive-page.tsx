@@ -27,7 +27,7 @@ export function ReceivePage() {
 
   return (
     <div className="mx-auto w-full max-w-lg space-y-6 animate-in">
-      <PageHeader icon={QrCode} title="收款" className="justify-center" />
+      <PageHeader icon={QrCode} title="收款" className="justify-center" tone="sky" />
 
       <Card className="fade-up">
         <CardHeader>

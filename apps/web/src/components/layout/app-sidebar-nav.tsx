@@ -5,7 +5,7 @@ import {
   ChevronRight,
   ClipboardList,
   Home,
-  List,
+  LayoutList,
   MessageSquare,
   Settings,
   Wallet,
@@ -72,7 +72,7 @@ const navEntries: NavEntry[] = [
     kind: "group",
     id: "lists",
     labelKey: "nav.serviceList",
-    icon: List,
+    icon: LayoutList,
     children: [
       { to: "/app/agents/x402", labelKey: "nav.x402List" },
       { to: "/app/agents/list", labelKey: "nav.agentList" },

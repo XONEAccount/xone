@@ -64,8 +64,8 @@ export function X402AgentsPage() {
   const enabledCount = sorted.filter((a) => a.enabled).length;
 
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-6 animate-in">
-      <PageHeader icon={List} title={t("x402.title")} />
+    <div className="mx-auto flex max-w-5xl flex-col gap-6 animate-in">
+      <PageHeader icon={List} title={t("x402.title")} tone="sky" />
 
       <Card className="fade-up">
         <CardHeader>

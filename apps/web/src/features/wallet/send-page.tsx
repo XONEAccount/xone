@@ -168,7 +168,7 @@ export function SendPage() {
 
   return (
     <div className="mx-auto w-full max-w-lg space-y-6 animate-in">
-      <PageHeader icon={ArrowLeftRight} title="转账" className="justify-center" />
+      <PageHeader icon={ArrowLeftRight} title="转账" className="justify-center" tone="teal" />
 
       <Card className="fade-up">
         <CardHeader>

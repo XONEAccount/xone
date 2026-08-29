@@ -62,7 +62,7 @@ export function SignInPage() {
       </div>
       <div className="w-full max-w-[380px] space-y-8 animate-in">
         <div className="space-y-3 text-center">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-md border border-border bg-white shadow-[0_8px_24px_rgba(10,10,10,0.04)]">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl brand-mark float-y">
             <Wallet className="h-5 w-5" strokeWidth={1.75} aria-hidden />
           </div>
           <div className="space-y-1">

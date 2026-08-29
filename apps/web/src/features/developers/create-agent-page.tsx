@@ -6,9 +6,7 @@ import { getTxExplorerUrl, USDC_TRANSFER_AUTHORIZATION_TYPES } from "@xone/confi
 import {
   ArrowDownToLine,
   Check,
-  Copy,
   ExternalLink,
-  KeyRound,
   LoaderCircle,
   Wallet,
   Zap,
@@ -108,10 +106,8 @@ export function CreateAgentPage() {
   const [funding, setFunding] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [apiKey, setApiKey] = useState<string | null>(null);
   const [agent, setAgent] = useState<DeveloperAgent | null>(null);
   const [existingNames, setExistingNames] = useState<string[]>([]);
-  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (!owner) return;
@@ -166,7 +162,6 @@ export function CreateAgentPage() {
         initialAllowance: 0,
       });
       setAgent(result.agent);
-      setApiKey(result.apiKey);
       setExistingNames((prev) => [...prev, trimmed.toLowerCase()]);
       setStep(2);
     } catch (err) {
@@ -174,16 +169,6 @@ export function CreateAgentPage() {
     } finally {
       setBusy(false);
     }
-  }
-
-  /**
-   * Copies the one-time API key to clipboard.
-   */
-  async function onCopyKey() {
-    if (!apiKey) return;
-    await navigator.clipboard.writeText(apiKey);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1600);
   }
 
   /**
@@ -284,26 +269,48 @@ export function CreateAgentPage() {
 
   return (
     <div className="space-y-8">
-      <PageHeader icon={Zap} title={t("devWallet.createTitle")} />
-      <ol className="flex flex-wrap gap-3 text-base text-muted-foreground">
+      <PageHeader icon={Zap} title={t("devWallet.createTitle")} tone="amber" />
+      <ol className="flex flex-wrap items-center gap-2 text-sm">
         {[
           { n: 1 as const, label: t("devWallet.stepCreate") },
           { n: 2 as const, label: t("devWallet.stepFund") },
-        ].map((item) => (
-          <li
-            key={item.n}
-            className={cn(
-              "rounded-full border px-4 py-1.5 text-sm",
-              step === item.n
-                ? "border-foreground bg-foreground text-background"
-                : step > item.n
-                  ? "border-foreground/40 text-foreground"
-                  : "border-border",
-            )}
-          >
-            {item.n}. {item.label}
-          </li>
-        ))}
+        ].map((item, index, list) => {
+          const active = step === item.n;
+          const done = step > item.n;
+          return (
+            <li key={item.n} className="flex items-center gap-2">
+              <span
+                className={cn(
+                  "inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 font-medium transition-colors",
+                  active && "border-foreground bg-foreground text-background",
+                  done && "border-foreground/30 text-foreground",
+                  !active && !done && "border-border text-muted-foreground",
+                )}
+              >
+                <span
+                  className={cn(
+                    "inline-flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-semibold",
+                    active && "bg-background/15 text-background",
+                    done && "bg-foreground text-background",
+                    !active && !done && "bg-muted text-muted-foreground",
+                  )}
+                >
+                  {done ? <Check className="h-3 w-3" strokeWidth={2.5} aria-hidden /> : item.n}
+                </span>
+                {item.label}
+              </span>
+              {index < list.length - 1 ? (
+                <span
+                  className={cn(
+                    "hidden h-px w-6 sm:block",
+                    done ? "bg-foreground/30" : "bg-border",
+                  )}
+                  aria-hidden
+                />
+              ) : null}
+            </li>
+          );
+        })}
       </ol>
 
       {error ? <DismissibleError message={error} onDismiss={() => setError(null)} /> : null}
@@ -394,6 +401,11 @@ export function CreateAgentPage() {
               </label>
 
               <Button type="submit" disabled={busy} className="w-full sm:w-auto">
+                {busy ? (
+                  <LoaderCircle className="size-4 animate-spin" aria-hidden />
+                ) : (
+                  <Wallet className="size-4" aria-hidden />
+                )}
                 {busy ? t("devWallet.creating") : t("devWallet.createSubmit")}
               </Button>
             </form>
@@ -401,79 +413,60 @@ export function CreateAgentPage() {
         </Card>
       ) : null}
 
-      {step >= 2 && agent && apiKey ? (
+      {step >= 2 && agent ? (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <KeyRound className="size-4" />
-              {t("devWallet.apiKeyTitle")}
+              <ArrowDownToLine className="size-4" />
+              {t("devWallet.fundTitle")}
             </CardTitle>
             <CardDescription>
-              {t("devWallet.apiKeyDesc")}
+              {t("devWallet.fundDesc", {
+                address: shortAddress(agent.walletAddress),
+                available: usdc,
+              })}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <code className="flex-1 break-all rounded-md border border-border bg-neutral-50 px-3 py-2 text-xs">
-                {apiKey}
-              </code>
-              <Button type="button" variant="outline" onClick={() => void onCopyKey()}>
-                {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
-                {copied ? t("devWallet.copied") : t("devWallet.copy")}
-              </Button>
-            </div>
-
             {step === 2 ? (
               <div className="space-y-4">
-                <div className="space-y-3 rounded-md border border-border p-3">
-                  <p className="flex items-center gap-2 text-sm font-medium">
-                    <ArrowDownToLine className="size-4" />
-                    {t("devWallet.fundTitle")}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {t("devWallet.fundDesc", {
-                      address: shortAddress(agent.walletAddress),
-                      available: usdc,
-                    })}
-                  </p>
-                  <div className="flex flex-col gap-2 sm:flex-row">
-                    <Input
-                      value={fundAmount}
-                      onChange={(e) => setFundAmount(e.target.value)}
-                      inputMode="decimal"
-                      className="sm:max-w-40"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={busy || !owner || !supportsOnChainFund}
-                      onClick={() => void onOpenFundConfirm()}
-                    >
-                      {t("devWallet.fundAction")}
-                    </Button>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {t("devWallet.fundAvailable", {
-                      amount: agent.allowanceEth,
-                      asset: agent.asset,
-                    })}
-                    {fundTxHash ? (
-                      <>
-                        {" "}
-                        ·{" "}
-                        <a
-                          className="inline-flex items-center gap-1 underline"
-                          href={getTxExplorerUrl(fundTxHash)}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          {shortAddress(fundTxHash)}
-                          <ExternalLink className="size-3" />
-                        </a>
-                      </>
-                    ) : null}
-                  </p>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Input
+                    value={fundAmount}
+                    onChange={(e) => setFundAmount(e.target.value)}
+                    inputMode="decimal"
+                    className="sm:max-w-40"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={busy || !owner || !supportsOnChainFund}
+                    onClick={() => void onOpenFundConfirm()}
+                  >
+                    {t("devWallet.fundAction")}
+                  </Button>
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  {t("devWallet.fundAvailable", {
+                    amount: agent.allowanceEth,
+                    asset: agent.asset,
+                  })}
+                  {fundTxHash ? (
+                    <>
+                      {" "}
+                      ·{" "}
+                      <a
+                        className="inline-flex items-center gap-1 underline"
+                        href={getTxExplorerUrl(fundTxHash)}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {shortAddress(fundTxHash)}
+                        <ExternalLink className="size-3" />
+                      </a>
+                    </>
+                  ) : null}
+                </p>
                 <Button asChild variant="outline">
                   <Link to="/app/developers/wallet">{t("devWallet.viewList")}</Link>
                 </Button>

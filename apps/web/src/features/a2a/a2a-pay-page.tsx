@@ -74,7 +74,7 @@ export function A2APayPage() {
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6 animate-in">
-      <PageHeader icon={WalletCards} title="Agent list" />
+      <PageHeader icon={WalletCards} title="Agent list" tone="emerald" />
 
       {toast ? (
         <div

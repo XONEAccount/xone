@@ -43,7 +43,7 @@ export function LedgerTablePage({
 
   return (
     <div className="w-full max-w-5xl space-y-6 animate-in md:mx-0">
-      <PageHeader icon={icon} title={title} />
+      <PageHeader icon={icon} title={title} tone="slate" />
 
       <Card className="fade-up overflow-hidden">
         <CardContent className="p-6">

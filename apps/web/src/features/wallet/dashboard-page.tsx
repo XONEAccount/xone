@@ -3,11 +3,13 @@ import { useQuery } from "@tanstack/react-query";
 import {
   ArrowLeftRight,
   ArrowUpRight,
+  CircleDollarSign,
   CreditCard,
+  Hexagon,
   MessageSquare,
   QrCode,
+  type LucideIcon,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SpendingChart } from "@/features/wallet/spending-chart";
 import { useI18n } from "@/hooks/use-i18n";
@@ -15,27 +17,37 @@ import { useWalletAccount } from "@/hooks/use-wallet-account";
 import { useWalletBalances } from "@/hooks/use-wallet-balances";
 import type { MessageKey } from "@/lib/i18n/messages";
 import { listDeveloperAgents } from "@/lib/developer-api";
+import { cn } from "@/lib/utils";
 import { useA2AStore } from "@/stores/a2a";
-import { appChainLabel } from "@/web3";
+
+type ActionTone = "teal" | "sky" | "amber" | "emerald" | "slate";
 
 /** Wallet-first shortcuts; AI chat sits just before ledger. */
 const actions: {
   to: string;
   labelKey: MessageKey;
-  icon: typeof ArrowLeftRight;
-  primary: boolean;
+  icon: LucideIcon;
+  tone: ActionTone;
 }[] = [
-    { to: "/app/send", labelKey: "dashboard.actionSend", icon: ArrowLeftRight, primary: true },
-    { to: "/app/receive", labelKey: "dashboard.actionReceive", icon: QrCode, primary: false },
-    { to: "/app/pay", labelKey: "dashboard.actionPay", icon: CreditCard, primary: false },
-    { to: "/app/chat", labelKey: "dashboard.actionChat", icon: MessageSquare, primary: false },
+    { to: "/app/send", labelKey: "dashboard.actionSend", icon: ArrowLeftRight, tone: "teal" },
+    { to: "/app/receive", labelKey: "dashboard.actionReceive", icon: QrCode, tone: "sky" },
+    { to: "/app/pay", labelKey: "dashboard.actionPay", icon: CreditCard, tone: "amber" },
+    { to: "/app/chat", labelKey: "dashboard.actionChat", icon: MessageSquare, tone: "emerald" },
     {
       to: "/app/ledger/payments",
       labelKey: "dashboard.actionLedger",
       icon: ArrowUpRight,
-      primary: false,
+      tone: "slate",
     },
   ];
+
+const toneWell: Record<ActionTone, string> = {
+  teal: "icon-well-teal",
+  sky: "icon-well-sky",
+  amber: "icon-well-amber",
+  emerald: "icon-well-emerald",
+  slate: "icon-well-slate",
+};
 
 /**
  * Wallet home: balance overview, shortcuts, and spending chart.
@@ -57,23 +69,28 @@ export function DashboardPage() {
   const activeCount =
     myAgents.data?.filter((agent) => agent.status === "active").length ?? 0;
 
-  const agentsLabel = !owner || myAgents.isLoading
-    ? t("dashboard.agentsLoading")
-    : agentCount === 0
-      ? t("dashboard.agentsNone")
-      : t("dashboard.agentsActive", { active: activeCount, total: agentCount });
+  const agentsLabel =
+    !owner || myAgents.isLoading
+      ? t("dashboard.agentsLoading")
+      : agentCount === 0
+        ? t("dashboard.agentsNone")
+        : t("dashboard.agentsActive", { active: activeCount, total: agentCount });
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-8 animate-in">
-      <section className="space-y-2 fade-up">
+      <section className="surface-card relative overflow-hidden rounded-xl p-6 fade-up">
+        <p className="text-sm font-medium text-muted-foreground">
+          {t("dashboard.available", { chain: "Base" })}
+        </p>
         {isLoading ? (
-          <Skeleton className="h-12 w-56" />
+          <Skeleton className="mt-2 h-12 w-56" />
         ) : (
-          <h1 className="balance-tick text-4xl font-semibold tracking-tight">
-            {usdc.toFixed(2)} <span className="text-lg font-medium">USDC</span>
+          <h1 className="balance-tick mt-1 text-4xl font-semibold tracking-tight">
+            {usdc.toFixed(2)}{" "}
+            <span className="text-lg font-medium text-muted-foreground">USDC</span>
           </h1>
         )}
-        <p className="text-md text-muted-foreground">
+        <p className="mt-2 text-sm text-muted-foreground">
           {t("dashboard.a2aAndAgents", {
             a2a: a2aBalance.toFixed(2),
             agents: agentsLabel,
@@ -85,17 +102,19 @@ export function DashboardPage() {
         {actions.map((action, index) => {
           const Icon = action.icon;
           return (
-            <Button
+            <Link
               key={action.to}
-              asChild
-              variant={action.primary ? "default" : "outline"}
-              className={cnDelay(index)}
+              to={action.to}
+              className={cn(
+                "hover-lift surface-card flex flex-col items-start gap-3 rounded-xl p-4",
+                cnDelay(index),
+              )}
             >
-              <Link to={action.to} className="hover-lift">
-                <Icon className="h-4 w-4" strokeWidth={1.75} aria-hidden />
-                {t(action.labelKey)}
-              </Link>
-            </Button>
+              <span className={cn("icon-well icon-pop h-10 w-10", toneWell[action.tone])}>
+                <Icon className="h-5 w-5" strokeWidth={1.75} aria-hidden />
+              </span>
+              <span className="text-sm font-medium">{t(action.labelKey)}</span>
+            </Link>
           );
         })}
       </section>
@@ -104,7 +123,7 @@ export function DashboardPage() {
 
       <section className="space-y-3 fade-up delay-3">
         <h2 className="text-sm font-medium">{t("dashboard.assets")}</h2>
-        <div className="divide-y divide-border rounded-md border border-border bg-white">
+        <div className="surface-card divide-y divide-border overflow-hidden rounded-xl">
           {(balances.length
             ? [...balances].sort((a, b) =>
               a.symbol === "USDC" ? -1 : b.symbol === "USDC" ? 1 : 0,
@@ -116,13 +135,27 @@ export function DashboardPage() {
           ).map((asset) => (
             <div
               key={asset.symbol}
-              className="flex items-center justify-between px-4 py-3 text-sm"
+              className="flex items-center justify-between px-4 py-3 text-sm transition-colors hover:bg-muted/50"
             >
-              <div>
-                <p className="font-medium">{asset.symbol}</p>
-                <p className="text-xs text-muted-foreground">{asset.name}</p>
+              <div className="flex items-center gap-3">
+                <span
+                  className={cn(
+                    "icon-well h-9 w-9",
+                    asset.symbol === "USDC" ? "icon-well-teal" : "icon-well-slate",
+                  )}
+                >
+                  {asset.symbol === "USDC" ? (
+                    <CircleDollarSign className="h-4 w-4" strokeWidth={1.75} aria-hidden />
+                  ) : (
+                    <Hexagon className="h-4 w-4" strokeWidth={1.75} aria-hidden />
+                  )}
+                </span>
+                <div>
+                  <p className="font-medium">{asset.symbol}</p>
+                  <p className="text-xs text-muted-foreground">{asset.name}</p>
+                </div>
               </div>
-              <p className="font-mono">
+              <p className="font-mono font-medium">
                 {isLoading
                   ? "…"
                   : Number(asset.displayValue).toLocaleString(undefined, {
@@ -145,5 +178,6 @@ function cnDelay(index: number) {
   if (index === 0) return "fade-up";
   if (index === 1) return "fade-up delay-1";
   if (index === 2) return "fade-up delay-2";
-  return "fade-up delay-3";
+  if (index === 3) return "fade-up delay-3";
+  return "fade-up delay-4";
 }

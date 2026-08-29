@@ -210,7 +210,7 @@ function PeriodBars({ periods }: PeriodBarsProps) {
           {outLabel}
         </span>
         <span className="inline-flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-sm bg-muted-foreground/50" aria-hidden />
+          <span className="h-2 w-2 rounded-sm bg-muted-foreground/45" aria-hidden />
           {inLabel}
         </span>
       </div>

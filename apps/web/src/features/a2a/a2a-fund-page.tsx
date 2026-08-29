@@ -69,7 +69,7 @@ export function A2AFundPage() {
 
   return (
     <div className="mx-auto max-w-lg space-y-6 animate-in md:mx-0">
-      <PageHeader icon={ArrowRightLeft} title="A2A 转入" />
+      <PageHeader icon={ArrowRightLeft} title="A2A 转入" tone="sky" />
 
       <p className="text-sm text-muted-foreground">
         将钱包 USDC 划入 A2A 可支付余额，供 Agent 在限额内自动结算。当前可支付{" "}

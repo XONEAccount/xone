@@ -17,7 +17,7 @@ export function AssetsPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 animate-in md:mx-0">
-      <PageHeader icon={Coins} title="资产" />
+      <PageHeader icon={Coins} title="资产" tone="teal" />
 
       <div className="divide-y divide-border rounded-md border border-border bg-white fade-up">
         {assets.map((asset) => (

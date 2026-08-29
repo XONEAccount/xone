@@ -322,7 +322,7 @@ export function AgentsListPage() {
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <PageHeader icon={Bot} title={t("devWallet.listTitle")} />
+        <PageHeader icon={Bot} title={t("devWallet.listTitle")} tone="emerald" />
         <div className="flex flex-wrap gap-2">
           <Button
             type="button"

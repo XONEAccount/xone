@@ -18,6 +18,7 @@ import {
   SendHorizontal,
   UserRound,
   Wallet,
+  Zap,
 } from "lucide-react";
 import { Streamdown } from "streamdown";
 import type { DeveloperAgent } from "@xone/types";
@@ -254,7 +255,7 @@ export function ChatPage() {
   if (!ownerAddress) {
     return (
       <div className="mx-auto max-w-2xl animate-in">
-        <PageHeader icon={MessageSquare} title={t("chat.title")} />
+        <PageHeader icon={MessageSquare} title={t("chat.title")} tone="emerald" />
         <p className="mt-4 text-sm text-muted-foreground">{t("chat.connectFirst")}</p>
       </div>
     );
@@ -263,7 +264,7 @@ export function ChatPage() {
   if (!initialMessages) {
     return (
       <div className="mx-auto max-w-2xl animate-in">
-        <PageHeader icon={MessageSquare} title={t("chat.title")} />
+        <PageHeader icon={MessageSquare} title={t("chat.title")} tone="emerald" />
         <p className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
           <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden />
           {t("chat.loadingHistory")}
@@ -486,9 +487,9 @@ function ChatPanel({
   ] as const;
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-6 animate-in">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <PageHeader icon={MessageSquare} title={t("chat.title")} />
+    <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col gap-4 animate-in">
+      <div className="flex shrink-0 flex-wrap items-start justify-between gap-3">
+        <PageHeader icon={MessageSquare} title={t("chat.title")} tone="emerald" />
         <Button
           type="button"
           size="sm"
@@ -500,15 +501,19 @@ function ChatPanel({
         </Button>
       </div>
 
-      <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-        <span className="rounded-md border border-border px-2 py-1">
+      <div className="flex shrink-0 flex-wrap gap-2 text-xs">
+        <span className="chat-warm-chip inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 font-medium">
+          <Zap className="h-3 w-3" aria-hidden />
           {t("chat.x402Enabled", { count: x402Services.length })}
         </span>
-        <span className="rounded-md border border-border px-2 py-1">
+        <span className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-muted/60 px-2.5 py-1 font-medium text-muted-foreground">
+          <Wallet className="h-3 w-3" aria-hidden />
           {t("chat.agentWallets", { count: wallets.length })}
         </span>
         {saveHint ? (
-          <span className="rounded-md border border-border px-2 py-1">{saveHint}</span>
+          <span className="rounded-lg border border-border bg-card/70 px-2.5 py-1 text-muted-foreground">
+            {saveHint}
+          </span>
         ) : null}
         {walletsError ? (
           <span className="text-destructive">{walletsError}</span>
@@ -518,17 +523,17 @@ function ChatPanel({
         ) : null}
       </div>
 
-      <Card className="fade-up">
-        <CardHeader>
+      <Card className="fade-up flex min-h-0 flex-1 flex-col overflow-hidden">
+        <CardHeader className="shrink-0">
           <CardTitle className="flex items-center gap-2">
             <Bot className="h-4 w-4" strokeWidth={1.75} aria-hidden />
             {t("chat.session")}
           </CardTitle>
         </CardHeader>
-        <CardContent className="flex flex-col gap-4">
+        <CardContent className="flex min-h-0 flex-1 flex-col gap-4">
           <div
             ref={scrollRef}
-            className="flex min-h-[360px] max-h-[560px] flex-col gap-3 overflow-y-auto"
+            className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto"
           >
             {messages.map((message) => (
               <MessageBubble
@@ -573,7 +578,7 @@ function ChatPanel({
             ) : null}
           </div>
 
-          <form className="flex gap-2" onSubmit={onSubmit}>
+          <form className="flex shrink-0 gap-2" onSubmit={onSubmit}>
             <Input
               value={input}
               onChange={(e) => setInput(e.target.value)}
@@ -591,13 +596,14 @@ function ChatPanel({
             </Button>
           </form>
 
-          <div className="flex flex-wrap gap-2">
+          <div className="flex shrink-0 flex-wrap gap-2">
             {hints.map((hint) => (
               <Button
                 key={hint}
                 type="button"
                 size="sm"
                 variant="outline"
+                className="chat-warm-chip border hover:opacity-90"
                 disabled={composerLocked}
                 onClick={() => setInput(hint)}
               >
@@ -648,8 +654,8 @@ function MessageBubble({
     >
       <div
         className={cn(
-          "flex size-9 shrink-0 items-center justify-center rounded-full border border-border",
-          isUser ? "bg-neutral-950 text-white" : "bg-neutral-100 text-foreground",
+          "flex size-9 shrink-0 items-center justify-center rounded-full border",
+          isUser ? "chat-warm-user" : "chat-warm-bot",
         )}
         aria-hidden
       >
@@ -658,8 +664,8 @@ function MessageBubble({
 
       <div
         className={cn(
-          "min-w-0 max-w-[90%] space-y-2 rounded-md border border-border px-3 py-2 text-sm",
-          isUser ? "bg-neutral-950 text-white" : "bg-neutral-50 text-foreground",
+          "min-w-0 max-w-[90%] space-y-2 rounded-xl border px-3 py-2 text-sm shadow-sm",
+          isUser ? "chat-warm-user" : "border-border bg-card text-foreground",
         )}
       >
         {message.parts.map((part, index) => {
@@ -827,9 +833,9 @@ function MessageBubble({
                       {perTx != null ? ` · perTx ${perTx}` : ""}
                       {remaining != null
                         ? t("chat.payDailyRemaining", {
-                            remaining,
-                            daily: daily ?? "—",
-                          })
+                          remaining,
+                          daily: daily ?? "—",
+                        })
                         : ""}
                     </p>
                     <div className="flex gap-2">

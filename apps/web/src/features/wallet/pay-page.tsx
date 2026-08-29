@@ -45,7 +45,7 @@ export function PayPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-lg flex-col gap-6 animate-in md:mx-0">
-      <PageHeader icon={CreditCard} title="充值" />
+      <PageHeader icon={CreditCard} title="充值" tone="amber" />
 
       <Card className="fade-up">
         <CardHeader>
