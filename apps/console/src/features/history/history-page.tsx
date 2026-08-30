@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowDownLeft, ArrowUpRight, Receipt, Search } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Receipt } from "lucide-react";
 import type { AgentHistoryEntry, AgentHistoryType } from "@xonepay/sdk";
 import { ListPager } from "@/components/layout/list-pager";
 import { PageHeader } from "@/components/layout/page-header";
+import { SearchBar } from "@/components/layout/search-bar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Empty, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
@@ -21,6 +22,7 @@ import {
   TableEmpty,
   TableHead,
   TableHeader,
+  TableLoading,
   TableRow,
 } from "@/components/ui/table";
 import { useAccount } from "@/hooks/use-account";
@@ -82,7 +84,9 @@ export function HistoryPage() {
   const { agents, remote } = useAccount();
   const [walletFilter, setWalletFilter] = useState("all");
   const [flowFilter, setFlowFilter] = useState<FlowDirection | "all">("all");
+  const [draft, setDraft] = useState("");
   const [search, setSearch] = useState("");
+  const [searching, setSearching] = useState(false);
   const [rows, setRows] = useState<LedgerRow[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -161,6 +165,18 @@ export function HistoryPage() {
     pager.setPage(1);
   }, [search, walletFilter, flowFilter]);
 
+  /**
+   * Commits the draft search string with a brief table spinner.
+   */
+  function commitSearch(): void {
+    if (searching) return;
+    setSearching(true);
+    window.setTimeout(() => {
+      setSearch(draft);
+      setSearching(false);
+    }, 280);
+  }
+
   return (
     <div className="mx-auto max-w-5xl space-y-6 animate-in">
       <PageHeader
@@ -168,16 +184,16 @@ export function HistoryPage() {
         title="Ledger"
         description="Spend and income for wallets you generated. Deposits count as income; x402 payments, transfers, and withdrawals count as spend."
         actions={
-          <>
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                className="w-44 pl-9"
-                placeholder="Search"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
+          <SearchBar onSearch={commitSearch} searching={searching}>
+            <Input
+              className="w-44"
+              placeholder="Search"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") commitSearch();
+              }}
+            />
             <Select value={walletFilter} onValueChange={setWalletFilter}>
               <SelectTrigger className="w-44">
                 <SelectValue placeholder="All wallets" />
@@ -204,7 +220,7 @@ export function HistoryPage() {
                 <SelectItem value="spend">Spend</SelectItem>
               </SelectContent>
             </Select>
-          </>
+          </SearchBar>
         }
       />
 
@@ -233,71 +249,75 @@ export function HistoryPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {pager.pageItems.map((row) => {
-                  const isIncome = row.flow === "income";
-                  return (
-                    <TableRow key={`${row.agentId}-${row.id}`}>
-                      <TableCell>
-                        <Link
-                          to={`/wallet/${row.agentId}`}
-                          className="font-medium underline-offset-4 hover:underline"
-                        >
-                          {row.walletName}
-                        </Link>
-                      </TableCell>
-                      <TableCell>
-                        <span
-                          className={cn(
-                            "inline-flex items-center gap-1 text-xs font-medium",
-                            isIncome
-                              ? "text-emerald-700"
-                              : "text-muted-foreground",
-                          )}
-                        >
-                          {isIncome ? (
-                            <ArrowDownLeft
-                              className="h-3.5 w-3.5"
-                              strokeWidth={1.75}
-                              aria-hidden
-                            />
-                          ) : (
-                            <ArrowUpRight
-                              className="h-3.5 w-3.5"
-                              strokeWidth={1.75}
-                              aria-hidden
-                            />
-                          )}
-                          {isIncome ? "Income" : "Spend"}
-                        </span>
-                      </TableCell>
-                      <TableCell>{typeLabel(row.type)}</TableCell>
-                      <TableCell
-                        className={cn(
-                          "font-mono text-xs",
-                          isIncome ? "text-emerald-700" : undefined,
-                        )}
-                      >
-                        {row.amount != null
-                          ? `${isIncome ? "+" : "−"}${row.amount} ${row.currency ?? ""}`
-                          : "—"}
-                      </TableCell>
-                      <TableCell className="max-w-[240px] truncate font-mono text-xs">
-                        {row.to || row.url || row.txHash || "—"}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {formatDateTime(row.createdAt)}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-                {filtered.length === 0 ? (
-                  <TableEmpty
-                    colSpan={6}
-                    title={
-                      loading ? "Loading ledger…" : "No spend or income records yet."
-                    }
-                  />
-                ) : null}
+                {searching || loading ? (
+                  <TableLoading colSpan={6} />
+                ) : (
+                  <>
+                    {pager.pageItems.map((row) => {
+                      const isIncome = row.flow === "income";
+                      return (
+                        <TableRow key={`${row.agentId}-${row.id}`}>
+                          <TableCell>
+                            <Link
+                              to={`/wallet/${row.agentId}`}
+                              className="font-medium underline-offset-4 hover:underline"
+                            >
+                              {row.walletName}
+                            </Link>
+                          </TableCell>
+                          <TableCell>
+                            <span
+                              className={cn(
+                                "inline-flex items-center gap-1 text-xs font-medium",
+                                isIncome
+                                  ? "text-emerald-700"
+                                  : "text-muted-foreground",
+                              )}
+                            >
+                              {isIncome ? (
+                                <ArrowDownLeft
+                                  className="h-3.5 w-3.5"
+                                  strokeWidth={1.75}
+                                  aria-hidden
+                                />
+                              ) : (
+                                <ArrowUpRight
+                                  className="h-3.5 w-3.5"
+                                  strokeWidth={1.75}
+                                  aria-hidden
+                                />
+                              )}
+                              {isIncome ? "Income" : "Spend"}
+                            </span>
+                          </TableCell>
+                          <TableCell>{typeLabel(row.type)}</TableCell>
+                          <TableCell
+                            className={cn(
+                              "font-mono text-xs",
+                              isIncome ? "text-emerald-700" : undefined,
+                            )}
+                          >
+                            {row.amount != null
+                              ? `${isIncome ? "+" : "−"}${row.amount} ${row.currency ?? ""}`
+                              : "—"}
+                          </TableCell>
+                          <TableCell className="max-w-[240px] truncate font-mono text-xs">
+                            {row.to || row.url || row.txHash || "—"}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {formatDateTime(row.createdAt)}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                    {filtered.length === 0 ? (
+                      <TableEmpty
+                        colSpan={6}
+                        title="No spend or income records yet."
+                      />
+                    ) : null}
+                  </>
+                )}
               </TableBody>
             </Table>
           </CardContent>

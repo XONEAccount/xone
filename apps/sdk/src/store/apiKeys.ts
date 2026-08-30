@@ -93,7 +93,7 @@ export function requireActiveApiKeyByToken(token: string): ApiKeyRecord {
 }
 
 /**
- * Soft-deletes an API key. Existing agents remain but new creates fail.
+ * Soft-deletes an API key. Callers should soft-delete bound agents separately.
  *
  * @param id - API key id
  * @returns Updated key

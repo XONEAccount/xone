@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, type CSSProperties } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { KeyRound, Receipt, User, Wallet, type LucideIcon } from "lucide-react";
 import { useAccount } from "@/hooks/use-account";
@@ -55,12 +55,12 @@ export function AppLayout() {
   }, [remote, refresh]);
 
   return (
-    <SidebarProvider>
+    <SidebarProvider style={{ "--sidebar-width": "12rem" } as CSSProperties}>
       <Sidebar collapsible="icon">
         <SidebarHeader className="h-14 justify-center border-b border-sidebar-border">
-          <div className="flex items-center gap-2.5 px-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-sidebar-border bg-sidebar-accent">
-              <Wallet className="h-4 w-4" strokeWidth={1.75} aria-hidden />
+          <div className="flex items-center gap-2 px-1.5 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0">
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-sidebar-border bg-sidebar-accent">
+              <Wallet className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
             </div>
             <div className="min-w-0 group-data-[collapsible=icon]:hidden">
               <p className="truncate text-sm font-semibold tracking-tight">XOne Console</p>

@@ -127,6 +127,19 @@ export function getAgentMap(): Map<string, AgentRecord> {
 }
 
 /**
+ * Soft-deletes every agent bound to an API key.
+ * @param apiKeyId - Owning API key id
+ */
+export function softDeleteAgentsForApiKey(apiKeyId: string): void {
+  for (const record of agents.values()) {
+    if (record.apiKeyId === apiKeyId && record.status !== "deleted") {
+      record.status = "deleted";
+      pushHistory(record, { type: "delete" });
+    }
+  }
+}
+
+/**
  * Soft-deletes an agent: spending is permanently blocked; record + history remain.
  *
  * @param id - Agent id

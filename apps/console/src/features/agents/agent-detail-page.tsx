@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Bot, LoaderCircle } from "lucide-react";
 import type { Agent, AgentHistoryEntry, AgentLimits, AgentStatus } from "@xonepay/sdk";
 import { ListPager } from "@/components/layout/list-pager";
@@ -20,6 +20,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useAccount } from "@/hooks/use-account";
 import { useClientPagination } from "@/hooks/use-client-pagination";
+import { cn } from "@/lib/utils";
 import { errorMessage, formatDateTime, shortAddress } from "@/utils/format";
 
 /**
@@ -88,6 +89,18 @@ export function AgentDetailPage() {
     }
   }
 
+  /**
+   * Goes to the previous in-app page, or Wallet list if there is no history.
+   */
+  function goBack(): void {
+    const idx = (window.history.state as { idx?: number } | null)?.idx;
+    if (typeof idx === "number" && idx > 0) {
+      navigate(-1);
+      return;
+    }
+    navigate("/wallet");
+  }
+
   if (!agent) {
     return (
       <div className="mx-auto max-w-5xl space-y-6 animate-in">
@@ -97,11 +110,9 @@ export function AgentDetailPage() {
             <p className="text-sm text-muted-foreground">
               It may have been removed, or mock data was cleared after a refresh.
             </p>
-            <Button type="button" variant="outline" asChild>
-              <Link to="/wallet">
-                <ArrowLeft className="h-4 w-4" />
-                Back
-              </Link>
+            <Button type="button" variant="outline" onClick={goBack}>
+              <ArrowLeft className="h-4 w-4" />
+              Back
             </Button>
           </CardContent>
         </Card>
@@ -118,11 +129,9 @@ export function AgentDetailPage() {
         actions={
           <>
             <StatusPill status={status} />
-            <Button type="button" variant="outline" asChild>
-              <Link to="/wallet">
-                <ArrowLeft className="h-4 w-4" />
-                Back
-              </Link>
+            <Button type="button" variant="outline" onClick={goBack}>
+              <ArrowLeft className="h-4 w-4" />
+              Back
             </Button>
           </>
         }
@@ -255,7 +264,7 @@ export function AgentDetailPage() {
                 onClick={() => {
                   if (
                     !window.confirm(
-                      "Soft delete blocks all spend. History is kept. Continue?",
+                      "Soft delete blocks all spend. Continue?",
                     )
                   ) {
                     return;
@@ -353,26 +362,24 @@ function StatCard({
 }
 
 /**
- * Agent status badge (shadcn Badge).
+ * Agent status badge with distinct tones.
  * @param status - Agent status
  */
 function StatusPill({ status }: { status: AgentStatus }) {
-  const variant =
-    status === "active"
-      ? "secondary"
-      : status === "deleted"
-        ? "destructive"
-        : status === "paused"
-          ? "outline"
-          : "secondary";
   return (
     <Badge
-      variant={variant}
-      className={
-        status === "paused"
-          ? "border-border bg-muted text-muted-foreground capitalize"
-          : "capitalize"
-      }
+      variant="outline"
+      className={cn(
+        "capitalize border",
+        status === "active" &&
+        "border-emerald-600/30 bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300",
+        status === "paused" &&
+        "border-amber-600/30 bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300",
+        status === "deleted" &&
+        "border-destructive/40 bg-destructive/10 text-destructive",
+        status === "exhausted" &&
+        "border-border bg-muted text-muted-foreground",
+      )}
     >
       {status}
     </Badge>

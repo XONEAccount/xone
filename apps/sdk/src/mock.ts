@@ -14,6 +14,7 @@ export {
   listAgentRecords,
   getAgentMap,
   deleteAgentRecord,
+  softDeleteAgentsForApiKey,
   createAgentRecord,
   clearAgentStore,
 } from "./store/mock.js";

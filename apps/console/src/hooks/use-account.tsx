@@ -18,6 +18,7 @@ import {
   getApiKeyRecord,
   listAgentRecords,
   listApiKeyRecords,
+  softDeleteAgentsForApiKey,
 } from "@xonepay/sdk/mock";
 import { api, isRemoteApiEnabled } from "@/lib/api";
 import { RemoteAgent } from "@/lib/remoteAgent";
@@ -168,6 +169,7 @@ export function AccountProvider({ children }: { children: ReactNode }) {
         return;
       }
       deleteApiKeyRecord(id);
+      softDeleteAgentsForApiKey(id);
       forgetSecret(id);
       bump();
     },

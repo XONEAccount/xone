@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import {
   Check,
   Copy,
-  Edit,
   Eye,
   EyeOff,
   FlaskConical,
@@ -14,7 +13,6 @@ import {
   Plus,
   RefreshCw,
   Trash2,
-  Wallet,
 } from "lucide-react";
 import type { ApiKeyRecord } from "@xonepay/sdk";
 import { ListPager } from "@/components/layout/list-pager";
@@ -49,6 +47,7 @@ import {
   TableCell,
   TableHead,
   TableHeader,
+  TableLoading,
   TableRow,
 } from "@/components/ui/table";
 import { useAccount } from "@/hooks/use-account";
@@ -60,8 +59,11 @@ const PLAYGROUND_URL =
   (import.meta.env.VITE_PLAYGROUND_URL as string | undefined)?.trim() ||
   "https://xone-sdk-docs.pages.dev/?view=playground";
 
+const SEARCH_SPIN_MS = 280;
+
 /**
  * API keys list and create flow.
+ * Lifecycle ops (pause / delete / open wallet) live here — 1 key ↔ 1 wallet.
  */
 export function ApiKeysPage() {
   const {
@@ -75,6 +77,7 @@ export function ApiKeysPage() {
 
   const [draft, setDraft] = useState("");
   const [query, setQuery] = useState("");
+  const [searching, setSearching] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
@@ -104,10 +107,15 @@ export function ApiKeysPage() {
   }, [query]);
 
   /**
-   * Commits the draft search string.
+   * Commits the draft search string with a brief table spinner.
    */
   function commitSearch(): void {
-    setQuery(draft);
+    if (searching) return;
+    setSearching(true);
+    window.setTimeout(() => {
+      setQuery(draft);
+      setSearching(false);
+    }, SEARCH_SPIN_MS);
   }
 
   /**
@@ -148,7 +156,7 @@ export function ApiKeysPage() {
   }
 
   /**
-   * Soft-deletes the key selected in the confirm dialog.
+   * Soft-deletes the key and its bound wallet.
    */
   async function onConfirmDelete(): Promise<void> {
     if (!deleteKey) return;
@@ -214,7 +222,7 @@ export function ApiKeysPage() {
         description="Create uniquely named keys. Each key binds to one wallet. "
         actions={
           <>
-            <SearchBar onSearch={commitSearch}>
+            <SearchBar onSearch={commitSearch} searching={searching}>
               <Input
                 className="w-48 sm:w-56"
                 placeholder="Search"
@@ -224,17 +232,17 @@ export function ApiKeysPage() {
                   if (e.key === "Enter") commitSearch();
                 }}
               />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={() => void refresh()}
+                disabled={loading}
+                aria-label="Refresh"
+              >
+                <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+              </Button>
             </SearchBar>
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              onClick={() => void refresh()}
-              disabled={loading}
-              aria-label="Refresh"
-            >
-              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-            </Button>
             <Button type="button" variant="outline" asChild>
               <a href={PLAYGROUND_URL} target="_blank" rel="noreferrer">
                 <FlaskConical className="h-4 w-4" />
@@ -291,127 +299,168 @@ export function ApiKeysPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
-                  <TableHead>Status</TableHead>
                   <TableHead>API Key</TableHead>
-                  <TableHead>Bound</TableHead>
+                  <TableHead>Wallet</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {pager.pageItems.map((key) => {
-                  const agent = getAgentByApiKey(key.id);
-                  const paused = agent?.getStatus() === "paused";
-                  return (
-                    <TableRow key={key.id}>
-                      <TableCell className="font-medium whitespace-nowrap">{key.name}</TableCell>
-                      <TableCell>
-                        <StatusPill
-                          value={key.status}
-                          tone={key.status === "active" ? "ok" : "bad"}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <span className="max-w-35 truncate font-mono text-xs">
-                            {key.token && revealed[key.id] ? key.token : MASK}
-                          </span>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() =>
-                              setRevealed((r) => ({
-                                ...r,
-                                [key.id]: !r[key.id],
-                              }))
-                            }
-                            aria-label={revealed[key.id] ? "Hide API key" : "Show API key"}
-                          >
-                            {revealed[key.id] ? (
-                              <Eye className="h-3.5 w-3.5" />
+                {searching ? (
+                  <TableLoading colSpan={5} />
+                ) : (
+                  <>
+                    {pager.pageItems.map((key) => {
+                      const agent = getAgentByApiKey(key.id);
+                      const paused = agent?.getStatus() === "paused";
+                      return (
+                        <TableRow key={key.id}>
+                          <TableCell className="font-medium whitespace-nowrap">
+                            {key.name}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1">
+                              <span className="max-w-35 truncate font-mono text-xs">
+                                {key.token && revealed[key.id] ? key.token : MASK}
+                              </span>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() =>
+                                  setRevealed((r) => ({
+                                    ...r,
+                                    [key.id]: !r[key.id],
+                                  }))
+                                }
+                                aria-label={
+                                  revealed[key.id] ? "Hide API key" : "Show API key"
+                                }
+                              >
+                                {revealed[key.id] ? (
+                                  <Eye className="h-3.5 w-3.5" />
+                                ) : (
+                                  <EyeOff className="h-3.5 w-3.5" />
+                                )}
+                              </Button>
+                            </div>
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap text-muted-foreground">
+                            {agent ? (
+                              <span className="inline-flex items-center gap-2">
+                                <span>{agent.name}</span>
+                                <StatusPill
+                                  value={agent.getStatus()}
+                                  tone={
+                                    agent.getStatus() === "active"
+                                      ? "ok"
+                                      : agent.getStatus() === "paused"
+                                        ? "warn"
+                                        : "bad"
+                                  }
+                                />
+                              </span>
                             ) : (
-                              <EyeOff className="h-3.5 w-3.5" />
+                              "—"
                             )}
-                          </Button>
-                        </div>
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap text-muted-foreground">
-                        {agent
-                          ? `${agent.name} (${agent.getStatus()})`
-                          : "—"}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap text-muted-foreground">
-                        {formatDateTime(key.createdAt)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex flex-nowrap items-center justify-end gap-1">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            disabled={!key.token}
-                            title={
-                              key.token
-                                ? "Copy API key"
-                                : "Plaintext is only available right after create"
-                            }
-                            onClick={() => void onCopy(key)}
-                          >
-                            {copiedId === key.id ? (
-                              <Check className="h-3.5 w-3.5" strokeWidth={1.75} aria-label="Copied" />
-                            ) : (
-                              <Copy className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
-                            )}
-                            Copy
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            disabled={pausingId === key.id}
-                            onClick={() => onPauseClick(key)}
-                          >
-                            {pausingId === key.id ? (
-                              <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
-                            ) : paused ? (
-                              <Play className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
-                            ) : (
-                              <Pause className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
-                            )}
-                            {paused ? "Resume" : "Pause"}
-                          </Button>
-                          {agent ? (
-                            <Button type="button" variant="ghost" size="sm" asChild>
-                              <Link to={`/wallet/${agent.id}`}>
-                                <Edit className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
-                                edit
-                              </Link>
-                            </Button>
-                          ) : null}
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="text-destructive"
-                            disabled={key.status === "deleted"}
-                            onClick={() => {
-                              setError(null);
-                              setDeleteKey(key);
-                            }}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
-                            Delete
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-                {filtered.length === 0 ? (
-                  <TableEmpty colSpan={6} title="No matches. Try clearing the search." />
-                ) : null}
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap text-muted-foreground">
+                            {formatDateTime(key.createdAt)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex flex-nowrap items-center justify-end gap-1">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                disabled={!key.token}
+                                title={
+                                  key.token
+                                    ? "Copy API key"
+                                    : "Plaintext is only available right after create"
+                                }
+                                onClick={() => void onCopy(key)}
+                              >
+                                {copiedId === key.id ? (
+                                  <Check
+                                    className="h-3.5 w-3.5"
+                                    strokeWidth={1.75}
+                                    aria-label="Copied"
+                                  />
+                                ) : (
+                                  <Copy
+                                    className="h-3.5 w-3.5"
+                                    strokeWidth={1.75}
+                                    aria-hidden
+                                  />
+                                )}
+                                Copy
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                disabled={!agent || pausingId === key.id}
+                                onClick={() => onPauseClick(key)}
+                              >
+                                {pausingId === key.id ? (
+                                  <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                                ) : paused ? (
+                                  <Play
+                                    className="h-3.5 w-3.5"
+                                    strokeWidth={1.75}
+                                    aria-hidden
+                                  />
+                                ) : (
+                                  <Pause
+                                    className="h-3.5 w-3.5"
+                                    strokeWidth={1.75}
+                                    aria-hidden
+                                  />
+                                )}
+                                {paused ? "Resume" : "Pause"}
+                              </Button>
+                              {agent ? (
+                                <Button type="button" variant="ghost" size="sm" asChild>
+                                  <Link to={`/wallet/${agent.id}`}>
+                                    <Eye
+                                      className="h-3.5 w-3.5"
+                                      strokeWidth={1.75}
+                                      aria-hidden
+                                    />
+                                    View
+                                  </Link>
+                                </Button>
+                              ) : null}
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="text-destructive"
+                                disabled={key.status === "deleted"}
+                                onClick={() => {
+                                  setError(null);
+                                  setDeleteKey(key);
+                                }}
+                              >
+                                <Trash2
+                                  className="h-3.5 w-3.5"
+                                  strokeWidth={1.75}
+                                  aria-hidden
+                                />
+                                Delete
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                    {filtered.length === 0 ? (
+                      <TableEmpty colSpan={5} title="No matches. Try clearing the search." />
+                    ) : null}
+                  </>
+                )}
               </TableBody>
             </Table>
           </CardContent>
@@ -475,8 +524,8 @@ export function ApiKeysPage() {
             <DialogTitle>Delete API key</DialogTitle>
             <DialogDescription>
               {deleteKey
-                ? `${deleteKey.name} will no longer be able to pay. Bound agents stay listed.`
-                : "This key will no longer be able to pay."}
+                ? `${deleteKey.name} and its bound wallet will both be soft-deleted. Spend is blocked permanently.`
+                : "This key and its bound wallet will both be soft-deleted."}
             </DialogDescription>
           </DialogHeader>
           {error && deleteKey ? (
@@ -546,7 +595,7 @@ export function ApiKeysPage() {
 }
 
 /**
- * Compact status label.
+ * Compact status label with distinct tones.
  */
 function StatusPill({
   value,
@@ -555,6 +604,18 @@ function StatusPill({
   value: string;
   tone: "ok" | "warn" | "bad";
 }) {
-  const variant = tone === "ok" ? "secondary" : tone === "bad" ? "destructive" : "outline";
-  return <Badge variant={variant}>{value}</Badge>;
+  return (
+    <Badge
+      variant="outline"
+      className={
+        tone === "ok"
+          ? "border-emerald-600/30 bg-emerald-50 text-emerald-800 capitalize dark:bg-emerald-950/40 dark:text-emerald-300"
+          : tone === "warn"
+            ? "border-amber-600/30 bg-amber-50 text-amber-800 capitalize dark:bg-amber-950/40 dark:text-amber-300"
+            : "border-destructive/40 bg-destructive/10 text-destructive capitalize"
+      }
+    >
+      {value}
+    </Badge>
+  );
 }

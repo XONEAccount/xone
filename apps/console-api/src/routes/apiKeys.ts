@@ -1,10 +1,10 @@
 import { Hono } from "hono";
 import type { ApiBindings, ApiVariables } from "../env";
-import { ensureProfile } from "../lib/agents";
+import { ensureProfile, softDeleteAgent } from "../lib/agents";
 import { HttpError } from "../lib/errors";
 import { randomAlnum, sha256Hex, uuidHex } from "../lib/ids";
 import { serializeApiKey } from "../lib/serialize";
-import { createServiceClient, type DbApiKey } from "../lib/supabase";
+import { createServiceClient, type DbAgent, type DbApiKey } from "../lib/supabase";
 import { requireUser } from "../middleware/auth";
 
 type Env = { Bindings: ApiBindings; Variables: ApiVariables };
@@ -116,5 +116,18 @@ apiKeysRoutes.delete("/:id", async (c) => {
     .single();
 
   if (updErr) throw new HttpError(500, updErr.message, "db_error");
+
+  // Soft-delete the bound agent wallet so console status stays in sync.
+  const { data: boundAgents } = await supabase
+    .from("xone_agents")
+    .select("*")
+    .eq("api_key_id", id)
+    .eq("user_id", c.get("userId"))
+    .neq("status", "deleted");
+
+  for (const row of (boundAgents ?? []) as DbAgent[]) {
+    await softDeleteAgent(c, row);
+  }
+
   return c.json(serializeApiKey(updated as DbApiKey));
 });
