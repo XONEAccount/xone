@@ -394,6 +394,16 @@ export async function payX402Merchant(
           `Bocha Search 已改为 exact 方案，请确认 seller 已部署最新版本。详情: ${text.slice(0, 160)}`,
       };
     }
+    // Cloudflare Workers: same-zone Worker→Worker fetch without global_fetch_strictly_public.
+    if (response.status === 404 && /error code:\s*1042/i.test(text)) {
+      return {
+        ok: false,
+        status: 502,
+        error:
+          "Cloudflare error 1042: wallet-api Worker cannot fetch the x402 seller on the same workers.dev zone. " +
+          "Redeploy wallet-api with compatibility flag global_fetch_strictly_public.",
+      };
+    }
     return {
       ok: false,
       status: 502,

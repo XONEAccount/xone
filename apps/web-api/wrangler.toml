@@ -1,7 +1,9 @@
 name = "xone-wallet-api"
 main = "src/index.ts"
 compatibility_date = "2025-08-10"
-compatibility_flags = ["nodejs_compat"]
+# Allow this Worker to fetch other Workers on the same account (e.g. x402 seller on workers.dev).
+# Without this, pay_x402 → seller returns Cloudflare 404 / error code 1042.
+compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]
 account_id = "02dd7efa4ca7a4f45fe830c2636bfbff"
 
 [vars]
