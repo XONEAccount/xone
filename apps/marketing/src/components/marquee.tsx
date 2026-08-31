@@ -1,8 +1,8 @@
 const items = [
   "Web3 wallet",
   "A2A payments",
-  "Secure by design",
-  "Fast settlement",
+  "x402 settle",
+  "MCP + LangChain",
   "Web · App · API · SDK",
   "Policy-controlled spend",
 ];

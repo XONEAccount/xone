@@ -1,6 +1,7 @@
 import { ArrowRight } from "lucide-react";
 import { motion } from "motion/react";
 import { DocumentMeta } from "@/components/document-meta";
+import { ConsolePolicyMock } from "@/components/product-mocks";
 import { Reveal } from "@/components/reveal";
 import { MarketingButton as Button } from "@/components/ui/marketing-button";
 import { links } from "@/lib/links";
@@ -16,7 +17,30 @@ const surfaces = [
   },
   {
     title: "SDK",
-    body: "TypeScript client over the same HTTP surface — less boilerplate for Node apps.",
+    body: "TypeScript client and LangChain tools over the same HTTP surface.",
+  },
+  {
+    title: "MCP",
+    body: "@xone/mcp for Cursor, Claude Desktop, and other hosts. Spend tools only.",
+  },
+  {
+    title: "Console",
+    body: "Operator JWT: keys, allowlists, pause, resume, soft-delete, ledger.",
+  },
+] as const;
+
+const x402Steps = [
+  {
+    title: "Resource returns 402",
+    body: "Your agent requests a paid HTTP resource. The seller quotes amount, asset, and payee.",
+  },
+  {
+    title: "Policy checks the quote",
+    body: "Daily cap, per-transaction cap, status, and optional host/payee allowlists run server-side.",
+  },
+  {
+    title: "Settle once",
+    body: "X-ONE pays with a sealed key. Reuse Idempotency-Key on retries so a blip does not double-charge.",
   },
 ] as const;
 
@@ -27,11 +51,11 @@ const steps = [
   },
   {
     title: "Bind a wallet",
-    body: "Generate an agent wallet for that key (SDK create, or POST /v1/sdk/agents). Set daily and per-transaction limits.",
+    body: "Generate an agent wallet for that key (SDK create, or POST /v1/sdk/agents). Set daily and per-transaction limits. Fund USDC at the address.",
   },
   {
-    title: "Pay via SDK or HTTP",
-    body: "Use @xonepay/sdk or call POST /v1/sdk/agents/:id/pay. Runtime tokens pay and read — pause and limits stay on JWT / Console.",
+    title: "Pay via SDK, HTTP, or MCP",
+    body: "Use @xonepay/sdk, POST /v1/sdk/agents/:id/pay, or xone_x402_pay. Runtime tokens pay and read — pause and limits stay on JWT / Console.",
   },
 ] as const;
 
@@ -59,15 +83,23 @@ const operatorRoutes = [
   { method: "GET", path: "/v1/me", note: "Profile" },
 ] as const;
 
+const mcpTools = [
+  { name: "xone_create_agent", note: "Create or load the bound wallet" },
+  { name: "xone_wallet_address", note: "Address, chain, status" },
+  { name: "xone_wallet_balance", note: "Policy snapshot — not RPC USDC" },
+  { name: "xone_x402_pay", note: "Settle an x402 URL" },
+  { name: "xone_get_history", note: "Recent events" },
+] as const;
+
 /**
- * Developer landing — SDK + API; web/app called out as end-user surfaces.
+ * Developer landing — SDK, HTTP, MCP; web/app called out as end-user surfaces.
  */
 export function DevelopersPage() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-16 sm:px-6 sm:py-20">
       <DocumentMeta
-        title="X-ONE Developers — API & SDK for agent payments"
-        description="Integrate X-ONE with HTTP API and SDK. Spender /v1/sdk plus operator /v1/agents. Web and App are for end users."
+        title="X-ONE Developers — API, SDK & MCP for agent payments"
+        description="Integrate X-ONE with HTTP, TypeScript SDK, LangChain tools, and MCP. Spender /v1/sdk plus operator /v1/agents. Web and App are for end users."
       />
 
       <Reveal>
@@ -75,11 +107,13 @@ export function DevelopersPage() {
           Developers
         </p>
         <h1 className="mt-3 text-4xl font-semibold tracking-tight sm:text-5xl">
-          Embed the wallet layer with API and SDK.
+          Embed the wallet layer with API, SDK, and MCP.
         </h1>
         <p className="mt-4 text-lg text-muted-foreground">
-          Everyday users open Web or App. Builders integrate through HTTP or
-          `@xonepay/sdk` — the same secure core. Free during beta.
+          Everyday users open Web or App. Builders integrate through HTTP,{" "}
+          <code className="font-mono text-sm">@xonepay/sdk</code>, or{" "}
+          <code className="font-mono text-sm">@xone/mcp</code> — the same
+          policy-gated core. Free during beta.
         </p>
       </Reveal>
 
@@ -94,12 +128,17 @@ export function DevelopersPage() {
         </motion.div>
         <Button asChild variant="outline">
           <a href={links.docsApi} target="_blank" rel="noreferrer">
-            HTTP API docs
+            HTTP API
           </a>
         </Button>
         <Button asChild variant="outline">
           <a href={links.docs} target="_blank" rel="noreferrer">
             SDK docs
+          </a>
+        </Button>
+        <Button asChild variant="outline">
+          <a href={links.docsMcp} target="_blank" rel="noreferrer">
+            MCP docs
           </a>
         </Button>
         <Button asChild variant="outline">
@@ -109,9 +148,9 @@ export function DevelopersPage() {
         </Button>
       </Reveal>
 
-      <ul className="mt-14 grid gap-6 sm:grid-cols-3">
+      <ul className="mt-14 grid gap-4 sm:grid-cols-2">
         {surfaces.map((item, i) => (
-          <Reveal key={item.title} delay={i * 80}>
+          <Reveal key={item.title} delay={i * 60}>
             <li className="h-full rounded-lg border border-border bg-card p-4">
               <p className="font-medium">{item.title}</p>
               <p className="mt-2 text-sm text-muted-foreground">{item.body}</p>
@@ -120,7 +159,41 @@ export function DevelopersPage() {
         ))}
       </ul>
 
-      <ol className="mt-14 space-y-8">
+      <Reveal className="mt-16">
+        <p className="text-sm font-medium uppercase tracking-[0.14em] text-muted-foreground">
+          x402
+        </p>
+        <h2 className="mt-3 text-2xl font-semibold tracking-tight">
+          Pay HTTP resources without handing the model a key.
+        </h2>
+        <p className="mt-3 text-muted-foreground">
+          x402 is an HTTP 402 payment standard. X-ONE is the buyer: quote in,
+          policy check, settle USDC, return the resource body.{" "}
+          <a
+            href={links.x402}
+            target="_blank"
+            rel="noreferrer"
+            className="font-medium underline-offset-4 hover:underline"
+          >
+            x402.org
+          </a>
+        </p>
+      </Reveal>
+      <ol className="mt-8 space-y-6">
+        {x402Steps.map((step, i) => (
+          <Reveal key={step.title} delay={i * 50} variant="left">
+            <li className="border-t border-border pt-5">
+              <p className="font-mono text-xs text-muted-foreground">
+                0{i + 1}
+              </p>
+              <h3 className="mt-1 text-lg font-medium">{step.title}</h3>
+              <p className="mt-1 text-sm text-muted-foreground">{step.body}</p>
+            </li>
+          </Reveal>
+        ))}
+      </ol>
+
+      <ol className="mt-16 space-y-8">
         {steps.map((step, i) => (
           <Reveal key={step.title} delay={i * 70} variant="left">
             <li className="border-t border-border pt-6">
@@ -133,6 +206,58 @@ export function DevelopersPage() {
           </Reveal>
         ))}
       </ol>
+
+      <Reveal className="mt-16 space-y-4">
+        <h2 className="text-lg font-medium">MCP</h2>
+        <p className="text-sm text-muted-foreground">
+          Same spend surface as the SDK, for MCP hosts. The host must supply a{" "}
+          <code className="font-mono text-xs">xone_…</code> key — the server
+          will not invent one. Pause and limits remain in Console.
+        </p>
+        <pre className="overflow-x-auto rounded-lg border border-border bg-card p-4 font-mono text-sm">
+          <code>npx -y @xone/mcp</code>
+        </pre>
+        <div className="overflow-x-auto rounded-lg border border-border">
+          <table className="w-full min-w-[480px] text-left text-sm">
+            <thead>
+              <tr className="border-b border-border bg-muted/50">
+                <th className="px-3 py-2 font-medium">Tool</th>
+                <th className="px-3 py-2 font-medium">Use</th>
+              </tr>
+            </thead>
+            <tbody>
+              {mcpTools.map((row) => (
+                <tr key={row.name} className="border-b border-border last:border-0">
+                  <td className="px-3 py-2 font-mono text-xs">{row.name}</td>
+                  <td className="px-3 py-2 text-muted-foreground">{row.note}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <a
+          href={links.docsMcp}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1 text-sm font-medium underline-offset-4 hover:underline"
+        >
+          Full MCP reference
+          <ArrowRight className="h-3.5 w-3.5" strokeWidth={1.75} />
+        </a>
+      </Reveal>
+
+      <Reveal className="mt-14">
+        <h2 className="text-lg font-medium">Console policy</h2>
+        <p className="mt-2 text-sm text-muted-foreground">
+          One API key binds to one agent wallet.{" "}
+          <code className="font-mono text-xs">getSpendSnapshot()</code> returns
+          address plus remaining daily / caps / status — fund USDC on-chain
+          separately.
+        </p>
+        <div className="mt-5 max-w-md">
+          <ConsolePolicyMock />
+        </div>
+      </Reveal>
 
       <Reveal className="mt-14 space-y-4">
         <h2 className="text-lg font-medium">Spender API (API key)</h2>
@@ -224,6 +349,11 @@ const result = await agent.pay({
 
 console.log(result.paid, result.body);`}</code>
         </pre>
+        <p className="text-sm text-muted-foreground">
+          LangChain: <code className="font-mono text-xs">agent.getTools()</code>{" "}
+          exposes the same spend tools as MCP. Transfer is not on the runtime
+          surface — x402 is the only pay path.
+        </p>
       </Reveal>
     </div>
   );

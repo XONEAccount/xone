@@ -20,3 +20,6 @@ apps/api/dist
 .cursor
 *.tsbuildinfo
 
+# Raw tour capture; compressed copy lives in public/guide/
+apps/marketing/Area.mp4
+

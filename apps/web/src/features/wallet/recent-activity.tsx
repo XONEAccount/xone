@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { ArrowDownLeft, ArrowUpRight } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { GettingStartedTourTrigger } from "@/features/wallet/getting-started-tour";
 import { useI18n } from "@/hooks/use-i18n";
 import { useSpendingActivity } from "@/hooks/use-spending-activity";
 import { cn } from "@/lib/utils";
@@ -61,6 +62,7 @@ export function RecentActivity() {
               >
                 {t("activity.ctaChat")}
               </Link>
+              <GettingStartedTourTrigger variant="outline" />
             </div>
           </div>
         ) : (

@@ -7,6 +7,12 @@ import { DocumentMeta } from "@/components/document-meta";
 import { FaqList } from "@/components/faq-list";
 import { HeroBackdrop } from "@/components/hero-backdrop";
 import { Marquee } from "@/components/marquee";
+import { NetworkStrip } from "@/components/network-strip";
+import {
+  AssistantMock,
+  ConsolePolicyMock,
+  WalletHeroMock,
+} from "@/components/product-mocks";
 import { Reveal } from "@/components/reveal";
 import { MarketingButton as Button } from "@/components/ui/marketing-button";
 import { WaitlistForm } from "@/components/waitlist-form";
@@ -31,11 +37,48 @@ const advantages = [
   },
 ] as const;
 
+const scenarios = [
+  {
+    audience: "Everyone",
+    title: "Pay an agent from chat",
+    body: "Ask the assistant to book a hotel under 50 USDC. You get a payment card — amount, payee, policy — and confirm when the rule requires it.",
+  },
+  {
+    audience: "Builders",
+    title: "Let your product spend under limits",
+    body: "Create an agent wallet, set a daily cap, and call pay() on an x402 URL. The runtime never sees a private key.",
+  },
+  {
+    audience: "Operators",
+    title: "Pause, limit, and audit",
+    body: "Console JWT owns keys, allowlists, pause, and the ledger. The spend token can pay — it cannot change policy.",
+  },
+] as const;
+
+const walletCapabilities = [
+  {
+    title: "Balances",
+    body: "See USDC and network token on the chain you are using — without a wall of contract addresses.",
+  },
+  {
+    title: "Send & receive",
+    body: "Address, QR, and a clear network warning. Preview before every user-initiated send.",
+  },
+  {
+    title: "AI assistant",
+    body: "Task-oriented: balances, send, pay an order. Financial actions show as cards, not buried in chat.",
+  },
+  {
+    title: "History",
+    body: "Every payment lands in a ledger you can read — intent, result, and on-chain proof when it exists.",
+  },
+] as const;
+
 const channels = [
   {
     title: "Web",
     audience: "Everyone",
-    body: "Full wallet in the browser — balances, send, receive, and A2A pay.",
+    body: "Full wallet in the browser — balances, send, receive, assistant, and A2A pay.",
     href: links.wallet,
     cta: "Open web wallet",
   },
@@ -57,10 +100,24 @@ const channels = [
   {
     title: "SDK",
     audience: "Builders",
-    body: "TypeScript SDK for agent wallets and x402 — ship payments in your product.",
+    body: "TypeScript client and LangChain tools for agent wallets and x402.",
     href: "/developers",
     cta: "SDK guide",
     internal: true,
+  },
+  {
+    title: "MCP",
+    audience: "Builders",
+    body: "Spend tools for Cursor, Claude Desktop, and other MCP hosts — policy still lives in Console.",
+    href: links.docsMcp,
+    cta: "MCP docs",
+  },
+  {
+    title: "Console",
+    audience: "Operators",
+    body: "API keys, limits, allowlists, pause, and ledger. Operator JWT only.",
+    href: links.console,
+    cta: "Open Console",
   },
 ] as const;
 
@@ -88,13 +145,23 @@ const compareRows = [
     xone: "Policy + authorization",
   },
   {
+    label: "x402 HTTP pay",
+    typical: "Custom checkout glue",
+    xone: "Native settle from SDK / MCP",
+  },
+  {
     label: "How you access it",
     typical: "App or extension only",
-    xone: "Web, App, API, SDK",
+    xone: "Web, App, API, SDK, MCP",
   },
 ] as const;
 
 const faqs = [
+  {
+    question: "How do I get started?",
+    answer:
+      "Open the web wallet, top up testnet USDC from a faucet, confirm the signature, then try Chat. Getting started has a one-minute silent walkthrough of that path.",
+  },
   {
     question: "What is A2A?",
     answer:
@@ -106,14 +173,29 @@ const faqs = [
       "Agents never get unrestricted keys. Spend goes through policy (limits, allowlists) and explicit authorization when required. Models propose; policy decides.",
   },
   {
-    question: "Who is Web / App vs API / SDK for?",
+    question: "Does the wallet include an AI assistant?",
     answer:
-      "Web and App are for people using the wallet day to day. API and SDK are for builders embedding payments into products and backends.",
+      "Yes. It is task-oriented — balances, send, pay an order — not a generic chatbot. Financial actions appear as structured cards. The model cannot bypass policy.",
+  },
+  {
+    question: "What is x402?",
+    answer:
+      "An HTTP 402 payment standard. A resource returns a quote; X-ONE settles USDC under your agent’s policy and retries with the same idempotency key.",
+  },
+  {
+    question: "What is MCP?",
+    answer:
+      "@xone/mcp exposes the spend surface to MCP hosts such as Cursor and Claude Desktop: create agent, snapshot, pay, history. Pause and limits stay in Console.",
+  },
+  {
+    question: "Who is Web / App vs API / SDK / MCP for?",
+    answer:
+      "Web and App are for people using the wallet day to day. API, SDK, and MCP are for builders embedding payments into products and agent runtimes.",
   },
   {
     question: "Which chains and assets?",
     answer:
-      "X-ONE is built multi-chain with USDC-style settlement in mind. Supported networks expand over time — check Docs for the current list.",
+      "Beta settles USDC on Base Sepolia. Mainnet networks will be listed in Docs as they go live. Do not send mainnet assets to a testnet address.",
   },
   {
     question: "Do I pay gas?",
@@ -143,7 +225,7 @@ export function HomePage() {
     <>
       <DocumentMeta
         title="X-ONE — Web3 wallet for A2A payments"
-        description="Secure, fast Web3 wallet with agent-to-agent payments. Web and App for everyone. API and SDK for builders. Free during beta."
+        description="Secure, fast Web3 wallet with agent-to-agent payments. Web and App for everyone. API, SDK, and MCP for builders. Free during beta."
       />
 
       <section
@@ -153,36 +235,50 @@ export function HomePage() {
         <HeroBackdrop />
         <motion.div
           style={{ y: heroY, opacity: heroOpacity }}
-          className="relative mx-auto flex min-h-[calc(100vh-3.5rem)] max-w-6xl flex-col justify-center px-4 py-16 sm:px-6 sm:py-20"
+          className="relative mx-auto grid max-w-6xl items-center gap-12 px-4 py-16 sm:px-6 sm:py-20 lg:min-h-[calc(100vh-3.5rem)] lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] lg:gap-16"
         >
-          <BrandMark />
-          <div className="mt-4 h-px w-24 bg-[var(--color-foreground)] draw-line" />
-          <h1 className="rise rise-delay-1 mt-6 max-w-3xl text-3xl leading-tight tracking-tight sm:text-4xl md:text-5xl font-semibold">
-            The Web3 wallet built for A2A payments.
-          </h1>
-          <p className="rise rise-delay-2 mt-5 max-w-xl text-base text-muted-foreground sm:text-lg">
-            Secure. Fast. Effortless. Hold assets, pay people and agents, and
-            move money across the agent economy — on web, app, API, and SDK.
-          </p>
-          <div className="rise rise-delay-3 mt-8 flex flex-wrap gap-3">
-            <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.98 }}>
-              <Button asChild size="lg" className="cta-glow">
-                <a href={links.wallet} target="_blank" rel="noreferrer">
-                  Open wallet
-                  <ArrowRight className="h-4 w-4" strokeWidth={1.75} />
-                </a>
-              </Button>
-            </motion.div>
-            <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.98 }}>
-              <Button asChild size="lg" variant="outline">
-                <Link to="/developers">For developers</Link>
-              </Button>
-            </motion.div>
+          <div>
+            <BrandMark className="text-4xl sm:text-6xl md:text-7xl" />
+            <div className="mt-4 h-px w-24 bg-[var(--color-foreground)] draw-line" />
+            <h1 className="rise rise-delay-1 mt-6 max-w-xl text-3xl leading-tight tracking-tight sm:text-4xl md:text-5xl font-semibold">
+              The Web3 wallet built for A2A payments.
+            </h1>
+            <p className="rise rise-delay-2 mt-5 max-w-xl text-base text-muted-foreground sm:text-lg">
+              Hold assets, pay people and agents, and keep AI spend under
+              policy — on web, app, API, SDK, and MCP.
+            </p>
+            <div className="rise rise-delay-3 mt-8 flex flex-wrap gap-3">
+              <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.98 }}>
+                <Button asChild size="lg" className="cta-glow">
+                  <a href={links.wallet} target="_blank" rel="noreferrer">
+                    Open wallet
+                    <ArrowRight className="h-4 w-4" strokeWidth={1.75} />
+                  </a>
+                </Button>
+              </motion.div>
+              <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.98 }}>
+                <Button asChild size="lg" variant="outline">
+                  <Link to="/developers">For developers</Link>
+                </Button>
+              </motion.div>
+            </div>
+            <p className="rise rise-delay-3 mt-4">
+              <Link
+                to="/guide"
+                className="text-sm font-medium text-muted-foreground underline-offset-4 hover:text-[var(--color-foreground)] hover:underline"
+              >
+                Watch a 1-min tour
+              </Link>
+            </p>
+          </div>
+          <div className="rise rise-delay-2 min-w-0">
+            <WalletHeroMock />
           </div>
         </motion.div>
       </section>
 
       <Marquee />
+      <NetworkStrip />
 
       <section className="border-b border-border py-12 sm:py-14">
         <div className="mx-auto grid max-w-6xl gap-4 px-4 sm:grid-cols-2 sm:px-6">
@@ -195,8 +291,8 @@ export function HomePage() {
             <p className="font-mono text-xs text-muted-foreground">For everyone</p>
             <p className="mt-2 text-xl font-medium">Use the wallet</p>
             <p className="mt-2 text-sm text-muted-foreground">
-              Send, receive, and A2A pay in a calm fintech UI — start on web
-              today.
+              Send, receive, assistant, and A2A pay in a calm fintech UI —
+              start on web today.
             </p>
             <p className="mt-4 inline-flex items-center gap-1 text-sm font-medium">
               Open wallet
@@ -211,10 +307,10 @@ export function HomePage() {
             className="group rounded-lg border border-border bg-card p-6 transition-colors hover:bg-muted/60"
           >
             <p className="font-mono text-xs text-muted-foreground">For builders</p>
-            <p className="mt-2 text-xl font-medium">Integrate API & SDK</p>
+            <p className="mt-2 text-xl font-medium">Integrate API, SDK & MCP</p>
             <p className="mt-2 text-sm text-muted-foreground">
-              Embed scoped agent spend into your product with the same secure
-              core.
+              Embed scoped agent spend into your product or runtime with the
+              same secure core.
             </p>
             <p className="mt-4 inline-flex items-center gap-1 text-sm font-medium">
               Developer guide
@@ -224,6 +320,64 @@ export function HomePage() {
               />
             </p>
           </Link>
+        </div>
+      </section>
+
+      <section id="use-cases" className="scroll-mt-16 border-b border-border py-20 sm:py-24">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
+          <Reveal>
+            <p className="text-sm font-medium uppercase tracking-[0.14em] text-muted-foreground">
+              Use cases
+            </p>
+            <h2 className="mt-3 max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">
+              Built for people, products, and operators.
+            </h2>
+          </Reveal>
+          <ul className="mt-10 grid items-stretch gap-6 lg:grid-cols-3">
+            {scenarios.map((item) => (
+              <li
+                key={item.title}
+                className="flex h-full flex-col rounded-lg border border-border bg-card p-5"
+              >
+                <p className="font-mono text-xs text-muted-foreground">
+                  {item.audience}
+                </p>
+                <p className="mt-2 text-lg font-medium">{item.title}</p>
+                <p className="mt-2 flex-1 text-sm text-muted-foreground">
+                  {item.body}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
+      <section id="wallet" className="scroll-mt-16 border-b border-border py-20 sm:py-24">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
+          <Reveal>
+            <p className="text-sm font-medium uppercase tracking-[0.14em] text-muted-foreground">
+              Wallet
+            </p>
+            <h2 className="mt-3 max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">
+              Everyday money, plus an assistant that cannot skip policy.
+            </h2>
+          </Reveal>
+          <div className="mt-10 grid items-start gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,20rem)]">
+            <ul className="grid items-stretch gap-6 sm:grid-cols-2">
+              {walletCapabilities.map((item) => (
+                <li
+                  key={item.title}
+                  className="flex h-full flex-col border-t border-border pt-4"
+                >
+                  <p className="font-medium">{item.title}</p>
+                  <p className="mt-2 text-sm text-muted-foreground">{item.body}</p>
+                </li>
+              ))}
+            </ul>
+            <Reveal delay={80} variant="scale">
+              <AssistantMock />
+            </Reveal>
+          </div>
         </div>
       </section>
 
@@ -311,8 +465,9 @@ export function HomePage() {
             {a2aSteps.map((step, i) => (
               <li
                 key={step.title}
-                className="flex h-full flex-col rounded-lg border border-border bg-card p-5"
+                className="a2a-step flex h-full flex-col overflow-hidden rounded-lg border border-border bg-card p-5"
               >
+                <span className="a2a-pulse" aria-hidden />
                 <p className="font-mono text-xs text-muted-foreground">
                   0{i + 1}
                 </p>
@@ -326,7 +481,7 @@ export function HomePage() {
         </div>
       </section>
 
-      <section id="security" className="border-b border-border py-20 sm:py-24">
+      <section id="security" className="scroll-mt-16 border-b border-border py-20 sm:py-24">
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
           <Reveal>
             <p className="text-sm font-medium uppercase tracking-[0.14em] text-muted-foreground">
@@ -360,6 +515,13 @@ export function HomePage() {
               </li>
             ))}
           </ul>
+          <Link
+            to="/security"
+            className="mt-8 inline-flex items-center gap-1 text-sm font-medium underline-offset-4 hover:underline"
+          >
+            How the safety model works
+            <ArrowRight className="h-3.5 w-3.5" strokeWidth={1.75} />
+          </Link>
         </div>
       </section>
 
@@ -370,10 +532,10 @@ export function HomePage() {
               Access
             </p>
             <h2 className="mt-3 max-w-2xl text-3xl tracking-tight sm:text-4xl font-semibold">
-              Web and App for people. API and SDK for builders.
+              Web and App for people. API, SDK, and MCP for builders.
             </h2>
           </Reveal>
-          <ul className="mt-10 grid items-stretch gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          <ul className="mt-10 grid items-stretch gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {channels.map((ch) => (
               <li
                 key={ch.title}
@@ -419,7 +581,7 @@ export function HomePage() {
         </div>
       </section>
 
-      <section id="waitlist" className="border-b border-border py-20 sm:py-24">
+      <section id="waitlist" className="scroll-mt-16 border-b border-border py-20 sm:py-24">
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
           <Reveal>
             <p className="text-sm font-medium uppercase tracking-[0.14em] text-muted-foreground">
@@ -437,7 +599,7 @@ export function HomePage() {
         </div>
       </section>
 
-      <section id="pricing" className="border-b border-border py-20 sm:py-24">
+      <section id="pricing" className="scroll-mt-16 border-b border-border py-20 sm:py-24">
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
           <Reveal>
             <p className="text-sm font-medium uppercase tracking-[0.14em] text-muted-foreground">
@@ -447,8 +609,8 @@ export function HomePage() {
               Free during beta.
             </h2>
             <p className="mt-4 max-w-xl text-muted-foreground">
-              Open the wallet and start building with API / SDK at no charge
-              while we are in beta. We will publish plans before general
+              Open the wallet and start building with API, SDK, and MCP at no
+              charge while we are in beta. We will publish plans before general
               availability.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
@@ -466,27 +628,30 @@ export function HomePage() {
       </section>
 
       <section className="border-b border-border py-20 sm:py-24">
-        <div className="mx-auto grid max-w-6xl gap-12 px-4 sm:px-6 lg:grid-cols-2">
+        <div className="mx-auto grid max-w-6xl items-start gap-12 px-4 sm:px-6 lg:grid-cols-2">
           <Reveal variant="left">
             <p className="text-sm font-medium uppercase tracking-[0.14em] text-muted-foreground">
               For developers
             </p>
             <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
-              Embed payments with API and SDK.
+              Same spend surface: HTTP, SDK, MCP.
             </h2>
             <p className="mt-4 text-muted-foreground">
-              Call{" "}
-              <code className="font-mono text-sm">/v1/sdk</code> for create and
-              pay, or{" "}
-              <code className="font-mono text-sm">/v1/agents</code> for pause and
-              limits. Or use{" "}
-              <code className="font-mono text-sm">@xonepay/sdk</code> as a typed
-              client.
+              Create an agent, pay an x402 resource, read history. Console owns
+              pause and limits.{" "}
+              <code className="font-mono text-sm">getSpendSnapshot()</code> is
+              policy headroom — not a live chain balance.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <Button asChild variant="outline">
                 <a href={links.docsApi} target="_blank" rel="noreferrer">
-                  HTTP API docs
+                  HTTP API
+                  <ArrowRight className="h-4 w-4" strokeWidth={1.75} />
+                </a>
+              </Button>
+              <Button asChild variant="outline">
+                <a href={links.docsMcp} target="_blank" rel="noreferrer">
+                  MCP
                   <ArrowRight className="h-4 w-4" strokeWidth={1.75} />
                 </a>
               </Button>
@@ -497,21 +662,41 @@ export function HomePage() {
                 </Link>
               </Button>
             </div>
+            <div className="mt-8">
+              <ConsolePolicyMock />
+            </div>
           </Reveal>
           <Reveal delay={80} variant="scale">
             <pre className="overflow-x-auto rounded-lg border border-border bg-card p-5 font-mono text-xs leading-relaxed sm:text-sm">
               <code>{`import { XOne } from "@xonepay/sdk";
 
 const xone = new XOne({ agentToken });
-await xone.pay({
+const agent = await xone.agent.create({
+  apiKey: agentToken,
+  name: "travel-bot",
+  dailyLimit: 10,
+  perTransaction: 1,
+});
+await agent.pay({
   url: "https://api.example.com/resource",
 });`}</code>
+            </pre>
+            <pre className="mt-4 overflow-x-auto rounded-lg border border-border bg-card p-5 font-mono text-xs leading-relaxed sm:text-sm">
+              <code>{`npx -y @xone/mcp
+
+# Cursor / Claude Desktop
+"mcpServers": {
+  "xone": {
+    "command": "npx",
+    "args": ["-y", "@xone/mcp"]
+  }
+}`}</code>
             </pre>
           </Reveal>
         </div>
       </section>
 
-      <section id="faq" className="border-b border-border py-20 sm:py-24">
+      <section id="faq" className="scroll-mt-16 border-b border-border py-20 sm:py-24">
         <div className="mx-auto max-w-3xl px-4 sm:px-6">
           <Reveal>
             <p className="text-sm font-medium uppercase tracking-[0.14em] text-muted-foreground">
@@ -520,6 +705,15 @@ await xone.pay({
             <h2 className="mt-3 text-3xl tracking-tight sm:text-4xl font-semibold">
               Questions, answered.
             </h2>
+            <p className="mt-4 text-sm text-muted-foreground">
+              Prefer to watch?{" "}
+              <Link
+                to="/guide"
+                className="font-medium text-foreground underline-offset-4 hover:underline"
+              >
+                Getting started — 1 min
+              </Link>
+            </p>
             <div className="mt-10">
               <FaqList items={[...faqs]} />
             </div>
@@ -536,7 +730,8 @@ await xone.pay({
                 Open the wallet
               </h2>
               <p className="mt-3 text-sm text-muted-foreground">
-                Balances, send, receive, and A2A pay — start on web now.
+                Balances, send, receive, assistant, and A2A pay — start on web
+                now.
               </p>
               <Button asChild className="mt-6" size="lg">
                 <a href={links.wallet} target="_blank" rel="noreferrer">
@@ -549,7 +744,7 @@ await xone.pay({
             <div className="rounded-lg border border-border bg-card p-8">
               <p className="font-mono text-xs text-muted-foreground">Builders</p>
               <h2 className="mt-2 text-3xl tracking-tight font-semibold">
-                Build with API / SDK
+                Build with API / SDK / MCP
               </h2>
               <p className="mt-3 text-sm text-muted-foreground">
                 Console, docs, and playground for scoped agent spend.

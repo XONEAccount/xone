@@ -1,4 +1,4 @@
-import { Languages, LogOut, Settings, User } from "lucide-react";
+import { CirclePlay, Languages, LogOut, Settings, User } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { PageHeader } from "@/components/layout/page-header";
@@ -12,13 +12,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { GettingStartedTourDialog } from "@/features/wallet/getting-started-tour";
 import { useI18n } from "@/hooks/use-i18n";
 import { useWalletAccount } from "@/hooks/use-wallet-account";
 import { queryClient } from "@/lib/query-client";
 import { useA2AStore } from "@/stores/a2a";
 
 /**
- * Settings: account info, language toggle, sign out.
+ * Settings: getting-started tour, account info, language, sign out.
  */
 export function SettingsPage() {
   const navigate = useNavigate();
@@ -28,6 +29,7 @@ export function SettingsPage() {
 
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [tourOpen, setTourOpen] = useState(false);
 
   const displayLoginMethod =
     loginMethod === "Privy embedded wallet"
@@ -53,6 +55,23 @@ export function SettingsPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-6 animate-in md:mx-0">
       <PageHeader icon={Settings} title={t("settings.title")} tone="slate" />
+
+      <Card className="fade-up">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CirclePlay className="h-4 w-4" aria-hidden />
+            {t("settings.tour")}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-muted-foreground">{t("settings.tourBody")}</p>
+          <Button type="button" variant="outline" onClick={() => setTourOpen(true)}>
+            {t("activity.ctaTour")}
+          </Button>
+        </CardContent>
+      </Card>
+
+      <GettingStartedTourDialog open={tourOpen} onOpenChange={setTourOpen} />
 
       <Card className="fade-up">
         <CardHeader>

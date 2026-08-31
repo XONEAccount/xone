@@ -70,6 +70,15 @@ const en = {
   "activity.empty": "No activity yet. Top up or try Chat to get started.",
   "activity.ctaPay": "Top up",
   "activity.ctaChat": "Open Chat",
+  "activity.ctaTour": "Watch a 1-min tour",
+
+  "tour.title": "Getting started",
+  "tour.body":
+    "Silent walkthrough: top up testnet USDC, confirm the signature, then try Chat.",
+  "tour.note": "About one minute. Beta on Base Sepolia — do not send mainnet funds.",
+
+  "settings.tour": "Getting started",
+  "settings.tourBody": "One-minute tour of top up, signing, and Chat.",
 
   "spending.title": "Spending",
   "spending.subtitle":
@@ -350,6 +359,14 @@ const zh: Record<MessageKey, string> = {
   "activity.empty": "还没有动态。可以先充值，或去对话试一次。",
   "activity.ctaPay": "去充值",
   "activity.ctaChat": "打开对话",
+  "activity.ctaTour": "看 1 分钟导览",
+
+  "tour.title": "上手指南",
+  "tour.body": "无声演示：测试网充值 USDC、确认签名，然后试试对话。",
+  "tour.note": "约一分钟。当前是 Base Sepolia 测试网，不要转入主网资产。",
+
+  "settings.tour": "上手指南",
+  "settings.tourBody": "一分钟看完充值、签名和对话。",
 
   "spending.title": "消费记录",
   "spending.subtitle": "主钱包与 Agent 钱包的支付 / 收入，按时间与服务汇总",

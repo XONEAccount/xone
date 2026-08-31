@@ -84,20 +84,6 @@ export function AgentsPage() {
 
   const pager = useClientPagination(filtered);
 
-  const summary = useMemo(() => {
-    let active = 0;
-    let paused = 0;
-    let remaining = 0;
-    for (const a of agents) {
-      const status = a.getStatus();
-      if (status === "active") active += 1;
-      if (status === "paused") paused += 1;
-      if (status === "deleted") continue;
-      remaining += spendById[a.id]?.remainingDaily ?? 0;
-    }
-    return { active, paused, remaining, total: agents.length };
-  }, [agents, spendById]);
-
   useEffect(() => {
     pager.setPage(1);
   }, [query, statusFilter]);
@@ -227,19 +213,6 @@ export function AgentsPage() {
         </div>
       ) : null}
 
-      {agents.length > 0 ? (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <SummaryCard label="Wallets" value={String(summary.total)} />
-          <SummaryCard label="Active" value={String(summary.active)} />
-          <SummaryCard label="Paused" value={String(summary.paused)} />
-          <SummaryCard
-            label="Remaining today"
-            value={spendLoading ? "…" : formatMoney(summary.remaining)}
-            mono
-          />
-        </div>
-      ) : null}
-
       {agents.length === 0 ? (
         <Card>
           <CardContent className="p-6">
@@ -332,30 +305,6 @@ function formatMoney(value: number): string {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   });
-}
-
-/**
- * Top summary metric card.
- */
-function SummaryCard({
-  label,
-  value,
-  mono,
-}: {
-  label: string;
-  value: string;
-  mono?: boolean;
-}) {
-  return (
-    <Card>
-      <CardContent className="p-4">
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <p className={cn("mt-1 text-lg font-semibold tracking-tight", mono && "font-mono")}>
-          {value}
-        </p>
-      </CardContent>
-    </Card>
-  );
 }
 
 /**
