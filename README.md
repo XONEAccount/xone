@@ -32,11 +32,6 @@
 <p align="center">
   <img src="docs/readme/hero.gif" alt="XOne product motion" width="920" />
 </p>
-
-<p align="center">
-  <img src="docs/readme/product-poster.jpg" alt="X-ONE Wallet product preview" width="920" />
-</p>
-
 ---
 
 **XOne** is a Web3 AI wallet and agent payment platform.
