@@ -1,4 +1,44 @@
-# XOne
+<p align="center">
+  <img src="docs/readme/logo.png" alt="XOne" width="160" />
+</p>
+
+<h1 align="center">XOne</h1>
+
+<p align="center">
+  <strong>Web3 AI wallet</strong> &nbsp;·&nbsp; <strong>Policy-gated agent payments</strong> &nbsp;·&nbsp; <strong>x402</strong>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=white" alt="React" />
+  <img src="https://img.shields.io/badge/TypeScript-5.9-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/Vite-7-646CFF?style=flat-square&logo=vite&logoColor=white" alt="Vite" />
+  <img src="https://img.shields.io/badge/Hono-4-E36002?style=flat-square&logo=hono&logoColor=white" alt="Hono" />
+  <img src="https://img.shields.io/badge/Cloudflare-Workers%20%2B%20Pages-F38020?style=flat-square&logo=cloudflare&logoColor=white" alt="Cloudflare" />
+  <img src="https://img.shields.io/badge/Supabase-Postgres-3FCF8E?style=flat-square&logo=supabase&logoColor=white" alt="Supabase" />
+  <img src="https://img.shields.io/badge/Privy-Auth%20%2B%20Wallet-000000?style=flat-square" alt="Privy" />
+  <img src="https://img.shields.io/badge/x402-Payments-0D9488?style=flat-square" alt="x402" />
+</p>
+
+<p align="center">
+  <a href="https://xonepay.ai/">Website</a> ·
+  <a href="https://github.com/XONEAccount/web">Repository</a> *(private)*
+</p>
+
+<p align="center">
+  <img src="docs/readme/banner.png" alt="XOne product banner" width="920" />
+</p>
+
+<p align="center">
+  <video src="docs/readme/hero.mp4" width="920" controls muted loop playsinline poster="docs/readme/product-poster.jpg">
+    Your browser does not support the video tag.
+  </video>
+</p>
+
+<p align="center">
+  <img src="docs/readme/product-poster.jpg" alt="X-ONE Wallet product preview" width="920" />
+</p>
+
+---
 
 **XOne** is a Web3 AI wallet and agent payment platform.
 
@@ -18,9 +58,7 @@ It provides two complementary product surfaces in one monorepo:
 | Marketing & ops | `apps/marketing`, `apps/admin`, `apps/admin-api` | Public site and internal operations |
 | Reference seller | `apps/XPayLabs-x402-seller` | Sample x402 merchant for integration tests |
 
-**Technology stack:** React, Vite, TypeScript, Tailwind CSS, shadcn/ui, Hono, Cloudflare Pages & Workers, Supabase, Privy, viem, x402.
-
-**Repository:** [github.com/XONEAccount/web](https://github.com/XONEAccount/web) *(private)*
+**Stack:** React · Vite · TypeScript · Tailwind · shadcn/ui · Hono · Cloudflare Pages & Workers · Supabase · Privy · viem · x402
 
 ---
 
@@ -71,6 +109,7 @@ packages/types           Shared domain types
 packages/schemas         Zod schemas
 packages/config          Chains, assets, defaults
 
+docs/readme              README media (logo, banner, hero video)
 supabase/                SQL migrations
 ```
 
