@@ -20,18 +20,17 @@
 </p>
 
 <p align="center">
-  <a href="https://xonepay.ai/">Website</a> ·
-  <a href="https://github.com/XONEAccount/web">Repository</a> *(private)*
+  <a href="https://xonepay.ai/">Website</a>
+  <a href="https://docs.xonepay.ai/">docs</a>
 </p>
 
 <p align="center">
   <img src="docs/readme/banner.png" alt="XOne product banner" width="920" />
 </p>
 
+<!-- GitHub README strips <video>; use GIF for inline playback. Full MP4: docs/readme/hero.mp4 -->
 <p align="center">
-  <video src="docs/readme/hero.mp4" width="920" controls muted loop playsinline poster="docs/readme/product-poster.jpg">
-    Your browser does not support the video tag.
-  </video>
+  <img src="docs/readme/hero.gif" alt="XOne product motion" width="920" />
 </p>
 
 <p align="center">
@@ -51,12 +50,12 @@ It provides two complementary product surfaces in one monorepo:
 
 ## Overview
 
-| Surface | Primary apps | Purpose |
-| --- | --- | --- |
-| Consumer wallet | `apps/web`, `apps/web-api` | End-user wallet, assistant, developer agent wallets |
-| Agent payments | `apps/console`, `apps/console-api`, `apps/sdk`, `apps/mcp`, `apps/docs` | Keys, limits, ledger, and policy-gated `pay` |
-| Marketing & ops | `apps/marketing`, `apps/admin`, `apps/admin-api` | Public site and internal operations |
-| Reference seller | `apps/XPayLabs-x402-seller` | Sample x402 merchant for integration tests |
+| Surface          | Primary apps                                                            | Purpose                                             |
+| ---------------- | ----------------------------------------------------------------------- | --------------------------------------------------- |
+| Consumer wallet  | `apps/web`, `apps/web-api`                                              | End-user wallet, assistant, developer agent wallets |
+| Agent payments   | `apps/console`, `apps/console-api`, `apps/sdk`, `apps/mcp`, `apps/docs` | Keys, limits, ledger, and policy-gated `pay`        |
+| Marketing & ops  | `apps/marketing`, `apps/admin`, `apps/admin-api`                        | Public site and internal operations                 |
+| Reference seller | `apps/XPayLabs-x402-seller`                                             | Sample x402 merchant for integration tests          |
 
 **Stack:** React · Vite · TypeScript · Tailwind · shadcn/ui · Hono · Cloudflare Pages & Workers · Supabase · Privy · viem · x402
 
@@ -141,9 +140,9 @@ Configure per-app environment files as needed (for example `apps/web/.env`, `app
 pnpm dev
 ```
 
-| Service | URL |
-| --- | --- |
-| Web | http://localhost:5173 |
+| Service    | URL                          |
+| ---------- | ---------------------------- |
+| Web        | http://localhost:5173        |
 | API health | http://localhost:4396/health |
 
 ### Console and agent API
@@ -163,12 +162,12 @@ pnpm dev:site    # marketing site
 
 ## Product surfaces and authentication
 
-| Surface | Authentication | Capabilities |
-| --- | --- | --- |
-| Wallet (`web` + `web-api`) | Privy (embedded / external wallets); profile linked via address | Balances, send/receive, A2A, AI assistant, developer agent wallets |
-| Console (`console` + `console-api`) | Operator JWT (Supabase user) | API keys, limits, allowlists, pause/resume, soft-delete, ledger |
-| Spend (`/v1/sdk/*`, `@xonepay/sdk`, `@xone/mcp`) | Agent API key (`xone_…`) | Create/get agent, `pay`, history, spend-policy snapshot |
-| Docs playground | — | Same HTTP contract for integration testing |
+| Surface                                          | Authentication                                                  | Capabilities                                                       |
+| ------------------------------------------------ | --------------------------------------------------------------- | ------------------------------------------------------------------ |
+| Wallet (`web` + `web-api`)                       | Privy (embedded / external wallets); profile linked via address | Balances, send/receive, A2A, AI assistant, developer agent wallets |
+| Console (`console` + `console-api`)              | Operator JWT (Supabase user)                                    | API keys, limits, allowlists, pause/resume, soft-delete, ledger    |
+| Spend (`/v1/sdk/*`, `@xonepay/sdk`, `@xone/mcp`) | Agent API key (`xone_…`)                                        | Create/get agent, `pay`, history, spend-policy snapshot            |
+| Docs playground                                  | —                                                               | Same HTTP contract for integration testing                         |
 
 **Spend vs operator:** soft-delete, pause, resume, and limit updates require a console JWT. They are not available on the spend token. Calling operator routes with a spend key returns `403` (`operator_required`).
 
